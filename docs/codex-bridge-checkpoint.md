@@ -125,3 +125,5 @@ turn 01a16577-8211-7822-8570-b75e90d70d6c.
 State approval_required; failure_class owner_approval_required;
 one actual turn/start; zero approval responses; no protocol diagnostics.
 Remote transport remains disabled. Full durable-core acceptance remains pending.
+
+Exact repair commit e75ac359e4878cfc0c98f68d241bd1a412a04638 was reproduced by Git bundle in an isolated Homelab checkout: 281 Linux tests passed in 1.85 seconds; compileall and git diff --check passed. Owned Linux artifacts were removed. Windows focused total: 46 passed. No full durable-core completion is claimed.
