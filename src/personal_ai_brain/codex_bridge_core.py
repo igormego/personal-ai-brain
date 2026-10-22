@@ -49,11 +49,8 @@ def locked(path):
         stream.seek(0)
         if os.name == "nt":
             import msvcrt
-            if not stream.read(1):
-                stream.write(b"0")
-                stream.flush()
             stream.seek(0)
-            msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+            msvcrt.locking(stream.fileno(), msvcrt.LK_LOCK, 1)
         else:
             import fcntl
             fcntl.flock(stream, fcntl.LOCK_EX)
@@ -207,4 +204,6 @@ def approval(ledger, task_id, event):
                           failure_class="owner_approval_required")
         return True  # Caller must disconnect/interrupt, never respond with acceptance.
     return False
+
+
 

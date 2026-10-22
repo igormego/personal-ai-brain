@@ -24,51 +24,97 @@ class AppServer:
                                         stderr=subprocess.DEVNULL, text=True, encoding="utf-8")
         self.messages = queue.Queue(maxsize=256)
         self.serial = 0
+        self.pending = {}
+        self.pending_lock = threading.Lock()
+        self.send_lock = threading.Lock()
+        self.server_request_handler = None
+        self.disconnected = False
         threading.Thread(target=self._read, daemon=True).start()
         self.rpc("initialize", {"clientInfo": {"name": "pab_bridge_core", "version": "0.1"},
                                "capabilities": {"experimentalApi": True}})
         self.send({"method": "initialized"})
 
     def _read(self):
+        failure = "app_server_disconnected"
         try:
-            for line in self.process.stdout:
+            while True:
+                line = self.process.stdout.readline(1024 * 1024 + 1)
+                if not line:
+                    break
                 if len(line) > 1024 * 1024:
                     raise ValueError("event_too_large")
-                self.messages.put(json.loads(line), timeout=5)
+                try:
+                    message = json.loads(line)
+                    if not isinstance(message, dict):
+                        raise ValueError("invalid_message")
+                except (ValueError, TypeError):
+                    self.messages.put({"client_diagnostic": "malformed_message"}, timeout=5)
+                    continue
+                if "method" in message:
+                    if not isinstance(message["method"], str):
+                        self.messages.put({"client_diagnostic": "malformed_message"}, timeout=5)
+                        continue
+                    if "id" in message and self.server_request_handler:
+                        self.server_request_handler(message)
+                    self.messages.put(message, timeout=5)
+                elif "id" in message and ("result" in message or "error" in message):
+                    with self.pending_lock:
+                        waiter = self.pending.get(message["id"])
+                    if waiter:
+                        waiter.put(message, timeout=5)
+                    else:
+                        self.messages.put({"client_diagnostic": "unmatched_response"}, timeout=5)
+                else:
+                    self.messages.put({"client_diagnostic": "malformed_message"}, timeout=5)
+        except Exception as exc:
+            failure = "dispatcher_failed_" + type(exc).__name__
         finally:
+            self.disconnected = True
+            with self.pending_lock:
+                waiters = list(self.pending.values())
+            for waiter in waiters:
+                try:
+                    waiter.put_nowait({"client_failure": failure})
+                except queue.Full:
+                    pass
             try:
-                self.messages.put({"client_disconnected": True}, timeout=1)
+                self.messages.put_nowait({"client_failure": failure})
             except queue.Full:
                 pass
 
     def send(self, message):
-        self.process.stdin.write(json.dumps(message) + "\n")
-        self.process.stdin.flush()
+        with self.send_lock:
+            self.process.stdin.write(json.dumps(message) + "\n")
+            self.process.stdin.flush()
 
     def event(self, timeout=30):
         value = self.messages.get(timeout=timeout)
-        if value.get("client_disconnected"):
-            raise RuntimeError("app_server_disconnected")
+        if value.get("client_failure"):
+            raise RuntimeError(value["client_failure"])
         return value
 
     def rpc(self, method, params):
-        # Only methods owned by this adapter; no shellCommand or command/exec.
         if method not in {"initialize", "thread/start", "turn/start", "turn/interrupt",
                           "thread/read", "thread/turns/list", "thread/items/list"}:
             raise ValueError("method_forbidden")
-        self.serial += 1
-        request = self.serial
-        self.send({"id": request, "method": method, "params": params})
-        deadline = time.monotonic() + 30
-        while time.monotonic() < deadline:
-            message = self.event(max(.01, deadline - time.monotonic()))
-            if message.get("id") == request and "method" not in message:
-                if "error" in message:
-                    raise RuntimeError("app_server_rpc_failed")
-                return message["result"]
-            if "id" in message and "method" in message:
-                raise RuntimeError("approval_required")
-        raise TimeoutError("rpc_timeout")
+        with self.pending_lock:
+            if self.disconnected:
+                raise RuntimeError("app_server_disconnected")
+            self.serial += 1
+            request = self.serial
+            waiter = queue.Queue(maxsize=1)
+            self.pending[request] = waiter
+        try:
+            self.send({"id": request, "method": method, "params": params})
+            message = waiter.get(timeout=30)
+            if "client_failure" in message:
+                raise RuntimeError(message["client_failure"])
+            if "error" in message:
+                raise RuntimeError("app_server_rpc_failed")
+            return message["result"]
+        finally:
+            with self.pending_lock:
+                self.pending.pop(request, None)
 
     def history(self, thread_id, turn_id):
         cursor = None
@@ -104,6 +150,18 @@ def execute(ledger, payload, client, timeout=120):
         return task
     task_id = task["task_id"]
     ledger.transition(task_id, "submitted", "reserved")
+    def server_request(event):
+        if event.get("method") in {
+            "item/commandExecution/requestApproval", "item/fileChange/requestApproval",
+            "item/permissions/requestApproval",
+        }:
+            current = ledger.submit(payload)
+            params = event.get("params", {})
+            if current["state"] == "running" and params.get("threadId") == current["thread_id"]:
+                if current["turn_id"] is None and params.get("turnId"):
+                    ledger.bind(task_id, current["thread_id"], params["turnId"])
+                approval(ledger, task_id, event)
+    client.server_request_handler = server_request
     try:
         result = client.rpc("thread/start", {
             "cwd": CWD, "permissions": PROFILE, "approvalPolicy": "on-request"})
@@ -119,7 +177,7 @@ def execute(ledger, payload, client, timeout=120):
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             event = client.event(min(30, max(.01, deadline - time.monotonic())))
-            if approval(ledger, task_id, event):
+            if ledger.submit(payload)["state"] == "approval_required":
                 client.close()
                 return ledger.submit(payload)
             if event.get("method") == "turn/completed":
@@ -137,4 +195,5 @@ def execute(ledger, payload, client, timeout=120):
         return ledger.transition(task_id, current["state"], "uncertain",
                                  failure_class="execution_truth_uncertain")
     return current
+
 
