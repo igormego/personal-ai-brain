@@ -1,5 +1,6 @@
 """Private stdio client. Exposes no generic command or remote transport interface."""
 from collections import deque
+import os
 import json
 import queue
 import subprocess
@@ -45,13 +46,28 @@ def classify(message):
     return "response"
 
 
+def bridge_environment():
+    """Choose the OS shell already covered by :minimal; no extra home reads."""
+    env = os.environ.copy()
+    if os.name == "nt":
+        entries = env.get("PATH", "").split(os.pathsep)
+        entries = [entry for entry in entries
+                   if "codex-primary-runtime" not in entry.lower()
+                   and "powershell" not in entry.lower()]
+        shell = os.path.join(env.get("SystemRoot", r"C:\\Windows"),
+                             "System32", "WindowsPowerShell", "v1.0")
+        env["PATH"] = os.pathsep.join([shell, *entries])
+    return env
+
+
 class AppServer:
     def __init__(self, executable):
         args = [str(executable), "app-server", "--listen", "stdio://"]
         for setting in OVERRIDES:
             args.extend(["-c", setting])
         self.process = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                        stderr=subprocess.DEVNULL, text=True, encoding="utf-8")
+                                        stderr=subprocess.DEVNULL, text=True, encoding="utf-8",
+                                        cwd=CWD, env=bridge_environment())
         self.messages = queue.Queue(maxsize=256)
         self.serial = 0
         self.pending = {}
@@ -201,8 +217,13 @@ def execute(ledger, payload, client, timeout=120):
                 approval(ledger, task_id, event)
     client.server_request_handler = server_request
     try:
+        from .codex_bridge_workspace import prepare, git
+        approved_base = git("rev-parse", "HEAD")
+        if task["base_sha"] != approved_base:
+            raise ValueError("base_not_approved")
+        workspace = prepare(task_id, approved_base)
         result = client.rpc("thread/start", {
-            "cwd": CWD, "permissions": PROFILE, "approvalPolicy": "on-request"})
+            "cwd": workspace["cwd"], "permissions": PROFILE, "approvalPolicy": "on-request"})
         thread_id = result["thread"]["id"]
         ledger.bind(task_id, thread_id, None)
         # Persist running BEFORE the potentially ambiguous turn/start RPC.

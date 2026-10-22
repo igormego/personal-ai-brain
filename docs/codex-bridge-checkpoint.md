@@ -127,3 +127,80 @@ one actual turn/start; zero approval responses; no protocol diagnostics.
 Remote transport remains disabled. Full durable-core acceptance remains pending.
 
 Exact repair commit e75ac359e4878cfc0c98f68d241bd1a412a04638 was reproduced by Git bundle in an isolated Homelab checkout: 281 Linux tests passed in 1.85 seconds; compileall and git diff --check passed. Owned Linux artifacts were removed. Windows focused total: 46 passed. No full durable-core completion is claimed.
+
+## Disposable linked-worktree acceptance stop
+
+Evidence checkpoint commit: 842736f (preserves the exact e75ac359 Linux results).
+A new trusted workspace helper derives only bridge-owned UUID paths/branches,
+refuses reuse and removes only clean owned worktrees. It is not integrated or
+accepted for execution.
+
+Controlled real worktree task:
+890bc10c-2e0a-4479-88f1-122624e76695.
+Base: 842736f.
+Thread/start with cwd set to the disposable worktree succeeded.
+One actual turn/start. The real turn reported:
+workspace sentinel denied; canonical sentinel denied; turn completed.
+Thus required workspace usability is NOT accepted. This is not evidence that
+the real thread escaped into canonical files.
+
+Separate standalone command/exec probes (not exposed by bridge client) reported:
+disposable workspace read denied (UnauthorizedAccessException);
+canonical sentinel read allowed.
+These standalone results must not be conflated with thread-tool enforcement.
+They demonstrate that merely changing cwd does not establish equivalent
+permission-root semantics across these two app-server paths.
+
+The helper/test did not change launch-process cwd or broaden permission roots.
+Required next investigation: supported binding of effective runtime workspace
+roots/profile to the trusted task worktree, including process startup context.
+
+Per explicit Windows acceptance STOP condition, no crash/cancellation/coding
+acceptance, PR, merge or deployment followed.
+Both owned test worktrees/branches and all sentinel files were removed.
+Canonical git status before/after matched byte-for-byte.
+Remote transport disabled; Project State unchanged.
+
+## Worktree root-binding resolution
+
+The earlier missing-workspace-root interpretation is superseded.
+Bounded commandExecution output showed the real blocker: selected bundled
+pwsh.exe under .cache/codex-runtimes could not resolve/start under :minimal.
+Those failed shell starts were not authoritative sentinel read-denial evidence.
+
+A reversible launch PATH selected installed Windows PowerShell instead, without
+adding filesystem permissions, profile roots, sandbox overrides or credentials.
+With that environment BOTH tested variants passed through real thread tools:
+A startup cwd canonical + thread cwd allocated worktree;
+B startup cwd allocated worktree + thread cwd same worktree.
+Thus startup cwd was not the determining workspace-root mechanism.
+An earlier explicit-root trial with the inaccessible shell was inconclusive;
+after runtime binding worked, no explicit profile-root fallback was needed.
+
+Integration:
+- AppServer startup cwd is explicitly the canonical launcher context.
+- The bridge-only subprocess environment selects Windows PowerShell.
+- Thread cwd comes exclusively from the trusted UUID worktree allocator.
+- Approved base is selected from local HEAD; mismatching submitted base is rejected.
+- Named bridge-workspace-only profile; no legacy sandbox/sandboxPolicy fields.
+- turn/start contains only threadId and task text.
+- Global interactive configuration is unchanged.
+- No canonical/parent profile-defined workspace_roots were added.
+
+Final real-thread workspace acceptance task:
+58c9c9ab-0077-470b-84aa-3dc416986f74.
+One new thread, one turn/start, completed without approval.
+Observed commandExecution flags:
+workspace read allowed; workspace write allowed;
+canonical read denied; canonical write denied;
+other repository denied; home sentinel denied;
+relative traversal denied; junction sentinel denied;
+network socket error 10013.
+Canonical Git status before/after matched.
+Owned worktrees/branches, junctions and sentinel files removed.
+
+WORKTREE ACCEPTED for the tested runtime/profile/Windows shell combination.
+Focused Windows tests: 53 passed in 1.17 seconds, including structured override
+rejection, trusted allocated cwd/profile mapping, omitted turn-level overrides,
+unapproved-base rejection and no second allocation on identical duplicate.
+Full durable-core crash/cancellation/coding acceptance remains pending.

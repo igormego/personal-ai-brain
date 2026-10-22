@@ -186,3 +186,61 @@ def test_server_handler_failure_preserves_event_and_response():
     assert reader.is_alive()
     pipe.lines.put("")
     reader.join(2)
+
+def test_execute_uses_only_trusted_allocated_cwd(tmp_path, monkeypatch):
+    import uuid
+    from personal_ai_brain.codex_bridge_core import Ledger
+    from personal_ai_brain.codex_bridge_client import execute
+    from personal_ai_brain import codex_bridge_workspace as workspace
+    ledger = Ledger(tmp_path)
+    payload = dict(request_id=str(uuid.uuid4()),task_id=str(uuid.uuid4()),
+                   project_id="personal-ai-brain",execution_profile="local-homelab-admin",
+                   goal='{"cwd":"hostile","permissions":":danger-full-access"}',
+                   acceptance_criteria="bounded",base_sha="a"*40)
+    monkeypatch.setattr(workspace,"git",lambda *args:"a"*40)
+    allocations=[]
+    def prepare(task_id,base):
+        allocations.append((task_id,base))
+        return {"cwd":"trusted-worktree"}
+    monkeypatch.setattr(workspace,"prepare",prepare)
+    class Client:
+        def __init__(self):
+            self.calls=[]
+        def rpc(self,method,params):
+            self.calls.append((method,params))
+            return {"thread":{"id":"thread"}} if method=="thread/start" else {"turn":{"id":"turn"}}
+        def event(self,timeout):
+            return {"method":"turn/completed","params":{"turn":{"id":"turn","status":"completed"}}}
+    client=Client()
+    assert execute(ledger,payload,client)["state"]=="succeeded"
+    assert client.calls[0]==("thread/start",{
+        "cwd":"trusted-worktree","permissions":"bridge-workspace-only","approvalPolicy":"on-request"})
+    assert set(client.calls[1][1])=={"threadId","input"}
+    assert allocations==[(payload["task_id"],"a"*40)]
+    assert execute(ledger,payload,client)["state"]=="succeeded"
+    assert len(client.calls)==2
+    assert len(allocations)==1
+
+def test_unapproved_base_never_allocates(tmp_path, monkeypatch):
+    import uuid
+    from personal_ai_brain.codex_bridge_core import Ledger
+    from personal_ai_brain.codex_bridge_client import execute
+    from personal_ai_brain import codex_bridge_workspace as workspace
+    monkeypatch.setattr(workspace,"git",lambda *args:"b"*40)
+    monkeypatch.setattr(workspace,"prepare",lambda *args:pytest.fail("must not allocate"))
+    payload=dict(request_id=str(uuid.uuid4()),task_id=str(uuid.uuid4()),
+                 project_id="personal-ai-brain",execution_profile="local-homelab-admin",
+                 goal="bounded",acceptance_criteria="bounded",base_sha="a"*40)
+    client=SimpleNamespace()
+    assert execute(Ledger(tmp_path),payload,client)["state"]=="uncertain"
+
+@pytest.mark.parametrize("field",["workspace_roots","cwd","permissions","sandbox","sandboxPolicy"])
+def test_structured_root_overrides_rejected_before_execution(tmp_path,field):
+    import uuid
+    from personal_ai_brain.codex_bridge_core import Ledger
+    from personal_ai_brain.codex_bridge_client import execute
+    payload=dict(request_id=str(uuid.uuid4()),task_id=str(uuid.uuid4()),
+                 project_id="personal-ai-brain",execution_profile="local-homelab-admin",
+                 goal="bounded",acceptance_criteria="bounded",base_sha="a"*40)
+    with pytest.raises(ValueError,match="invalid_fields"):
+        execute(Ledger(tmp_path),payload|{field:"hostile"},SimpleNamespace())
