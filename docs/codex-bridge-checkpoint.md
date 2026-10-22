@@ -204,3 +204,38 @@ Focused Windows tests: 53 passed in 1.17 seconds, including structured override
 rejection, trusted allocated cwd/profile mapping, omitted turn-level overrides,
 unapproved-base rejection and no second allocation on identical duplicate.
 Full durable-core crash/cancellation/coding acceptance remains pending.
+
+## Worktree candidate validation and subsequent recovery STOP
+
+Candidate d47110171e5fe239c7506523f58dd23558a91258 reproduced by Git bundle:
+288 Linux tests passed in 1.91 seconds; compileall passed.
+Windows focused total 53. WORKTREE ACCEPTED remains the slice verdict.
+
+Continued approved recovery acceptance:
+A task 645b5b68-308d-4dda-bc22-61b5763426d6:
+reserved before allocation -> uncertain, zero turn/start.
+B task 54584551-73dd-4cf6-aab5-1d429ea248b0:
+thread 01a1658b-ce78-7ee2-8733-90a0f1d61e1d, no turn;
+reserved -> uncertain, zero turn/start.
+Identical replay produced no allocation/turn; conflicting payload rejected in A/B.
+
+C task fe10eb43-a4cd-4e5a-a42c-8fecbc8018c3:
+thread 01a1658b-d9ad-7312-9e4e-a2be08b12636;
+turn 01a1658b-e070-7352-b4a3-4d81597c5bc7;
+one turn/start, bridge running before kill.
+After process kill, runner stalled in the client shutdown path before a fresh
+reconciliation server was launched. Owned Python runner tree was verified and
+terminated. No unrelated process was terminated.
+Fresh read-only history query returned sanitized RuntimeError/unavailable;
+Ledger.recover classified uncertain. No replacement turn was started.
+Underlying stream/process shutdown cause is not yet proven by a stack capture.
+
+Preserved owned uncertain worktrees under C:\Projects\.pab-bridge-workspaces:
+54584551-73dd-4cf6-aab5-1d429ea248b0;
+fe10eb43-a4cd-4e5a-a42c-8fecbc8018c3.
+Local bounded ledger/receipt evidence remains in .bridge-recovery-private.
+These are intentional retention artifacts, not active remote execution.
+Remaining matrix, cancellation and coding acceptance were not run after this
+Windows live-acceptance failure. No PR/push/merge/deployment/Project State closure.
+Next repair: bound shutdown/pipe handling and owned child-process lifetime;
+re-test history reconciliation after abrupt termination without replay.
