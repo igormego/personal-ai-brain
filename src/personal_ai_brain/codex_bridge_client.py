@@ -65,7 +65,12 @@ class AppServer:
         args = [str(executable), "app-server", "--listen", "stdio://"]
         for setting in OVERRIDES:
             args.extend(["-c", setting])
-        self.process = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+        from .codex_bridge_process import ProcessOwner
+        self.lifecycle = "STARTING"
+        self.stopping = threading.Event()
+        self.close_lock = threading.Lock()
+        self.owner = ProcessOwner()
+        self.process = self.owner.spawn(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                         stderr=subprocess.DEVNULL, text=True, encoding="utf-8",
                                         cwd=CWD, env=bridge_environment())
         self.messages = queue.Queue(maxsize=256)
@@ -75,10 +80,19 @@ class AppServer:
         self.send_lock = threading.Lock()
         self.server_request_handler = None
         self.disconnected = False
-        threading.Thread(target=self._read, daemon=True).start()
-        self.rpc("initialize", {"clientInfo": {"name": "pab_bridge_core", "version": "0.1"},
+        self.writes = queue.Queue(maxsize=32)
+        self.reader = threading.Thread(target=self._read, name="pab-codex-reader")
+        self.writer = threading.Thread(target=self._write, name="pab-codex-writer")
+        self.reader.start()
+        self.writer.start()
+        self.lifecycle = "RUNNING"
+        try:
+            self.rpc("initialize", {"clientInfo": {"name": "pab_bridge_core", "version": "0.1"},
                                "capabilities": {"experimentalApi": True}})
-        self.send({"method": "initialized"})
+            self.send({"method": "initialized"})
+        except Exception:
+            self.close()
+            raise
 
     def diagnostic(self, category):
         if not hasattr(self, "diagnostics"):
@@ -109,7 +123,12 @@ class AppServer:
                         except Exception:
                             self.diagnostic("server_request_handler_failed")
                     # Backpressure on valid events; malformed floods never enter this queue.
-                    self.messages.put(message)
+                    while not getattr(self, "stopping", threading.Event()).is_set():
+                        try:
+                            self.messages.put(message, timeout=.1)
+                            break
+                        except queue.Full:
+                            continue
                 else:
                     with self.pending_lock:
                         waiter = self.pending.get(message["id"])
@@ -136,10 +155,42 @@ class AppServer:
             except queue.Full:
                 pass
 
+    def _write(self):
+        while not self.stopping.is_set():
+            try:
+                message, done = self.writes.get(timeout=.1)
+            except queue.Empty:
+                continue
+            try:
+                self.process.stdin.write(json.dumps(message) + "\n")
+                self.process.stdin.flush()
+                done.put_nowait(None)
+            except Exception:
+                done.put_nowait("transport_write_failed")
+                self._fail_waiters("transport_write_failed")
+                return
+
+    def _fail_waiters(self, failure):
+        with self.pending_lock:
+            self.disconnected = True
+            for waiter in self.pending.values():
+                try:
+                    waiter.put_nowait({"client_failure": failure})
+                except queue.Full:
+                    pass
+
     def send(self, message):
-        with self.send_lock:
-            self.process.stdin.write(json.dumps(message) + "\n")
-            self.process.stdin.flush()
+        if self.disconnected or self.stopping.is_set():
+            raise RuntimeError("client_stopping")
+        done = queue.Queue(maxsize=1)
+        try:
+            self.writes.put((message, done), timeout=1)
+            error = done.get(timeout=3)
+        except queue.Empty:
+            self._fail_waiters("transport_write_timeout")
+            raise RuntimeError("transport_write_timeout") from None
+        if error:
+            raise RuntimeError(error)
 
     def event(self, timeout=30):
         value = self.messages.get(timeout=timeout)
@@ -186,16 +237,42 @@ class AppServer:
         return None
 
     def close(self):
-        if self.process.poll() is None:
-            self.process.terminate()
+        # Never close a buffered pipe while another thread may own its I/O lock.
+        if not self.close_lock.acquire(timeout=.1):
+            return
+        try:
+            if self.lifecycle == "STOPPED":
+                return
+            self.lifecycle = "STOPPING"
+            self.stopping.set()
+            self._fail_waiters("client_shutdown")
+            process = self.process
+            if process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    pass
+            # Job closure also kills descendants holding inherited pipe handles,
+            # even if the root app-server has already exited.
+            self.owner.close()
             try:
-                self.process.wait(timeout=10)
+                process.wait(timeout=2)
             except subprocess.TimeoutExpired:
-                self.process.kill()
-                self.process.wait(timeout=10)
-        for stream in (self.process.stdin, self.process.stdout):
-            if stream:
-                stream.close()
+                self.lifecycle = "FAILED"
+            for thread in (self.reader, self.writer):
+                if thread is not threading.current_thread():
+                    thread.join(timeout=2)
+            if self.reader.is_alive() or self.writer.is_alive():
+                self.lifecycle = "FAILED"
+            else:
+                for stream in (process.stdin, process.stdout):
+                    if stream:
+                        stream.close()
+                self.lifecycle = "STOPPED"
+        finally:
+            self.close_lock.release()
+
 
 def execute(ledger, payload, client, timeout=120):
     """Reserve exactly once. Caller-supplied factory/bind are trusted local code."""
@@ -256,3 +333,21 @@ def execute(ledger, payload, client, timeout=120):
     return current
 
 
+
+
+
+def cancel(ledger, task_id, client):
+    """Owner-invoked cancellation; identifiers come only from durable task truth."""
+    from .codex_bridge_core import identifier
+    identifier(task_id)
+    task = ledger.load()["tasks"][task_id]
+    if task["state"] not in {"running", "approval_required"}:
+        return task
+    if not task["thread_id"] or not task["turn_id"]:
+        return task
+    client.rpc("turn/interrupt", {"threadId": task["thread_id"], "turnId": task["turn_id"]})
+    status = client.history(task["thread_id"], task["turn_id"])
+    if status == "interrupted":
+        return ledger.transition(task_id, task["state"], "interrupted",
+                                 failure_class="owner_cancelled")
+    return ledger.load()["tasks"][task_id]

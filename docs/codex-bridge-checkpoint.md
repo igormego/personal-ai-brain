@@ -239,3 +239,54 @@ Remaining matrix, cancellation and coding acceptance were not run after this
 Windows live-acceptance failure. No PR/push/merge/deployment/Project State closure.
 Next repair: bound shutdown/pipe handling and owned child-process lifetime;
 re-test history reconciliation after abrupt termination without replay.
+
+## Bounded shutdown repair and live re-acceptance
+
+Controlled reproduction established the old stall at buffered stdout.close()
+(client line 198): parent was dead, reader blocked, closer blocked; both released
+only after the inherited-handle descendant exited (4.09 seconds).
+No raw model output or credentials were used in this reproduction.
+
+Windows ownership now uses a private Job Object with KILL_ON_JOB_CLOSE.
+App-server is created suspended, assigned before its first instruction, and only
+its own suspended thread is resumed. Assignment failure kills that owned child.
+No process-name discovery or arbitrary PID cleanup interface is exposed.
+Linux process tests use a private session/process group.
+
+Transport has one reader and one bounded-queue writer, both explicitly joined.
+Sends have a finite queue/ack budget. Shutdown rejects new writes, fails waiters,
+waits at most 2 seconds after terminate, closes the owned Job Object (including
+descendants), waits at most 2 seconds for root exit and joins each worker for at
+most 2 seconds. Buffered streams close only after workers exit.
+Process cleanup never starts/resumes a turn.
+
+Live killed-server re-acceptance:
+idle task 383a317a-b34f-48f0-86fb-e47aab097ed1: 0 turns, 0.078s shutdown;
+active task 7d69b053-afc0-42fb-9248-8283c2672763: 1 turn, 0.015s,
+history unavailable -> uncertain;
+approval task 1dfe0e88-b5ed-47b8-85e2-496deaae3e67: 1 turn, 0.078s,
+approval_required -> persisted interrupted -> interrupted.
+No approval sent, no reader/writer survived these shutdowns.
+
+Completion-before-ledger-write:
+task a1d6f5f4-6df7-47c5-bf13-824d6a498c81,
+thread 01a16593-101e-7d43-ba13-641ab46a59d5,
+turn 01a16593-1617-7ef2-87aa-d6c651e1b842:
+one turn; running ledger recovered persisted completed -> succeeded;
+identical duplicate after restart caused no turn; conflict rejected.
+
+Cancellation:
+An initial immediate interrupt was rejected before command readiness; that task
+was not retried or replayed and its artifacts are retained.
+Fresh task 2f8c2040-b7de-48e5-8e4b-6f58f2a1fe7f,
+thread 01a16593-b646-7e72-80ec-703cabd46c99,
+turn 01a16593-bcba-7002-b6cb-1f3e7f7b1c9d:
+observed commandExecution start, sent exactly one turn/interrupt;
+observed and persisted interrupted, ledger recovered interrupted;
+one turn/start; duplicate no relaunch; conflict rejected;
+shutdown 0.094s with no surviving reader/writer.
+
+Focused Windows suite: 60 passed. Includes owned-descendant inherited-pipe test,
+unrelated-process survival, shutdown states/idempotency, waiter release, ownership
+reuse rejection and ledger-only cancellation targeting.
+Full final validation and real coding acceptance remain pending.

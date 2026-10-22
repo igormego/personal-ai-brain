@@ -244,3 +244,21 @@ def test_structured_root_overrides_rejected_before_execution(tmp_path,field):
                  goal="bounded",acceptance_criteria="bounded",base_sha="a"*40)
     with pytest.raises(ValueError,match="invalid_fields"):
         execute(Ledger(tmp_path),payload|{field:"hostile"},SimpleNamespace())
+
+def test_cancel_targets_only_ledger_ids_and_does_not_relaunch(tmp_path):
+    import uuid
+    from personal_ai_brain.codex_bridge_core import Ledger
+    from personal_ai_brain.codex_bridge_client import cancel
+    store=Ledger(tmp_path)
+    p=dict(request_id=str(uuid.uuid4()),task_id=str(uuid.uuid4()),
+           project_id="personal-ai-brain",execution_profile="local-homelab-admin",
+           goal="test",acceptance_criteria="test",base_sha="a"*40)
+    store.submit(p);store.transition(p["task_id"],"submitted","reserved")
+    store.transition(p["task_id"],"reserved","running",thread_id="thread",turn_id="turn")
+    calls=[]
+    c=SimpleNamespace(rpc=lambda method,params:calls.append((method,params)),
+                      history=lambda thread,turn:"interrupted")
+    assert cancel(store,p["task_id"],c)["state"]=="interrupted"
+    assert calls==[("turn/interrupt",{"threadId":"thread","turnId":"turn"})]
+    assert cancel(store,p["task_id"],c)["state"]=="interrupted"
+    assert len(calls)==1
