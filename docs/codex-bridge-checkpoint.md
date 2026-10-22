@@ -68,3 +68,60 @@ and ledger approval persistence during RPC wait.
 Disposable-worktree execution, complete live crash/cancellation matrix and real
 coding acceptance remain unimplemented/unaccepted. No deployment authorization
 is inferred from these focused checks.
+
+## Acceptance stop: malformed response ID terminates dispatcher
+
+2026-10-22, exact implementation HEAD
+c6118deca37906f082a55d776c0ea7894b2b145f, deterministic in-memory
+protocol probe using the existing test Pipe/client helpers.
+
+While thread/read was pending, supplied:
+1. malformed unrelated response with id=[] and a result object;
+2. valid turn/completed interruption notification;
+3. valid response matching the pending RPC.
+
+Observed:
+- pending RPC failed with RuntimeError: dispatcher_failed_TypeError;
+- reader terminated;
+- valid interruption notification was not delivered;
+- two input messages remained unread.
+
+Cause: AppServer._read indexes pending with message["id"] before validating
+that the JSON-RPC response ID is a supported scalar. An array-valued ID is
+unhashable. The outer exception handler terminates all dispatch instead of
+isolating the malformed unrelated message.
+
+This violates malformed-message isolation and the no-message-loss acceptance
+invariant. Per the continuation's explicit STOP condition, no live worktree,
+crash/cancellation or coding acceptance followed. No PR/push/merge/deployment
+or Project State completion occurred.
+
+Required repair: validate inbound message envelopes/ID types before correlation;
+isolate malformed messages into bounded sanitized diagnostics; add a regression
+covering malformed response followed by a valid interruption event and matching
+RPC response. Reassess bounded-queue overflow handling in the same dispatcher
+review before resuming the remaining acceptance.
+
+## Malformed-message repair and live regression
+
+Central classify() validates decoded envelopes before correlation/dispatch.
+Responses require a positive exact Python int ID (bool/float/containers rejected),
+exactly one result/error, and a structured error with integer code/string message.
+Server requests accept exact int or nonempty string IDs; notifications omit IDs.
+Malformed messages and handler failures generate sanitized diagnostics in a
+64-entry ring, separate from valid-event delivery. No raw malformed payloads
+are retained. Unknown/late/duplicate responses cannot overwrite a waiter.
+EOF/transport failures wake pending RPCs; message-level faults do not.
+
+Windows focused suite: 46 passed in 1.00 seconds.
+New fault coverage includes 16 malformed envelope variants, duplicate/unknown
+responses, 200-message malformed flood and handler exception containment.
+All injected cases retain subsequent valid traffic and keep the reader alive.
+
+Real MXC approval regression:
+task 91a4abfe-287f-4ee8-93e2-2d0a01a6d3a6;
+thread 01a16577-7bcb-70d2-874c-d91296833eba;
+turn 01a16577-8211-7822-8570-b75e90d70d6c.
+State approval_required; failure_class owner_approval_required;
+one actual turn/start; zero approval responses; no protocol diagnostics.
+Remote transport remains disabled. Full durable-core acceptance remains pending.

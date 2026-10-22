@@ -1,4 +1,5 @@
 """Private stdio client. Exposes no generic command or remote transport interface."""
+from collections import deque
 import json
 import queue
 import subprocess
@@ -14,6 +15,35 @@ OVERRIDES = [
     'permissions.bridge-workspace-only.filesystem={":root"="deny",":minimal"="read",":tmpdir"="deny",":slash_tmp"="deny"}',
     'permissions.bridge-workspace-only.network.enabled=false',
 ]
+
+def classify(message):
+    """Codex omits jsonrpc; our correlation IDs are positive integers."""
+    if not isinstance(message, dict):
+        return "malformed"
+    if "jsonrpc" in message and message["jsonrpc"] != "2.0":
+        return "malformed"
+    if "method" in message:
+        if ("result" in message or "error" in message or
+                not isinstance(message["method"], str) or not message["method"] or
+                ("params" in message and not isinstance(message["params"], dict))):
+            return "malformed"
+        if "id" not in message:
+            return "notification"
+        identifier = message["id"]
+        if type(identifier) is int or (type(identifier) is str and identifier):
+            return "server_request"
+        return "malformed"
+    if type(message.get("id")) is not int or message["id"] <= 0:
+        return "malformed"
+    if ("result" in message) == ("error" in message):
+        return "malformed"
+    if "error" in message:
+        error = message["error"]
+        if (not isinstance(error, dict) or type(error.get("code")) is not int or
+                not isinstance(error.get("message"), str)):
+            return "malformed"
+    return "response"
+
 
 class AppServer:
     def __init__(self, executable):
@@ -34,6 +64,11 @@ class AppServer:
                                "capabilities": {"experimentalApi": True}})
         self.send({"method": "initialized"})
 
+    def diagnostic(self, category):
+        if not hasattr(self, "diagnostics"):
+            self.diagnostics = deque(maxlen=64)
+        self.diagnostics.append({"protocol_error": category, "reader_continued": True})
+
     def _read(self):
         failure = "app_server_disconnected"
         try:
@@ -45,29 +80,32 @@ class AppServer:
                     raise ValueError("event_too_large")
                 try:
                     message = json.loads(line)
-                    if not isinstance(message, dict):
-                        raise ValueError("invalid_message")
-                except (ValueError, TypeError):
-                    self.messages.put({"client_diagnostic": "malformed_message"}, timeout=5)
+                    category = classify(message)
+                except (ValueError, TypeError, RecursionError):
+                    category = "malformed"
+                if category == "malformed":
+                    self.diagnostic("malformed_message")
                     continue
-                if "method" in message:
-                    if not isinstance(message["method"], str):
-                        self.messages.put({"client_diagnostic": "malformed_message"}, timeout=5)
-                        continue
-                    if "id" in message and self.server_request_handler:
-                        self.server_request_handler(message)
-                    self.messages.put(message, timeout=5)
-                elif "id" in message and ("result" in message or "error" in message):
+                if category in {"notification", "server_request"}:
+                    if category == "server_request" and self.server_request_handler:
+                        try:
+                            self.server_request_handler(message)
+                        except Exception:
+                            self.diagnostic("server_request_handler_failed")
+                    # Backpressure on valid events; malformed floods never enter this queue.
+                    self.messages.put(message)
+                else:
                     with self.pending_lock:
                         waiter = self.pending.get(message["id"])
-                    if waiter:
-                        waiter.put(message, timeout=5)
-                    else:
-                        self.messages.put({"client_diagnostic": "unmatched_response"}, timeout=5)
-                else:
-                    self.messages.put({"client_diagnostic": "malformed_message"}, timeout=5)
-        except Exception as exc:
-            failure = "dispatcher_failed_" + type(exc).__name__
+                        if waiter:
+                            try:
+                                waiter.put_nowait(message)
+                            except queue.Full:
+                                self.diagnostic("duplicate_response")
+                        else:
+                            self.diagnostic("unmatched_response")
+        except Exception:
+            failure = "transport_reader_failed"
         finally:
             self.disconnected = True
             with self.pending_lock:
