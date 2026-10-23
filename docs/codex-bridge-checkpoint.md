@@ -735,3 +735,43 @@ coding task is needed after the idle fix; never replay the interrupted task ID.
 Remaining: successful real coding/result commit; final exact Homelab regression;
 full final security review; PR/CI/merge; installed local invocation; Project State
 closure. Remote transport remains disabled. No generated change pushed/merged.
+
+## 2026-10-23 fresh coding acceptance passed
+
+User explicitly authorized one NEW task after the interrupted attempt. Previous
+03c1f1ca-b74a-449c-b724-c2131185569b workspace, ledger and receipts were preserved;
+not replayed/resumed/reused. New task 2f0c522b-7c9f-4d0d-ba39-b860ff4ff01d,
+request 595befe8-c283-4eeb-8ec8-f987d595bc6b, exact base
+663aad021cdf7db97a257a1f9d6704bd3925d80c. Fresh Linux checkout under trusted task root.
+Thread 01a16924-d2ed-7f73-af6c-b1f20997cb3b;
+turn 01a16924-d587-7da2-baa5-36334b06f0e3. Actual turn/start count EXACTLY 1.
+
+Real coding result: FreshnessPolicy.from_mapping rejects invalid attention names;
+meaningful edge-case/compatibility tests added. Only state_quality.py and
+its test_state_quality.py changed: 70 additions, 2 deletions. Trusted validator
+checked exact permitted diff, unchanged base, no unexpected untracked files,
+whitespace integrity, and independently reran tests through official restrictive
+Linux sandbox: 40 passed. Only after validation, trusted adapter committed the
+local task change with hooks/signing disabled. Task commit
+209522877ba077c3739fbc24eee996a13438e522, parent exactly approved base.
+Task commit remains ONLY inside Linux task checkout; not pushed/PR'd/merged.
+
+Windows ledger succeeded; persisted Codex history completed. Result is allowlisted
+branch/commit/file paths/counts/test summary only. Identical duplicate returned
+stored succeeded result, turn count stayed 1. Same task ID with changed goal
+rejected conflict, turn count stayed 1. Shutdown 0.109s, lifecycle STOPPED.
+No credentials/extra destinations/permission broadening. Private bounded receipts:
+.native-controls-private/wsl-coding-fresh-34ef17b2097c4899b701357720ad995f/.
+
+Final focused Windows validation on implementation lineage 663aad0: 83 passed.
+Static tracked-secret scan: 122 tracked files, zero private-key/token-pattern files.
+Diff check clean. Default-branch AGENTS refreshed from origin/main; main is an
+ancestor (0 main-only commits); no reconciliation conflict.
+Security review of final implementation: fixed local backend/project mapping;
+no payload-selected paths/distro/executable/env/provider; direct --exec transport;
+tracked Git transfer only; root-deny/minimal-read/task-write sandbox; offline task
+commands; auth/Windows-home outside sandbox; on-request approvals never accepted;
+one reservation/automatic turn maximum; uncertain never replayed; Job-owned bounded
+shutdown; existing single dispatcher and method allowlist (thread/shellCommand
+forbidden); result mapper allowlisted. No remote listener/poller added.
+Live backend tests plus exact final Homelab regression/CI remain distinct evidence.
