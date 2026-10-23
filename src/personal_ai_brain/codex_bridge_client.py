@@ -366,6 +366,16 @@ def cancel(ledger, task_id, client):
     client.rpc("turn/interrupt", {"threadId": task["thread_id"], "turnId": task["turn_id"]})
     status = client.history(task["thread_id"], task["turn_id"])
     if status == "interrupted":
-        return ledger.transition(task_id, task["state"], "interrupted",
-                                 failure_class="owner_cancelled")
+        # The execution worker can consume turn/completed while this RPC waits.
+        # Preserve terminal truth instead of reporting a spurious CAS conflict.
+        for _ in range(2):
+            current = ledger.load()["tasks"][task_id]
+            if current["state"] not in {"running", "approval_required"}:
+                return current
+            try:
+                return ledger.transition(task_id, current["state"], "interrupted",
+                                         failure_class="owner_cancelled")
+            except ValueError as error:
+                if str(error) != "state_conflict":
+                    raise
     return ledger.load()["tasks"][task_id]

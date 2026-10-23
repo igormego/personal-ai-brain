@@ -262,3 +262,29 @@ def test_cancel_targets_only_ledger_ids_and_does_not_relaunch(tmp_path):
     assert calls==[("turn/interrupt",{"threadId":"thread","turnId":"turn"})]
     assert cancel(store,p["task_id"],c)["state"]=="interrupted"
     assert len(calls)==1
+
+@pytest.mark.parametrize('race_stage', ['history', 'transition'])
+def test_cancel_preserves_worker_terminal_state(tmp_path, monkeypatch, race_stage):
+    import uuid
+    from personal_ai_brain.codex_bridge_core import Ledger
+    from personal_ai_brain.codex_bridge_client import cancel
+    store = Ledger(tmp_path)
+    p = dict(request_id=str(uuid.uuid4()), task_id=str(uuid.uuid4()),
+             project_id='personal-ai-brain', execution_profile='local-homelab-admin',
+             goal='test', acceptance_criteria='test', base_sha='a'*40)
+    store.submit(p)
+    store.transition(p['task_id'], 'submitted', 'reserved')
+    store.transition(p['task_id'], 'reserved', 'running', thread_id='thread', turn_id='turn')
+    transition = store.transition
+    def history(*_):
+        if race_stage == 'history':
+            transition(p['task_id'], 'running', 'interrupted')
+        return 'interrupted'
+    def competing_transition(task_id, expected, target, **fields):
+        transition(task_id, expected, 'interrupted')
+        return transition(task_id, expected, target, **fields)
+    if race_stage == 'transition':
+        monkeypatch.setattr(store, 'transition', competing_transition)
+    client = SimpleNamespace(rpc=lambda *args: None, history=history)
+    assert cancel(store, p['task_id'], client)['state'] == 'interrupted'
+    assert store.load()['tasks'][p['task_id']]['attempts'] == 1
