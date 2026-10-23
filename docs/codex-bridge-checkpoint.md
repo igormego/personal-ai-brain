@@ -610,3 +610,52 @@ workspace allocation into the Windows-ledger bridge, preserving fixed project
 mapping, payload hashes, idempotency, approval and no-replay semantics. Then verify
 backend-dependent real coding/result mapping and crash lifecycle. Existing passed
 dispatcher and ledger gates remain reusable. No PR/merge/Project State closure.
+
+## 2026-10-23 trusted WSL adapter candidate
+
+Implementation candidate ffd17f6ea6a486341c149d3add26cda5f9d3ab69:
+- Reuses existing AppServer reader/writer/dispatcher and Windows ProcessOwner.
+- Trusted local execution_backend wsl-codex-v01 selects fixed Debian, pabbridge,
+  /usr/local/bin/codex, direct WSL --exec, clean Linux environment and fixed
+  CODEX_HOME. Payload contract unchanged; unknown backends and overrides rejected.
+- Windows validates exact local HEAD, exports tracked Git history via temporary
+  bundle, streams bundle to trusted Linux setup without exposing Windows source
+  to sandbox. Temporary Windows bundle deleted after transfer.
+- Linux user-owned /home/pabbridge/bridge-v01/tasks/<canonical-task-UUID> checkout
+  verifies exact base, creates task branch, removes bundle origin, sets task-only
+  commit identity. Reallocation refuses existing paths; uncertain work preserved.
+- execute selects trusted workspace backend before thread/start; ledger identities,
+  hashes, no-replay, approval policy and result allowlist unchanged.
+
+Focused Windows tests: 79 passed (historical 67 plus 12 adapter cases), including
+fixed distro/environment, unknown backend and payload override rejection, exact
+materialization mapping/temporary cleanup, unapproved base and existing ledger
+result/duplicate/conflict behavior. First run's one failure was test TEMP access;
+test now uses its owned pytest temp directory. No product permission broadening.
+
+Local-only runtime task a320986a-8994-4756-bd3b-1bf3f7a178b5 materialized exact
+candidate base above. Official Linux sandbox on that workspace: ISOLATION_PASS,
+exit 0. Controlled fixture relative list/read/write/child traversal pass; Windows
+home/canonical paths absent; trusted sibling and real auth-directory controlled
+sentinels unreadable; auth.json invisible; socket creation PermissionError.
+Codex-home directory itself is an empty runtime placeholder, so directory existence
+alone is not an exposure test. Real credential contents never read.
+Existing client over fixed adapter initialized in 0.609s, closed in 0.109s,
+lifecycle STOPPED. Actual turn/start count zero in this slice.
+Receipts: .native-controls-private/adapter-local-acceptance.json and
+adapter-boundary.json. Controlled sentinels removed; task checkout retained.
+
+Automatic approval review blocked the planned integrated model turn: it stated
+that repository/README content might be transmitted to external ChatGPT without
+explicit payload-and-destination approval. No rejected model invocation ran.
+Local-only unaffected work completed. Need explicit approval for tracked repository
+code/docs at candidate ffd17f6 and task-created files to be processed by OpenAI's
+ChatGPT/Codex service through the authenticated Debian app-server for the requested
+integrated workspace, recovery/cancellation and internal coding acceptance.
+Do not bypass by indirect execution. Credentials, untracked private ledgers and
+raw event logs remain excluded from task materialization/results.
+
+Pending: real integrated thread/ledger acceptance, backend crash matrix,
+cancellation, real coding/result commit, final security review, exact final
+Homelab regression, PR/CI/merge, local installation and Project State closure.
+No native MXC investigation resumed. Remote transport remains disabled.
