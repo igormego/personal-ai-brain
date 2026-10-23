@@ -9,7 +9,7 @@ database, listener, Docker socket, shell handler or dynamic plugin loader is use
 
 ## Contract for any caller
 
-Create an issue in the **private** `Az1mutt/personal-project-brain` repository.
+Create an issue in the **private** `igormego/personal-project-brain` repository.
 Use the exact title `pab-control/v0.1`. The body must be a raw JSON object, without
 Markdown fences or prose. Generate a fresh lowercase canonical UUID and a current
 RFC3339 timestamp with timezone for each new request:

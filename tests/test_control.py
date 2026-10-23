@@ -259,3 +259,21 @@ def test_core_handlers_read_only_and_findings_are_success(tmp_path, monkeypatch)
         result = cap.handler(args)
         assert result["source_status"] == "findings" and result["health"]["errors"] == 1
     assert list(tmp_path.iterdir()) == []
+
+
+def test_canonical_transport_identity_and_redirect_boundary():
+    from personal_ai_brain.github_issues import NoRedirect
+    seen = []
+
+    def opener(req, **kwargs):
+        seen.append(req.full_url)
+        return io.BytesIO(json.dumps({
+            "private": True, "has_issues": True,
+            "full_name": "igormego/personal-project-brain",
+        }).encode())
+
+    GitHubIssues("test", opener=opener).verify_private()
+    assert seen == ["https://api.github.com/repos/igormego/personal-project-brain"]
+    assert NoRedirect().redirect_request(
+        None, None, 301, "Moved", {}, "https://api.github.com/repos/other/repo"
+    ) is None
