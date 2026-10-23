@@ -6,39 +6,40 @@ project:
   owner: "Project OS & Agent Architecture chat"
 
 status: "active"
-phase: "credentialless-coding-agent-broker-v01-accepted"
+phase: "chatgpt-codex-local-bridge-v01-accepted"
 
 current_gate: >
-  Credentialless Coding Agent Broker v0.1 foundation is accepted as its own
-  milestone. Live provider and coding gates remain disabled. Real Ollama/local
-  inference, paid OpenAI acceptance, provider routing/escalation, autonomous
-  GitHub publication and deployment automation are not completed or enabled.
+  Local Bridge v0.1 durable core is COMPLETED and locally accepted after PR #20.
+  Remote Transport Activation and external ChatGPT-originated acceptance are the
+  next gate; remote transport, remote approvals, automatic review/correction and
+  autonomous publication/deployment remain disabled. Core Agent remains read-only.
 
 current_state: >
-  Recovered exact checkpoint c3df34fef37df23711b94751255e9ea482c75779 and its
-  parent 83a54fe from the existing Homelab worktree, preserving local recovery
-  branch and complete-history bundles. Replayed the original documentation
-  prerequisite and both broker commits onto main 667a6ef without conflicts;
-  all three range-diff entries are equivalent. Current Codex execution architecture
-  v1 and environment/CI changes remain intact. The trusted inference broker,
-  four mediated workspace operations, deterministic validation/offline tests,
-  budget reservations and no-silent-replay durability are credentiallessly accepted.
-  All 235 Python tests and separate offline PowerShell environment checks passed.
-  On 2026-10-13 read-only runtime verification found 17 root-owned broker/runner
-  modules and the unit text equivalent under the historical transfer normalization;
-  stored live acceptance evidence matches the committed receipt. Builder/broker
-  remain active/enabled with private networks, no new privileges and empty
-  capability bounds. Broker denies all IP traffic; provider is disabled and
-  coding_enabled is false. Historical actual-identity and failure acceptance is
-  retained, not rerun. No new deployment, restart, API key or inference occurred.
-  Existing externally accepted Remote Work Submission and read-only Core/control
-  behavior remain covered by regression tests. Media remains parked and unchanged.
+  Credentialless Coding Agent Broker v0.1 foundation and ChatGPT/Codex Local Bridge
+  v0.1 durable core are completed. Windows retains the durable ledger, strict
+  request/task identity and payload hashing, idempotency, no-silent-replay recovery,
+  approval_required semantics, bounded dispatcher/lifecycle and result allowlist.
+  The fixed Debian WSL2 Codex backend uses Linux task checkouts, managed ChatGPT
+  authentication and offline root-deny sandbox isolation. A fresh real coding task
+  completed in one turn, passed 40 sandboxed tests and produced a local-only commit;
+  duplicate/conflict checks passed without another turn. Final validation: 83 Windows
+  bridge tests and 318 full Homelab regression tests. PR #20 merged as
+  cfd57bb639c7925ba984d80c9477fa4a0bb04812 with green CI. The merged package is
+  installed in the Windows project venv; an intentionally invoked local API task
+  succeeded with one turn and stored duplicate result. Private ledger ACLs are
+  limited to the user, SYSTEM and Administrators. Native Windows MXC is unsupported
+  and deferred for the tested build due to independently reproduced workspace
+  failures. Previous uncertain/interrupted tasks and generated task commit remain
+  preserved. Existing Homelab production broker/provider gates and services were
+  not changed; their older runtime observations remain historical.
 
 exact_next_action: >
-  Local LLM Provider v0.1 — Ollama feasibility and real coding acceptance.
-  Start with live hardware feasibility in local-homelab-admin before selecting or
-  installing a model. Keep paid OpenAI, provider routing, autonomous publication
-  and deployment automation deferred to separately approved milestones.
+  Remote Transport Activation + external ChatGPT acceptance. Define and separately
+  approve a narrow authenticated transport into the accepted local run_local API,
+  with fixed project/backend mapping, durable request/task IDs, explicit owner
+  approvals and bounded results. Then test one external request, duplicate/conflict,
+  recovery and correlated result delivery. Do not enable a listener or GitHub queue
+  poller before that milestone is approved.
 
 blockers: []
 
@@ -49,6 +50,8 @@ dependencies:
     dependency: "Hosts Core and control containers, separate credentials and durable private audit."
 
 important_open_loops:
+  - "COMPLETED: Credentialless Coding Agent Broker v0.1 foundation; Local Bridge durable core, request/task idempotency, dispatcher, approval_required, bounded lifecycle/recovery, WSL2 backend, managed ChatGPT auth, Linux workspace isolation and internal real coding acceptance. See docs/codex-bridge-checkpoint.md."
+  - "PENDING: Remote Transport Activation, external ChatGPT-originated acceptance, remote approval workflow, automatic ChatGPT review/correction loop, autonomous PR/merge/deploy, OpenAI API provider, local LLM provider and provider router. These are not enabled by the accepted local bridge."
   - "Codex Cloud pab-homelab-dev: VERIFIED_WITH_WARNING on 2026-10-12 for repository-only PAB/Homelab development; task lifecycle and surface selection recorded in docs/codex-environments.md. Absolute SSH absence remains uncertified after a configuration-only proxy response; pwsh requires the saved startup PATH export and is not on default PATH. No live Homelab acceptance implied."
   - "Codex local-homelab-admin: Local acceptance VERIFIED_WITH_WARNINGS on 2026-10-13; installed project environment/action schema confirmed, exact user-context SSH probe passed; UI recognition, fresh Worktree execution and organization policy remain unverified. Canonical checkouts and preserved worktrees established; old task roots, generated ledger artifacts, referenced SSH-key candidate and auth ACL review remain preserved/pending. Ledger README additions are already represented or superseded in canonical documentation. See docs/codex-environments.md."
   - "Retain bounded transport inbox/outbox records (2048-entry cap) and execution deduplication truth; no automatic pruning."
@@ -68,13 +71,18 @@ important_open_loops:
 portfolio:
   milestone: true
   signal: >
-    Credentialless broker foundation is accepted with exact recovery provenance,
-    mediated tools and independent offline validation. Real-provider acceptance
-    remains pending; live coding/provider gates stay disabled.
+    Local durable Bridge v0.1 is accepted with managed ChatGPT coding through a
+    restricted WSL2 backend. External transport and autonomous publication remain
+    pending; the generated coding-task commit stays local.
 
 verification:
-  last_verified: "2026-10-14"
+  last_verified: "2026-10-23"
   sources:
+    - "docs/codex-bridge-checkpoint.md: authoritative local Bridge v0.1 architecture, exact task IDs, crash/cancel/coding evidence and limitations."
+    - "PR https://github.com/igormego/personal-ai-brain/pull/20 merged as cfd57bb639c7925ba984d80c9477fa4a0bb04812; CI run 39969924522 passed full tests and offline Codex environment checks."
+    - "83 focused Windows tests; 318 full Homelab tests on exact candidate f5a6cb0cc0ff4fa4fa88b042ea591907a0ae7d8c; tracked-secret/static checks clean."
+    - "Coding task 2f0c522b-7c9f-4d0d-ba39-b860ff4ff01d succeeded with one turn and 40 sandboxed tests; local-only task commit 209522877ba077c3739fbc24eee996a13438e522; duplicate/conflict added zero turns."
+    - "Installed local API task 3e161702-0676-457d-89e0-a56e45c99998 succeeded on merged base with one turn; duplicate returned stored result; no bridge listener, queue poller or service installed."
     - "Foundation PR https://github.com/Az1mutt/personal-ai-brain/pull/19 squash-merged as 1d0275e02a9dcf920381fed7f83b9232da1f3a11; merged tree equals tested head 75a53e4fc6ccddb058fffbbd20e5f28f2f0f88bc. CI https://github.com/Az1mutt/personal-ai-brain/actions/runs/38547344327 passed Python tests and offline Codex environment checks."
     - "2026-10-14 read-only live refresh: runtime source/unit equivalence, root-owned non-writable modules, unchanged acceptance receipt, active broker/builder, private networks, no-new-privileges, empty capabilities and broker IP deny-all confirmed; provider and coding gates remain disabled. No deployment or restart required."
     - 'docs/CODING_BROKER_CHECKPOINT.md: exact recovery, current-main replay equivalence, 235 tests and bounded read-only runtime revalidation on 2026-10-13.'

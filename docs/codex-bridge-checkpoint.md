@@ -789,3 +789,49 @@ This section changes evidence documentation only; implementation remains identic
 to the exact tested candidate. PR CI will additionally validate its final head.
 Security review passed within the documented boundaries. Proceeding with the
 already-authorized Change/Review PR; no autonomous generated task change included.
+
+## 2026-10-23 merged, installed and locally accepted
+
+PR https://github.com/igormego/personal-ai-brain/pull/20 squash-merged as
+cfd57bb639c7925ba984d80c9477fa4a0bb04812. Exact reviewed head 6910ff6; CI run
+39969924522/job 120469579624 passed full Python tests and offline PowerShell Codex
+environment checks. Squash tree equals reviewed branch tree. GitHub redirected
+the old Az1mutt repository URL to current owner igormego (same repository ID).
+The legacy trusted repository label is preserved for durable identity compatibility.
+
+Merged package installed editable in C:\Projects\personal-ai-brain\.venv.
+Accepted local entry is personal_ai_brain.codex_bridge_wsl.run_local(ledger,
+payload, validate_completion=<trusted operator validator>). No remote contract
+can supply that validator, backend configuration, command or environment. Normal
+interactive Codex remains separate. No service, inbound bridge listener or GitHub
+queue poller was installed; transport remains stdio-only and intentionally invoked.
+
+Installed API acceptance: task 3e161702-0676-457d-89e0-a56e45c99998, base merge SHA
+above, one automatic turn, Windows ledger succeeded; identical duplicate returned
+stored result with total count still 1. Task checkout remained clean. Durable
+installed ledger: %LOCALAPPDATA%\PersonalAIBrain\bridge-v01\ledger. Directory,
+ledger.json and ledger.lock ACLs restricted to current user/SYSTEM/Administrators;
+future atomic snapshot files inherit the private directory ACL. No credentials
+stored in the ledger or task artifacts.
+
+Merged local/remote branch deleted after tree equivalence and complete-history
+bundle verification. Recovery history retained privately as
+.native-controls-private/accepted-implementation-history.bundle. Isolated clean
+Homelab regression checkout/venv/bundle removed after exact-SHA and clean-tree
+checks. Uncertain/interrupted task ledgers/workspaces and generated coding task
+commit remain preserved; no force cleanup of their artifacts. Existing 28 private
+artifact files verified byte-for-byte preserved across main synchronization.
+
+Project State now marks Credentialless Coding Agent Broker v0.1 foundation and
+Local Bridge durable core/idempotency/dispatcher/approval/lifecycle/recovery/WSL
+backend/managed auth/isolation/internal coding acceptance COMPLETED. Native MXC
+unsupported/deferred for tested build. Homelab production services/providers and
+all remote/autonomous capabilities remain unchanged.
+
+Next milestone: Remote Transport Activation + external ChatGPT acceptance.
+Handoff: separately approve one narrow authenticated transport into run_local;
+retain fixed project/backend mapping, strict payload, durable IDs/hashes, explicit
+owner approval and bounded results; verify correlated external request/result,
+duplicate/conflict and recovery. Remote approval workflow, automatic review/
+correction loop, autonomous PR/merge/deploy, API/local-LLM providers and router
+remain PENDING. No activation is implied by this closure.
