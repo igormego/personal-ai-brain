@@ -6,7 +6,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, build_opener, HTTPRedirectHandler
 
 TITLE = "pab-control/v0.1"
-REPOSITORY = "Az1mutt/personal-project-brain"
+REPOSITORY = "igormego/personal-project-brain"
 
 
 class TransportError(RuntimeError):
