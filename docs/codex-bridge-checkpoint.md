@@ -524,3 +524,20 @@ Machine Platform plus firmware virtualization. This does not establish which
 prerequisite is missing; an administrator read-only feature/firmware query was
 launched through normal UAC to distinguish them. No automatic reboot requested.
 Distro/bwrap/Linux Codex/auth/sandbox/bridge process feasibility remains pending.
+
+## 2026-10-23 approved administrator readiness result
+
+Administrator receipt now collected: VirtualMachinePlatform Enabled;
+HypervisorPresent true; CPU CIM reports VirtualizationFirmwareEnabled false and
+SecondLevelAddressTranslationExtensions false. These mixed observations do not
+establish a firmware defect while feature activation/reboot is pending.
+Host WSL status remains default version 2, virtualization unavailable, no distro.
+Both Component Based Servicing RebootPending and Windows Update RebootRequired
+registry indicators are present. Last boot: 2026-09-27 17:51:25 (host local time).
+Next required action: user-controlled Windows restart, then recheck WSL2 readiness
+and install/start Debian through supported WSL commands. Do not repeat native MXC
+controls. If virtualization remains unavailable after reboot, investigate firmware
+or nested virtualization prerequisites before Linux acceptance. No automatic
+reboot, credential access, bridge changes, full acceptance or milestone closure.
+Microsoft guidance: https://learn.microsoft.com/en-us/windows/wsl/troubleshooting
+requires restarting after enabling Virtual Machine Platform.
