@@ -91,3 +91,39 @@ class WslBackend:
         if workspace != expected:
             raise ValueError("workspace_mapping_mismatch")
         return expected
+
+
+def run_local(ledger, payload, *, validate_completion=None, timeout=120):
+    """Intentionally invoked local API; no listener, poller or task-selected backend.
+
+    The validator is trusted operator code, never supplied by the task payload.
+    A startup failure consumes the reservation and cannot silently retry later.
+    """
+    from .codex_bridge_client import AppServer, execute
+    from .codex_bridge_core import public_result
+    task = ledger.submit(payload)
+    if task["state"] != "submitted":
+        return public_result(task)
+    try:
+        client = AppServer(execution_backend=BACKEND)
+    except Exception:
+        try:
+            ledger.transition(task["task_id"], "submitted", "reserved")
+            task = ledger.transition(task["task_id"], "reserved", "uncertain",
+                                     failure_class="backend_startup_failed")
+        except ValueError as error:
+            if str(error) != "state_conflict":
+                raise
+            task = ledger.load()["tasks"][task["task_id"]]
+        return public_result(task)
+    try:
+        try:
+            task = execute(ledger, payload, client, timeout=timeout,
+                           validate_completion=validate_completion)
+        except ValueError as error:
+            if str(error) != "state_conflict":
+                raise
+            task = ledger.load()["tasks"][task["task_id"]]
+        return public_result(task)
+    finally:
+        client.close()

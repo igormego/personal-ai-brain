@@ -93,3 +93,25 @@ def test_wsl_result_uses_existing_ledger_no_duplicate_or_conflict_launch(monkeyp
     with pytest.raises(ValueError, match='conflict'):
         execute(ledger, payload | {'goal': 'changed'}, Client())
     assert calls == ['prepare', 'thread/start', 'turn/start']
+
+
+def test_local_startup_failure_is_durable_and_never_retried(monkeypatch, tmp_path):
+    from personal_ai_brain import codex_bridge_client as client
+    payload = dict(request_id=str(uuid.uuid4()), task_id=str(uuid.uuid4()),
+                   project_id='personal-ai-brain', execution_profile='local-homelab-admin',
+                   goal='test', acceptance_criteria='test', base_sha='a'*40)
+    calls = []
+    def unavailable(**kwargs):
+        calls.append(kwargs)
+        raise OSError('unavailable backend')
+    monkeypatch.setattr(client, 'AppServer', unavailable)
+    ledger = Ledger(tmp_path)
+    result = wsl.run_local(ledger, payload)
+    assert result['status'] == 'uncertain'
+    assert result['failure_class'] == 'backend_startup_failed'
+    assert result['attempts'] == 1
+    assert wsl.run_local(ledger, payload) == result
+    with pytest.raises(ValueError, match='conflict'):
+        wsl.run_local(ledger, payload | {'goal': 'changed'})
+    assert calls == [{'execution_backend': wsl.BACKEND}]
+    assert ledger.load()['tasks'][payload['task_id']]['turn_id'] is None
