@@ -288,3 +288,31 @@ def test_cancel_preserves_worker_terminal_state(tmp_path, monkeypatch, race_stag
     client = SimpleNamespace(rpc=lambda *args: None, history=history)
     assert cancel(store, p['task_id'], client)['state'] == 'interrupted'
     assert store.load()['tasks'][p['task_id']]['attempts'] == 1
+
+
+def test_execute_waits_through_idle_interval_without_relaunch(tmp_path, monkeypatch):
+    import uuid
+    from personal_ai_brain.codex_bridge_core import Ledger
+    from personal_ai_brain.codex_bridge_client import execute
+    from personal_ai_brain import codex_bridge_workspace as workspace
+    monkeypatch.setattr(workspace, 'git', lambda *args: 'a'*40)
+    monkeypatch.setattr(workspace, 'prepare', lambda *args: {'cwd': 'trusted'})
+    payload = dict(request_id=str(uuid.uuid4()), task_id=str(uuid.uuid4()),
+                   project_id='personal-ai-brain', execution_profile='local-homelab-admin',
+                   goal='test', acceptance_criteria='test', base_sha='a'*40)
+    class Client:
+        def __init__(self):
+            self.calls = []
+            self.waits = 0
+        def rpc(self, method, params):
+            self.calls.append(method)
+            return {'thread': {'id': 'thread'}} if method == 'thread/start' else {'turn': {'id': 'turn'}}
+        def event(self, timeout):
+            self.waits += 1
+            if self.waits == 1:
+                raise queue.Empty
+            return {'method': 'turn/completed', 'params': {'turn': {'id': 'turn', 'status': 'completed'}}}
+    client = Client()
+    assert execute(Ledger(tmp_path), payload, client, validate_completion=lambda ws: {})['state'] == 'succeeded'
+    assert client.waits == 2
+    assert client.calls == ['thread/start', 'turn/start']

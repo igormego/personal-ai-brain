@@ -324,7 +324,12 @@ def execute(ledger, payload, client, timeout=120, validate_completion=None):
         ledger.bind(task_id, thread_id, turn_id)
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
-            event = client.event(min(30, max(.01, deadline - time.monotonic())))
+            try:
+                event = client.event(min(30, max(.01, deadline - time.monotonic())))
+            except queue.Empty:
+                # A quiet model interval is not transport death. Keep the same
+                # turn alive until the trusted overall execution deadline.
+                continue
             if ledger.submit(payload)["state"] == "approval_required":
                 client.close()
                 return ledger.submit(payload)

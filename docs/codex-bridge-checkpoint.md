@@ -659,3 +659,79 @@ Pending: real integrated thread/ledger acceptance, backend crash matrix,
 cancellation, real coding/result commit, final security review, exact final
 Homelab regression, PR/CI/merge, local installation and Project State closure.
 No native MXC investigation resumed. Remote transport remains disabled.
+
+## 2026-10-23 approved integrated acceptance and coding stop
+
+User explicitly approved tracked repository code/docs, task-created workspace
+files and bounded instructions/test output for authenticated OpenAI ChatGPT/Codex
+processing. Credentials, private ledgers, unrelated files, unrestricted logs and
+additional destinations remain excluded. No further approval boundary bypassed.
+
+Integrated workspace task 86ecfe44-21f0-4bbf-be06-cfbec9bfa166:
+thread 01a16916-ce8a-7fb3-b27d-e114370638e1;
+turn 01a16916-d0c4-7612-b9a2-ca353e657afa; base 095ae1e.
+Real model turn verified normal relative list/read/write/child operations,
+external/auth-file invisibility and network denial. Trusted bounded fixture
+validator passed; Windows ledger succeeded, persisted history completed.
+Actual turn/start count 1; identical duplicate returned succeeded with count still
+1; modified payload rejected. Close 0.093s, lifecycle STOPPED.
+
+Live cancellation exposed a concurrent terminal-state race: initial task
+0d58bf4c-3108-4a2a-822a-960b12a82877 reached interrupted, while cancellation caller
+raised state_conflict after worker recorded the same terminal state. No replay.
+Fix f20a24b preserves/reloads terminal truth and retries only a bounded CAS race;
+two regression cases added. Fresh cancellation acceptance passed below.
+
+Fixed local API run_local added in 0c244db: internally selects WSL backend;
+backend-startup failure consumes one durable reservation and returns uncertain;
+no listener/poller, no task-selected configuration. Startup-failure duplicate
+cannot start the backend again. Trusted validator is operator code, not payload.
+
+Backend-dependent matrix (all model instructions within approved scope):
+
+| Case | Task ID | Thread ID | Turn ID | Starts | Persisted history | Windows ledger |
+| --- | --- | --- | --- | --- | --- | --- |
+| Active owned WSL invocation/transport killed | e8c72251-c167-4c2e-8440-d3be396ac069 | 01a1691b-853c-75d0-a977-fcf4ca05de7b | 01a1691b-86c2-7e62-9b51-2d4be41d8c8b | 1 | interrupted | uncertain |
+| Windows bridge hard-killed active | 0981e48c-5923-4cb6-83bc-54a73f6ba350 | 01a1691c-62ad-7d40-a905-dc1a51b206d6 | 01a1691c-64e1-7af2-868b-7e97591e045e | 1 | interrupted | interrupted |
+| Approval pending | 7e1e6300-f6a2-4dec-8abf-7bc9441198de | 01a1691e-ce09-74c1-8b09-b0bf025ee48c | 01a1691e-d057-7062-a8f5-122a041a81cf | 1 | interrupted after close | approval_required before cleanup; interrupted after recovery |
+| Completed turn; terminal write fault injected | 240572cf-bfe8-4e7a-9f03-81d3ef27691a | 01a1691f-c914-7ef2-88b6-8ba7c65ade1b | 01a1691f-cb78-7782-8f3a-cebdb1080216 | 1 | completed | uncertain, missing validated result |
+| WSL executable unavailable at startup | 56cae51c-80b7-424b-856a-69224a85dc28 | none | none | 0 | none | uncertain, backend_startup_failed |
+| Supported cancellation | e1587453-42ca-46a6-a961-bdaf2161e862 | 01a1691a-e7b9-7f83-a957-4d96d09b303b | 01a1691a-e9ec-7a82-bcfe-f81b78449656 | 1 | interrupted | interrupted |
+
+Each matrix case returned its stored result on duplicate without another start.
+Unrelated independently owned WSL processes survived each accepted case; no
+wsl --shutdown or process-name killing. Active transport case killed only the
+owned Windows WSL invocation, not a separately targeted Linux PID. Bridge hard
+kill closed its Job Object. Successful explicit closes <=0.109s; pending worker
+threads released. Startup-unavailable case completed in 3.110s with one startup
+attempt. Initial approval diagnostic task e0bcd49d-5960-4164-9dc0-b213b39c3480 also
+interrupted safely, but omitted intermediate-state receipt, so the fresh explicit
+approval case above is the acceptance evidence. No approval accepted.
+Private bounded receipts under .native-controls-private/wsl-matrix/.
+
+Coding acceptance STOP:
+Task 03c1f1ca-b74a-449c-b724-c2131185569b, base
+0c244db421673f5e0a5ce1983be17538a0eec3cb;
+thread 01a16920-13b6-7711-a19c-715e8556ab75;
+turn 01a16920-15ac-76c2-acc9-f07648b322ee. Exactly 1 turn/start.
+Goal: meaningful FreshnessPolicy attention-name validation plus tests, restricted
+to state_quality.py and test_state_quality.py. Trusted validator was to inspect
+bounded diff, rerun tests inside official sandbox and make a local-only commit.
+Execution returned uncertain after ~43s; history was inProgress before close,
+then interrupted on read-only follow-up. Owned checkout status/diff empty.
+No generated source change, passing coding tests or task commit exists.
+Identical duplicate stayed uncertain; modified payload rejected; count stayed 1.
+No resume/replay/new coding task started. Coding artifact checkout retained.
+
+Found client idle-event bug: queue.Empty after a quiet 30s interval escaped the
+execution loop and caused uncertain cleanup before its longer overall deadline.
+This is consistent with the observed timing; the original exception type was not
+persisted, so exact attribution is not claimed as proven. Fix now waits through
+idle intervals on the SAME turn until overall deadline, with a regression test
+that asserts only one start. Focused Windows suite now 83 passed.
+
+Live acceptance stopped at the failed coding gate. A fresh explicitly authorized
+coding task is needed after the idle fix; never replay the interrupted task ID.
+Remaining: successful real coding/result commit; final exact Homelab regression;
+full final security review; PR/CI/merge; installed local invocation; Project State
+closure. Remote transport remains disabled. No generated change pushed/merged.
