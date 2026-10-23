@@ -775,3 +775,17 @@ one reservation/automatic turn maximum; uncertain never replayed; Job-owned boun
 shutdown; existing single dispatcher and method allowlist (thread/shellCommand
 forbidden); result mapper allowlisted. No remote listener/poller added.
 Live backend tests plus exact final Homelab regression/CI remain distinct evidence.
+
+## 2026-10-23 final regression and publication candidate
+
+Exact tested Git candidate: f5a6cb0cc0ff4fa4fa88b042ea591907a0ae7d8c.
+Lossless Git bundle transferred to isolated Homelab
+/tmp/pab-bridge-final.FEVc6XYa/checkout; HEAD asserted exact before execution.
+Fresh venv, editable .[dev], full PAB suite including platform-independent bridge
+coverage: 318 passed in 2.12s. Compileall and Git diff check passed; tracked tree
+clean. Exact Homelab scan: 122 tracked files, zero private-key/token-pattern files.
+No production checkout/service/config changed. Windows focused suite: 83 passed.
+This section changes evidence documentation only; implementation remains identical
+to the exact tested candidate. PR CI will additionally validate its final head.
+Security review passed within the documented boundaries. Proceeding with the
+already-authorized Change/Review PR; no autonomous generated task change included.
