@@ -399,3 +399,66 @@ pending. No PR/push/merge/deployment/Project State completion.
 Next supported investigation: provider-path compatibility under MXC with a
 controlled root and narrowly scoped sandbox/runtime diagnostic evidence,
 without granting root/parent/canonical access.
+
+## 2026-10-23 decisive native execution-path control
+
+Classification D: GENERAL MXC WORKSPACE FAILURE on the tested runtime/profile.
+This is below the bridge app-server client: the supported codex sandbox command
+reproduced the provider failure without app-server or model execution.
+
+Versions:
+- OpenAI.Codex Appx package 26.1016.6573.0.
+- CLI/app-server 0.163.0-alpha.11.
+- Windows 11 25H2 build 26200.9457.
+- Installed Windows PowerShell 5.1.26100.9444, System32 WindowsPowerShell v1.0.
+- Explicit windows.sandbox=mxc; bridge-workspace-only; task network false.
+- App updater separately reported installedVersion 26.1016.51333, build 21161,
+  prod channel, restart_required. This is not an up-to-date confirmation.
+- Alternate CLI bin directory had no executable. No relevant supported fix/version
+  was established from available release information. No update/restart performed.
+  Verdict is scoped to the tested runtime, not every future native release.
+
+One fresh trusted worktree control aa9a187e-5e5c-4ec4-94ff-dd1dcaff403e:
+Host same Windows PowerShell -NoProfile -NonInteractive, cwd worktree:
+provider/process cwd correct, relative listing/read/write, Set-Location . and
+controlled child all succeeded.
+Official Codex sandbox invocation used --include-managed-config,
+--permission-profile bridge-workspace-only, --cd exact worktree, and explicit
+MXC plus the existing profile overrides. No legacy sandbox policy fields.
+
+Official sandbox + PowerShell:
+process cwd correct; provider cwd elsewhere; relative listing/read/write and
+Set-Location denied; absolute .NET read/write allowed.
+Canonical/other/home controlled sentinel reads denied.
+
+Separate official sandbox cmd checks, with individual exit codes:
+cwd: exit 0, matches exact task root;
+dir /b control.txt: exit 1, access denied;
+type control.txt: exit 0, controlled content read;
+relative echo write: exit 0, controlled file created.
+Thus classification C alone would overstate cmd normal-operation support.
+Directory enumeration failure also affects cmd; classification D is required.
+No prompt-only absolute-path workaround or command/exec substitution is accepted.
+
+WSL read-only inventory: Windows Subsystem for Linux is not installed.
+No distro, bubblewrap, Linux Codex or managed-auth feasibility is established.
+No WSL install/feature enablement, credentials, mount changes or migration.
+A WSL implementation was not started because phase 5/D explicitly requires STOP.
+
+All owned diagnostic worktrees/branches and external sentinels were removed.
+Bounded sanitized receipts retained under .native-controls-private.
+No auth or sandbox-secrets access. Zero turn/start in this slice (host/official
+sandbox controls only). No implementation change; baseline tests not repeated.
+Windows historical total 67; Linux historical accepted worktree total 288;
+final lifecycle Linux regression remains pending.
+No PR/push/merge/installation/Project State completion. Remote transport disabled.
+
+Recommended next step:
+resolve/confirm the supported native runtime update state, then repeat only this
+small official-sandbox control. If enumeration remains denied, address the native
+MXC/profile runtime compatibility with supported diagnostics; do not modify
+bridge launch logic or grant parent/root/home access to hide the failure.
+If separately proceeding to WSL, first provision/verify WSL2 through supported
+mechanisms; prefer bridge-owned Linux-filesystem task checkout and keep trusted
+app-server authentication outside all sandboxed command mounts. Feasibility and
+credential isolation must be proven before adopting that lane.
