@@ -541,3 +541,41 @@ or nested virtualization prerequisites before Linux acceptance. No automatic
 reboot, credential access, bridge changes, full acceptance or milestone closure.
 Microsoft guidance: https://learn.microsoft.com/en-us/windows/wsl/troubleshooting
 requires restarting after enabling Virtual Machine Platform.
+
+## 2026-10-23 post-reboot WSL2 feasibility
+
+Windows reboot verified (last boot 2026-10-23 12:25:21 host local). WSL no longer
+reports virtualization unavailable. Supported Debian install completed exit 0;
+wsl --list --verbose registers Debian version 2. Distro starts: Debian 13.5 trixie,
+WSL2 kernel 6.18.54.1-microsoft-standard-WSL2. No firmware changes needed.
+Standard Debian packages installed: bubblewrap 0.12.0, Git, Python3/venv,
+Node.js/npm, curl and CA certificates (including package-manager dependencies).
+Created unprivileged pabbridge account, UID 1000, without administrator membership.
+Normal stable npm @openai/codex@latest installed CLI/app-server 0.164.0.
+No nightly/development/unofficial package. Windows native runtime unchanged.
+
+Unprivileged bwrap --unshare-all minimal-system startup: BWRAP_OK.
+Official codex sandbox on Linux task Git repository
+/home/pabbridge/tasks/4097983cedf5418ca37ccc59e34308b9 used unchanged bridge
+root-deny, minimal-read, workspace-write, tmp-deny and network-disabled semantics.
+Exit 0: cwd exact, relative list/read/write and child traversal succeeded.
+Trusted sibling sentinel, Windows home, Windows Codex home and canonical Windows
+repository paths invisible (FileNotFoundError); socket connection PermissionError.
+Only harmless Linux sentinel content was created; no real private file read.
+Linux bounded receipt in /home/pabbridge/trusted/control-4097983cedf5418ca37ccc59e34308b9.json.
+
+Windows ProcessOwner Job Object -> WSL Python parent+sleep child smoke test:
+close 0.016 seconds; both owned Linux PIDs absent afterward. This is one graceful
+ownership smoke test, not full bridge-crash/lifecycle acceptance.
+Windows-owned Linux app-server stdio initialize succeeded, userAgent 0.164.0
+Debian; close 0.016 seconds. Zero model turns; remote transport remains disabled.
+
+Dedicated Linux codex login status: not logged in. Started official ChatGPT device
+authentication, awaiting user browser completion. No Windows auth copied/extracted,
+no API key, no credentials printed/stored in task folders. One-time device code
+is intentionally omitted here. Authentication/inference, backend-dependent crash
+acceptance, real coding task and result mapping remain unverified. Current bridge
+implementation is not yet wired to WSL; feasibility must not be reported as full
+milestone acceptance. No PR/merge/Project State closure.
+Official install/auth references: https://learn.chatgpt.com/docs/cli and
+https://learn.chatgpt.com/docs/auth.
