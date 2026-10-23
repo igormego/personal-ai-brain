@@ -66,3 +66,27 @@ def test_result_omits_untrusted_content(tmp_path):
     task["raw_event"] = {"secret": "not for output"}
     result = public_result(task)
     assert not {"goal", "acceptance_criteria", "raw_event", "thread_id"} & result.keys()
+
+@pytest.mark.parametrize("result", [
+    {"raw_event":"forbidden"},
+    {"files_changed":["C:/Users/private"]},
+    {"files_changed":["../private"]},
+    {"files_changed":["name\nsecret"]},
+    {"test_summary":"ok\nsecret"},
+    {"additions":True},
+])
+def test_result_metadata_rejects_unbounded_or_private_shapes(result):
+    from personal_ai_brain.codex_bridge_core import validate_result
+    with pytest.raises(ValueError,match="invalid_result"):
+        validate_result(result)
+
+def test_completed_without_required_validation_stays_uncertain(tmp_path):
+    ledger=Ledger(tmp_path)
+    p=payload()
+    ledger.submit(p)
+    ledger.transition(p["task_id"],"submitted","reserved")
+    ledger.transition(p["task_id"],"reserved","running",thread_id="thread",
+                      turn_id="turn",requires_validation=True)
+    ledger.recover(lambda thread,turn:"completed")
+    assert ledger.submit(p)["state"]=="uncertain"
+    assert ledger.submit(p)["attempts"]==1

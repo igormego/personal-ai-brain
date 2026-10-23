@@ -212,12 +212,12 @@ def test_execute_uses_only_trusted_allocated_cwd(tmp_path, monkeypatch):
         def event(self,timeout):
             return {"method":"turn/completed","params":{"turn":{"id":"turn","status":"completed"}}}
     client=Client()
-    assert execute(ledger,payload,client)["state"]=="succeeded"
+    assert execute(ledger,payload,client,validate_completion=lambda ws:{})["state"]=="succeeded"
     assert client.calls[0]==("thread/start",{
         "cwd":"trusted-worktree","permissions":"bridge-workspace-only","approvalPolicy":"on-request"})
     assert set(client.calls[1][1])=={"threadId","input"}
     assert allocations==[(payload["task_id"],"a"*40)]
-    assert execute(ledger,payload,client)["state"]=="succeeded"
+    assert execute(ledger,payload,client,validate_completion=lambda ws:{})["state"]=="succeeded"
     assert len(client.calls)==2
     assert len(allocations)==1
 

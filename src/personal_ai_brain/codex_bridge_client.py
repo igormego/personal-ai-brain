@@ -274,7 +274,7 @@ class AppServer:
             self.close_lock.release()
 
 
-def execute(ledger, payload, client, timeout=120):
+def execute(ledger, payload, client, timeout=120, validate_completion=None):
     """Reserve exactly once. Caller-supplied factory/bind are trusted local code."""
     task = ledger.submit(payload)
     if task["state"] != "submitted":
@@ -304,7 +304,7 @@ def execute(ledger, payload, client, timeout=120):
         thread_id = result["thread"]["id"]
         ledger.bind(task_id, thread_id, None)
         # Persist running BEFORE the potentially ambiguous turn/start RPC.
-        ledger.transition(task_id, "reserved", "running")
+        ledger.transition(task_id, "reserved", "running", requires_validation=True)
         result = client.rpc("turn/start", {
             "threadId": thread_id, "input": [{"type": "text", "text":
                 task["goal"] + "\nAcceptance criteria:\n" + task["acceptance_criteria"]}]})
@@ -322,6 +322,12 @@ def execute(ledger, payload, client, timeout=120):
                     continue
                 target = {"completed": "succeeded", "failed": "failed",
                           "interrupted": "interrupted"}.get(turn["status"], "uncertain")
+                if target == "succeeded":
+                    if validate_completion is None:
+                        return ledger.transition(task_id, "running", "failed",
+                                                 failure_class="validation_required")
+                    metadata = validate_completion(workspace)
+                    return ledger.transition(task_id, "running", target, result=metadata)
                 return ledger.transition(task_id, "running", target)
         client.rpc("turn/interrupt", {"threadId": thread_id, "turnId": turn_id})
     except Exception:

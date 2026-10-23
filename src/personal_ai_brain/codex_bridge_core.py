@@ -137,7 +137,7 @@ class Ledger:
                  "approval_required": {"interrupted", "uncertain", "cancelled"}}
         if target not in edges.get(expected, set()):
             raise ValueError("invalid_transition")
-        if set(fields) - {"thread_id", "turn_id", "failure_class"}:
+        if set(fields) - {"thread_id", "turn_id", "failure_class", "result", "requires_validation"}:
             raise ValueError("invalid_metadata")
         with locked(self.root / "ledger.lock"):
             state = self.load()
@@ -148,6 +148,8 @@ class Ledger:
                 if task["attempts"] != 0:
                     raise ValueError("replay_forbidden")
                 task["attempts"] = 1
+            if "result" in fields:
+                validate_result(fields["result"])
             task.update(fields, state=target, updated_at=now())
             atomic(self.path, state)
             return dict(task)
@@ -180,19 +182,47 @@ class Ledger:
                     status = None
             target = {"completed": "succeeded", "failed": "failed",
                       "interrupted": "interrupted"}.get(status, "uncertain")
+            if target == "succeeded" and task.get("requires_validation") and "result" not in task:
+                target = "uncertain"
             # Approval states cannot become success from unrelated/stale evidence.
             if task["state"] == "approval_required" and target in {"succeeded", "failed"}:
                 target = "uncertain"
             self.transition(task["task_id"], task["state"], target,
                             failure_class=None if target == "succeeded" else "recovery_" + target)
 
+def validate_result(result):
+    allowed = {"branch", "commit_sha", "files_changed", "additions", "deletions", "test_summary"}
+    if not isinstance(result, dict) or set(result) - allowed:
+        raise ValueError("invalid_result")
+    for key in ("branch", "commit_sha", "test_summary"):
+        if key in result and (not isinstance(result[key], str) or len(result[key]) > 512 or
+                              any(ord(c) < 32 for c in result[key])):
+            raise ValueError("invalid_result")
+    for key in ("additions", "deletions"):
+        if key in result and (type(result[key]) is not int or not 0 <= result[key] <= 100000000):
+            raise ValueError("invalid_result")
+    if "files_changed" in result:
+        files = result["files_changed"]
+        if (not isinstance(files, list) or len(files) > 128 or
+                any(not isinstance(f, str) or len(f) > 256 or ":" in f or
+                    f.startswith(("/", "\\\\")) or ".." in f.split("/") or
+                    any(ord(c) < 32 for c in f) for f in files)):
+            raise ValueError("invalid_result")
+
+
 def public_result(task):
     """Deliberately omit goal, raw output, paths and arbitrary model summaries."""
-    return {key: task[key] for key in (
+    output = {key: task[key] for key in (
         "request_id", "task_id", "project_id", "base_sha", "repository",
         "attempts", "created_at", "updated_at", "failure_class")} | {
             "status": task["state"],
             "approval_required": task["state"] == "approval_required"}
+    result = task.get("result", {})
+    if isinstance(result, dict):
+        for key in ("branch", "commit_sha", "files_changed", "additions", "deletions", "test_summary"):
+            if key in result:
+                output[key] = result[key]
+    return output
 
 def approval(ledger, task_id, event):
     if event.get("method") in {

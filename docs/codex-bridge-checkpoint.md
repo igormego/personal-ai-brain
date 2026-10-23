@@ -290,3 +290,45 @@ Focused Windows suite: 60 passed. Includes owned-descendant inherited-pipe test,
 unrelated-process survival, shutdown states/idempotency, waiter release, ownership
 reuse rejection and ledger-only cancellation targeting.
 Full final validation and real coding acceptance remain pending.
+
+## Internal coding acceptance STOP after lifecycle repair
+
+Lifecycle checkpoint: 3a1cd6edfb0f030aaa9c9ea4e2bdc5479fe286e8.
+Additional uncommitted validation guard:
+executed tasks require trusted completion validation before succeeded;
+completed turn history without a durable required-validation result reconciles
+uncertain. Result metadata shape is bounded/allowlisted.
+Focused Windows tests including guard/result cases: 67 passed in 1.95 seconds.
+This candidate has not had final Linux validation.
+
+Real coding task 39aa076f-7f11-4df7-879e-96e62f615274:
+thread 01a16597-fb38-7661-95dc-11dc3d5bed57;
+turn 01a16598-0109-7130-9885-a2c1a7a66d62;
+base 3a1cd6edfb0f030aaa9c9ea4e2bdc5479fe286e8.
+One turn/start, result uncertain, duplicate same stored result,
+conflicting payload rejected. No generated commit, no source files changed.
+The private runtime was staged only inside this owned worktree.
+
+Read-only persisted item inspection:
+three commandExecution items, each exit 1, zero passed-test summaries.
+All command cwd fields matched the allocated task worktree.
+Get-Content repository-relative reads reported missing path.
+A subsequent Set-Location reported access denied.
+Thus correct command cwd metadata and absolute sentinel access do not yet prove
+normal PowerShell repository-relative coding usability.
+Exact provider-location/runtime cause remains unresolved; no root-read grant,
+profile broadening or task retry was attempted.
+
+The canonical-comparison receipt is invalidated: the supervising agent added
+authorized focused tests in canonical while acceptance was active. Its false
+status/diff comparison must NOT be treated as evidence of a task escape.
+No generated task edits were found in either approved source/test file.
+
+Per Windows live-acceptance STOP condition, no remaining matrix or further coding
+turn followed. Failed/uncertain worktrees and private ledger receipts retained.
+No PR/push/merge/local installation/Project State closure.
+Remote transport remains disabled.
+
+Next investigation: reconcile shell provider location and MXC directory access
+inside the correctly mapped worktree, using controlled relative reads and
+Set-Location tests. Do not conflate that with the fixed inherited-pipe shutdown.
