@@ -332,3 +332,70 @@ Remote transport remains disabled.
 Next investigation: reconcile shell provider location and MXC directory access
 inside the correctly mapped worktree, using controlled relative reads and
 Set-Location tests. Do not conflate that with the fixed inherited-pipe shutdown.
+
+## 2026-10-23 shell/provider diagnosis STOP
+
+Preservation checkpoint:
+59f6fcd1e20dff90d60bccacf96c298b1d651c0a.
+No permission broadening or normal interactive configuration changes.
+
+Comparison:
+both prior successful sentinel turn and failed coding turn used installed Windows
+PowerShell, named bridge-workspace-only, explicit MXC, on-request approvals,
+trusted thread cwd and no turn-level cwd/sandbox overrides.
+Successful simple probes used absolute .NET File APIs; failed coding used
+PowerShell provider-relative operations. That distinction matters.
+
+Fresh real-thread matrix:
+baseline runtime roots, no-login control, exact task profile root.
+No-login trials produced no usable flag evidence and are inconclusive.
+Baseline/exact-root .NET file operations passed; provider-relative operations
+failed. Initial path-comparison labels used doubled slashes and are superseded.
+
+Authoritative corrected exact-root diagnostic:
+workspace 1048cf80-8466-4c19-abaf-fbec9fee4a5d;
+thread 01a167ec-5641-7b61-b6ec-3be1a85921df.
+One turn in this fresh diagnostic thread; no approval.
+- process cwd: exact task worktree;
+- PowerShell provider cwd: other;
+- .NET absolute and relative sentinel reads: allowed;
+- absolute provider Get-Content: allowed;
+- .NET absolute directory enumeration: allowed;
+- exact root GetAttributes: allowed;
+- absolute write: allowed;
+- provider Get-Item ., relative Get-ChildItem/Get-Content/Set-Content: denied;
+- nested provider-relative read / Resolve-Path: denied;
+- Set-Location exact worktree / . / controlled child: denied.
+
+The same exact trusted task path was added reversibly to profile workspace_roots
+for the final variant; it did not repair provider access. No canonical/parent
+root was added, no :root read, no legacy sandbox mixing.
+All diagnostic worktrees/branches and controlled files were removed.
+These were explicitly authorized fresh diagnostic turns, not retries of a
+durable bridge coding task.
+
+Read-only persisted command metadata:
+installed Windows PowerShell=True, NoProfile=True, NonInteractive=False;
+no Set-Location before supplied probe body.
+The earlier whole-command wrapper_location flag included the probe's own
+Set-Location tests and is NOT evidence of an internal wrapper prefix.
+Profile loading and a pre-probe cd wrapper are not demonstrated causes.
+
+The official documented CODEX_HOME/.sandbox/sandbox.log was absent.
+.sandbox-secrets was not accessed. No raw events/auth/log bodies retained.
+No independent Python was installed or provisioned for these diagnostic turns.
+
+Conclusion:
+process cwd propagation and direct file access are functioning.
+Failure is isolated to Windows PowerShell provider location/path resolution
+under this restrictive MXC setup; the exact underlying provider/access check
+is not established. Do not claim an ancestor grant is necessary or safe.
+Normal coding usability remains NOT ACCEPTED despite absolute sentinel success.
+
+Per explicit relative-path STOP condition, no coding retry or final milestone
+closure followed. Windows baseline remains 67; no implementation changed in this
+slice, so full suites were not repeated. Final Linux lifecycle validation remains
+pending. No PR/push/merge/deployment/Project State completion.
+Next supported investigation: provider-path compatibility under MXC with a
+controlled root and narrowly scoped sandbox/runtime diagnostic evidence,
+without granting root/parent/canonical access.
