@@ -462,3 +462,24 @@ If separately proceeding to WSL, first provision/verify WSL2 through supported
 mechanisms; prefer bridge-owned Linux-filesystem task checkout and keep trusted
 app-server authentication outside all sandboxed command mounts. Feasibility and
 credential isolation must be proven before adopting that lane.
+
+## 2026-10-23 supported-restart handoff
+
+Requested slice: resolve restart_required before rerunning ONLY the narrow official
+sandbox controls. No full bridge acceptance or WSL installation until the native
+post-restart verdict is available.
+Pre-restart: Appx 26.1016.6573.0; CLI/app-server 0.163.0-alpha.11;
+updater installedVersion 26.1016.51333/build 21161/prod/restart_required.
+Windows 26200.9457; Windows PowerShell 5.1.26100.9444.
+Only desktop package processes are authorized restart targets. Standalone codex
+process ownership was not established and they must not be killed by name.
+Persisted private ledgers and retained uncertain worktrees remain unchanged.
+
+After restart:
+1. query updater and Desktop/CLI/app-server versions; establish actual change;
+2. official MXC compatibility echo with managed :workspace, startup only;
+3. recreate one owned worktree and repeat PowerShell/cmd relative operation controls
+   and controlled canonical/other/home denials, using unchanged restrictive profile;
+4. if fixed, smallest real thread probe; if still broken, stop native investigation
+   and perform authorized supported WSL2 feasibility/setup, preserving all isolation.
+No post-restart result is claimed by this handoff.
