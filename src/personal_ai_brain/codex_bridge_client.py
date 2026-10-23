@@ -61,10 +61,20 @@ def bridge_environment():
 
 
 class AppServer:
-    def __init__(self, executable):
-        args = [str(executable), "app-server", "--listen", "stdio://"]
-        for setting in OVERRIDES:
-            args.extend(["-c", setting])
+    def __init__(self, executable=None, *, execution_backend=None):
+        self.workspace_backend = None
+        if execution_backend is not None:
+            from .codex_bridge_wsl import select_backend
+            self.workspace_backend = select_backend(execution_backend)
+            if executable is not None:
+                raise ValueError("backend_executable_override")
+            args = self.workspace_backend.launch_args()
+        else:
+            if executable is None:
+                raise ValueError("executable_required")
+            args = [str(executable), "app-server", "--listen", "stdio://"]
+            for setting in OVERRIDES:
+                args.extend(["-c", setting])
         from .codex_bridge_process import ProcessOwner
         self.lifecycle = "STARTING"
         self.stopping = threading.Event()
@@ -298,7 +308,9 @@ def execute(ledger, payload, client, timeout=120, validate_completion=None):
         approved_base = git("rev-parse", "HEAD")
         if task["base_sha"] != approved_base:
             raise ValueError("base_not_approved")
-        workspace = prepare(task_id, approved_base)
+        backend = getattr(client, "workspace_backend", None)
+        workspace = (backend.prepare(task_id, approved_base) if backend is not None
+                     else prepare(task_id, approved_base))
         result = client.rpc("thread/start", {
             "cwd": workspace["cwd"], "permissions": PROFILE, "approvalPolicy": "on-request"})
         thread_id = result["thread"]["id"]
