@@ -483,3 +483,44 @@ After restart:
 4. if fixed, smallest real thread probe; if still broken, stop native investigation
    and perform authorized supported WSL2 feasibility/setup, preserving all isolation.
 No post-restart result is claimed by this handoff.
+
+## 2026-10-23 post-restart native verdict and WSL setup
+
+Desktop restart verified by process replacement: old PID 28748 absent; new package
+main PID 31668. Helper receipt stopped before completion, so it is not proof of
+successful updater activation. Package path remains OpenAI.Codex_26.1016.6573.0.
+Updater: installedVersion 26.1016.51333, build 21161, prod, restart_required.
+Packaged CLI (also app-server executable) --version: 0.163.0-alpha.11, unchanged.
+No real runtime update confirmed; update pending state remains unresolved.
+
+Fresh disposable Git repository postrestart-c67846004b7742108cda611fefdcb8a8:
+- Official documented explicit-MXC compatibility echo: MXC_OK, exit 0.
+- Unchanged restrictive bridge profile, managed config, network disabled, exact cwd.
+- Installed Windows PowerShell -NoProfile -NonInteractive: process cwd correct;
+  provider cwd C:\; listing/read/write/Set-Location fail; exit 1.
+- cmd: cd correct exit 0; dir access denied exit 1; relative type and write exit 0.
+- Harmless canonical/other-repo/home sentinels all denied (exit 23); removed.
+- No app-server/turn execution and no bridge implementation changes.
+Bounded sanitized receipt: .native-controls-private/postrestart-c67846004b7742108cda611fefdcb8a8.json.
+Native verdict: STILL BROKEN on unchanged installed runtime after verified Desktop
+restart. Stop native investigation per current user instruction; proceed WSL2.
+
+WSL setup: status confirms not installed. Both wsl --install --distribution Debian
+--no-launch and bare wsl --install returned exit 1 with not-installed message.
+Runner token is not administrator (require_escalated bypasses workspace sandbox,
+but does not itself grant Windows administrator rights). Normal UAC RunAs launch
+of supported Debian installer requested; completion not yet established.
+No Linux distro/bwrap/Codex/auth/isolation/process-lifecycle feasibility claimed.
+No credentials copied/read, no API key, no permission broadening, no bridge-client
+workaround, no full acceptance, PR, merge, or Project State completion.
+References: https://learn.chatgpt.com/docs/windows/windows-sandbox;
+https://learn.chatgpt.com/docs/app/windows;
+https://learn.microsoft.com/en-us/windows/wsl/basic-commands.
+
+WSL install delta: UAC-launched installer PID 30316 subsequently exited. WSL now
+reports version 3.0.3.0, kernel 6.18.54.1-1, default version 2. No distribution is
+registered. WSL2 startup reports virtualization unavailable and requests Virtual
+Machine Platform plus firmware virtualization. This does not establish which
+prerequisite is missing; an administrator read-only feature/firmware query was
+launched through normal UAC to distinguish them. No automatic reboot requested.
+Distro/bwrap/Linux Codex/auth/sandbox/bridge process feasibility remains pending.
