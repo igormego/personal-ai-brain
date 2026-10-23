@@ -579,3 +579,34 @@ implementation is not yet wired to WSL; feasibility must not be reported as full
 milestone acceptance. No PR/merge/Project State closure.
 Official install/auth references: https://learn.chatgpt.com/docs/cli and
 https://learn.chatgpt.com/docs/auth.
+
+## 2026-10-23 WSL ChatGPT authentication verified
+
+Official device-auth retry completed: Successfully logged in. Dedicated Linux
+account codex login status reports Logged in using ChatGPT. No API key or Windows
+credential extraction/copy; login cache remains in Linux account Codex home.
+Post-login controlled sentinel inside that Codex home is invisible under official
+sandbox with unchanged restrictive profile (DENIED, exit 0); sentinel removed.
+
+Transport discovery: WSL default-shell invocation expanded the TOML filesystem
+argument, causing app-server startup exit 2 before initialize. Early probe timeout
+was startup failure, not an ambiguous model turn. WSL --exec preserves direct
+argument boundaries and fixes this transport issue without permission changes.
+Use --exec for future bridge-owned app-server invocation; do not use shell command
+strings to transport TOML arguments.
+
+Exactly one real post-login inference reached turn/start and completed under the
+restrictive Linux profile, approval on-request; no approval accepted. Thread
+01a16909-d251-73f0-afd0-780978da20db; turn
+01a16909-d734-7f40-8e4a-552b30215c3f. Terminal status completed, error null.
+Prompt requested only fixed acknowledgement and no tools or filesystem changes.
+Windows-owned Job Object close was immediate at timer precision.
+Bounded receipt: .native-controls-private/wsl-auth-probe.json. Authentication and
+basic app-server inference feasibility now pass. This does not establish a real
+coding task or end-to-end durable bridge acceptance.
+
+Next implementation/acceptance work: wire the trusted WSL transport and Linux task
+workspace allocation into the Windows-ledger bridge, preserving fixed project
+mapping, payload hashes, idempotency, approval and no-replay semantics. Then verify
+backend-dependent real coding/result mapping and crash lifecycle. Existing passed
+dispatcher and ledger gates remain reusable. No PR/merge/Project State closure.
