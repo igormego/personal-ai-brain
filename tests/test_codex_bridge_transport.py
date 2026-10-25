@@ -308,3 +308,35 @@ def test_validator_fixed_sandbox_and_no_payload_options(monkeypatch):
     assert 'permissions.bridge-workspace-only.network.enabled=false' in args
     assert rt.VALIDATE in args
     with pytest.raises(ValueError):rt.validate_completion(ws|{'cwd':'/other'})
+
+
+def test_repeated_transport_failure_backoff_is_bounded(setup):
+    worker, mailbox, ledger, turns = setup
+    stop=threading.Event(); delays=[]
+    def fail(): raise t.TransportError()
+    mailbox.verify=fail
+    def wait(delay):
+        delays.append(delay)
+        if len(delays)==5: stop.set()
+    t.serve(worker,stop,wait)
+    assert delays==[60,120,240,300,300]
+
+
+def test_tampered_authoritative_comment_fails_closed(setup):
+    worker, mailbox, ledger, turns = setup
+    p=payload();mailbox.add(1,p)
+    with pytest.raises(t.TransportError,match='delivery_reconcile'):worker.tick()
+    mailbox.messages[1][0]['body'] += 'tampered'
+    with pytest.raises(t.TransportError,match='result_integrity_failure'):worker.tick()
+    assert mailbox.posts==1 and not mailbox.closed and len(turns)==1
+
+
+def test_runtime_uses_only_accepted_local_entry(monkeypatch):
+    seen=[]
+    def run(ledger, request, **kwargs):
+        seen.append(kwargs)
+        return {'status':'succeeded'}
+    monkeypatch.setattr(rt,'run_local',run)
+    request=t.parse_request(json.dumps(payload()))
+    assert rt.execute(object(),request)=={'status':'succeeded'}
+    assert seen==[{'validate_completion':rt.validate_completion,'timeout':600}]

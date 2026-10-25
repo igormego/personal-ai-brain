@@ -287,7 +287,7 @@ def serve(worker, stop, wait=None):
                 worker.tick()
                 delay = 30
             except TransportError as error:
-                delay = min(300, max(delay, error.delay))
+                delay = 30 if error.code == 'delivery_reconcile' else min(300, max(delay * 2, error.delay))
                 atomic(worker.root / 'health.json', {'status': error.code, 'checked_at': now()})
             except Exception:
                 atomic(worker.root / 'health.json', {'status': 'worker_failure', 'checked_at': now()})
