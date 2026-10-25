@@ -277,3 +277,13 @@ def test_canonical_transport_identity_and_redirect_boundary():
     assert NoRedirect().redirect_request(
         None, None, 301, "Moved", {}, "https://api.github.com/repos/other/repo"
     ) is None
+
+
+def test_homelab_ignores_windows_bridge_protocol(tmp_path):
+    calls = []
+    worker, transport = make_worker(tmp_path, [json.dumps(request())], lambda args: calls.append(args))
+    transport.issues[1]['title'] = 'pab-codex/v0.1'
+    worker.tick()
+    assert not calls and not transport.comments
+    assert transport.issues[1]['state'] == 'open'
+    assert not list((tmp_path / 'requests').iterdir())
