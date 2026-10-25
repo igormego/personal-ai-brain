@@ -172,3 +172,26 @@ private Issues credential and caller boundary are reused. See
 durable handoff semantics, ownership/mount boundaries and the separate external
 ChatGPT acceptance gate. The earlier read-only registry restriction describes
 v0.4A; only these named local-work effects are now additionally permitted.
+
+## Canonical owner maintenance — 2026-10-23
+
+PR #21 (`2236ac3`) fixes the stale owner without accepting redirects or changing
+credential permissions. The running adapter verifies the private
+`igormego/personal-project-brain` repository directly. Issues read/write was
+verified by a correlated `core.health` request, result comment and automatic
+closure; private Contents remains denied for the transport credential. Complete
+fine-grained grant enumeration was unavailable; no broader permission audit is claimed.
+
+Internal maintenance request `5fe3183a-dbe8-4a78-924d-0ccacfe2363f` completed in
+private Issue #42 with existing source findings (12 states, 3 errors, 6 warnings,
+2 proposals). This accepts the existing Homelab control path, not external ChatGPT
+transport into the new Windows Local Bridge. A 2026-10-25 read-only refresh confirmed
+healthy transport, both healthy containers and successful fresh Core reads.
+
+The runtime checkout preserves base `f7ad9ba` on local deployment branch
+`codex/runtime-issues-owner-20261023`, with only PR #21 cherry-picked as `eeb749c`.
+The control image layers only the corrected module onto the prior image;
+`personal-ai-brain:control-before-owner-fix-20261023` remains available for rollback.
+The normal `personal-ai-brain:control` tag points to the corrected image. Core was
+recreated for credential refresh; unrelated services were not restarted. Updating
+the preserved runtime baseline to current main is outside this maintenance scope.

@@ -92,6 +92,13 @@ Homelab implementation and internal transport verification are distinct from the
 final ChatGPT connector acceptance. The rolling handoff records both explicitly.
 See [control bridge](control-bridge.md). Repo Steward remains a separate future step.
 
+Verified maintenance on 2026-10-23: Core credential rotated; all four fresh Core
+capabilities completed. The existing Issues adapter uses the canonical owner with
+redirects still denied; one internal read-only Issue roundtrip completed. Core and
+transport remained healthy in the 2026-10-25 post-expiry check. See the
+[credential inventory](credential-inventory.md) and [control bridge](control-bridge.md).
+Remote Transport Activation into the Windows Local Bridge and external ChatGPT
+acceptance remain a separate pending gate.
 ## Future — Repo Steward
 
 First write-capable specialist agent.
