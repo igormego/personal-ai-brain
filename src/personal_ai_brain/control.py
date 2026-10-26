@@ -9,6 +9,7 @@ from uuid import UUID
 
 from personal_ai_brain import runtime
 from personal_ai_brain.machine_snapshot import build_machine_snapshot
+from personal_ai_brain.assistant_project_os import StatusRejected, select_project_status, validate_selector
 
 
 class Rejected(ValueError):
@@ -151,6 +152,22 @@ def build_registry(core_state: Path, reader_factory, redactor, work_client=None)
             return result
         return handler
 
+    def project_status(arguments):
+        # The existing Core reader owns GitHub source access; the selector has
+        # no repository/ref/path input and can never invoke coding or writes.
+        reader = reader_factory()
+        _agent, snapshot, _proposals = runtime.collect(reader)
+        try:
+            return select_project_status(snapshot, arguments)
+        except StatusRejected:
+            raise CapabilityFailed("source_read_failure") from None
+
+    def project_status_selector(arguments):
+        try:
+            return validate_selector(arguments)
+        except StatusRejected:
+            raise Rejected("invalid_project_selector") from None
+
     def logs_tail(arguments):
         path = core_state / "service.log"  # Fixed file, never a request argument.
         with path.open("rb") as source:
@@ -168,6 +185,13 @@ def build_registry(core_state: Path, reader_factory, redactor, work_client=None)
     caps = [Capability("runtime.health", "Core process liveness and last manual run", "read_only", empty_schema, no_arguments, runtime_health)]
     for kind in ("health", "snapshot", "report", "rollup_proposals"):
         caps.append(Capability("core." + kind, "Fresh read-only Core " + kind, "read_only", empty_schema, no_arguments, core_result(kind)))
+    caps.append(Capability("project_os.status", "Read-only one-project or workstream status",
+                           "read_only",
+                           {"type": "object", "additionalProperties": False,
+                            "required": ["project_id"],
+                            "properties": {"project_id": {"type": "string"},
+                                           "workstream_id": {"type": "string"}}},
+                           project_status_selector, project_status))
     caps.append(Capability("runtime.logs_tail", "Bounded redacted Core lifecycle log", "read_only",
                            {"type": "object", "additionalProperties": False, "properties": {"lines": {"type": "integer", "minimum": 1, "maximum": 100}}},
                            log_arguments, logs_tail))
