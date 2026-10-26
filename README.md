@@ -39,6 +39,10 @@ Project State → Core ──┼─ Homelab Agent
                        orchestrated actions
 ```
 
+## Personal Assistant direction
+
+The first user-facing product direction is a single Personal Assistant reachable through ChatGPT and, later, WhatsApp, with shared backend capabilities and durable domain state rather than separate channel-specific bots. See [Personal Assistant MVP](docs/personal-assistant-mvp.md).
+
 ## Core Agent
 
 Implemented:
