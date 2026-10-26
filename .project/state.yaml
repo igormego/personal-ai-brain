@@ -9,10 +9,13 @@ status: "active"
 phase: "chatgpt-codex-local-bridge-v01-accepted"
 
 current_gate: >
-  Local Bridge v0.1 durable core is COMPLETED and locally accepted after PR #20.
-  Remote Transport Activation and external ChatGPT-originated acceptance are the
-  next gate; remote transport, remote approvals, automatic review/correction and
-  autonomous publication/deployment remain disabled. Core Agent remains read-only.
+  Local Bridge v0.1 remains locally accepted (PR #20). Outbound Windows remote
+  transport implementation merged on 2026-10-25 (PR #23), but live Windows
+  credential/install/startup/readiness have not been independently verified here.
+  Issue #22 Remote Transport Activation and external ChatGPT-originated acceptance
+  remain OPEN; READY_FOR_EXTERNAL_CHATGPT_ACCEPTANCE is not established.
+  Remote approvals, automatic review/correction, autonomous publication/deployment
+  remain disabled. Core Agent stays read-only.
 
 current_state: >
   Credentialless Coding Agent Broker v0.1 foundation and ChatGPT/Codex Local Bridge
@@ -35,15 +38,25 @@ current_state: >
   Core credential maintenance completed on 2026-10-23: replacement verified with
   four fresh Core capabilities, canonical Issues owner fixed, and one read-only
   Issue roundtrip completed. Post-expiry Core and transport checks passed on
-  2026-10-25. This does not activate transport into the Windows Local Bridge.
+  2026-10-25. This does not by itself activate transport into the Windows Local Bridge.
+  On 2026-10-25 PR #23 merged the bounded outbound Windows Issues mailbox and
+  strict pab-codex/v0.1 adapter; CI passed and PR evidence reports 143 focused
+  Windows tests. Runtime installation, dedicated credential permission checks,
+  actual startup, Homelab coexistence and external ChatGPT acceptance were not
+  demonstrated by this GitHub-only refresh. New specialist workstream Personal
+  Assistant - ChatGPT & WhatsApp is scoped in Issue #25, blocked by Issue #22;
+  its Gateway v0.1 and WhatsApp adapters are NOT implemented.
 
 exact_next_action: >
-  Remote Transport Activation + external ChatGPT acceptance. Define and separately
-  approve a narrow authenticated transport into the accepted local run_local API,
-  with fixed project/backend mapping, durable request/task IDs, explicit owner
-  approvals and bounded results. Then test one external request, duplicate/conflict,
-  recovery and correlated result delivery. Do not enable a listener or GitHub queue
-  poller before that milestone is approved.
+  Platform owner: complete the approved Issue #22 Windows-local transport
+  credential/installation/startup/least-privilege and Homelab coexistence checks
+  for already-merged PR #23, then explicitly report READY_FOR_EXTERNAL_CHATGPT_ACCEPTANCE
+  only if live prerequisites pass. Independent ChatGPT caller then tests one
+  bounded real request, duplicate/conflict, recovery and correlated result delivery;
+  do not create a test Issue before READY. On acceptance, close #22 and update
+  Project State. Personal Assistant owner next implements Issue #25: one normalized
+  ChatGPT request and one read-only Project OS status capability, with no WhatsApp
+  integration until that contract is accepted.
 
 blockers: []
 
@@ -55,7 +68,9 @@ dependencies:
 
 important_open_loops:
   - "COMPLETED: Credentialless Coding Agent Broker v0.1 foundation; Local Bridge durable core, request/task idempotency, dispatcher, approval_required, bounded lifecycle/recovery, WSL2 backend, managed ChatGPT auth, Linux workspace isolation and internal real coding acceptance. See docs/codex-bridge-checkpoint.md."
-  - "PENDING: Remote Transport Activation, external ChatGPT-originated acceptance, remote approval workflow, automatic ChatGPT review/correction loop, autonomous PR/merge/deploy, OpenAI API provider, local LLM provider and provider router. These are not enabled by the accepted local bridge."
+  - "IMPLEMENTED IN CODE, NOT LIVE-ACCEPTED: PR #23 outbound Windows remote transport mailbox; Issue #22 pending Windows installation/readiness and independent ChatGPT acceptance. No live external bridge gate closure is claimed."
+  - "PENDING: Remote approval workflow, automatic ChatGPT review/correction loop, autonomous PR/merge/deploy, OpenAI API provider, local LLM provider and provider router."
+  - "PERSONAL ASSISTANT: Issue #25 is the owner-scoped Gateway v0.1 implementation handoff, dependent on Issue #22; approved direction docs/personal-assistant-mvp.md; no assistant Gateway/WhatsApp code exists."
   - "Codex Cloud pab-homelab-dev: VERIFIED_WITH_WARNING on 2026-10-12 for repository-only PAB/Homelab development; task lifecycle and surface selection recorded in docs/codex-environments.md. Absolute SSH absence remains uncertified after a configuration-only proxy response; pwsh requires the saved startup PATH export and is not on default PATH. No live Homelab acceptance implied."
   - "Codex local-homelab-admin: Local acceptance VERIFIED_WITH_WARNINGS on 2026-10-13; installed project environment/action schema confirmed, exact user-context SSH probe passed; UI recognition, fresh Worktree execution and organization policy remain unverified. Canonical checkouts and preserved worktrees established; old task roots, generated ledger artifacts, referenced SSH-key candidate and auth ACL review remain preserved/pending. Ledger README additions are already represented or superseded in canonical documentation. See docs/codex-environments.md."
   - "Retain bounded transport inbox/outbox records (2048-entry cap) and execution deduplication truth; no automatic pruning."
@@ -77,11 +92,15 @@ portfolio:
   signal: >
     Local durable Bridge v0.1 is accepted with managed ChatGPT coding through a
     restricted WSL2 backend. External transport and autonomous publication remain
-    pending; the generated coding-task commit stays local.
+    pending; the generated coding-task commit stays local. Outbound transport
+    code merged via PR #23; live activation/external acceptance remain unverified.
+    Assistant Gateway scope recorded in Issue #25, without runtime changes.
 
 verification:
-  last_verified: "2026-10-25"
+  last_verified: "2026-10-26"
   sources:
+    - "2026-10-26 GitHub-only refresh: PR #23 (6c0273c11f26a14ed5b35f0aa51f74faa03dede5) merged 2026-10-25 with CI success; PR evidence reports 143 focused Windows tests. No fresh Windows machine/runtime or Homelab probe; installation/readiness/external acceptance unverified."
+    - "Issue #22 https://github.com/igormego/personal-ai-brain/issues/22 remains OPEN with no external acceptance evidence. Approved assistant handoff https://github.com/igormego/personal-ai-brain/blob/main/docs/personal-assistant-mvp.md; scoped Gateway tracking https://github.com/igormego/personal-ai-brain/issues/25."
     - "2026-10-23 maintenance: docs/credential-inventory.md records Core replacement, owner-confirmed least privilege, protected storage and old-token natural-expiry decision. All four fresh Core capabilities completed with existing source findings."
     - "PR https://github.com/igormego/personal-ai-brain/pull/21 merged as 2236ac3e064f2b35f3816d45385f9597c45946e7 after green CI and 40 control tests. Canonical owner fix preserves redirect rejection and credential permissions."
     - "Internal control roundtrip: private Issue #42, request 5fe3183a-dbe8-4a78-924d-0ccacfe2363f, core.health completed, one correlated result comment and automatic closure. New Local Bridge Remote Transport Activation/external acceptance still pending."
