@@ -1,8 +1,8 @@
 # Local Bridge outbound Issues transport v0.1
 
 Implementation for [Issue #22](https://github.com/igormego/personal-ai-brain/issues/22).
-External ChatGPT acceptance remains pending. Project State must not mark this
-milestone complete until that independent acceptance passes.
+External ChatGPT acceptance completed on 2026-10-26. Project State records the
+accepted v0.1 milestone and its bounded limitations.
 
 ## Fixed boundary
 
@@ -159,3 +159,33 @@ State complete. An independent ChatGPT caller must create/read the real coding
 request, then test identical duplicate and conflicting payload with zero added
 turns. Remote approvals, review/correction loops, autonomous publication/deployment,
 API/local-model providers and routing remain out of scope.
+
+## External acceptance — 2026-10-26
+
+Independent ChatGPT-originated acceptance completed after READY:
+
+- private Issue #44 submitted request
+  `0349729a-b6d2-4524-ab0e-492088304024` / task
+  `8ee760bf-ee69-4804-b9e9-c532cac1decc` on base
+  `ce2ca72a8735ef6b2e674d5ba1e985ecc8d88586`;
+- the Windows worker consumed it and the Local Bridge executed exactly one task
+  attempt through the WSL Codex backend;
+- the result was `succeeded`, changed only the two v0.1 allowlisted files and
+  reported `9 tests passed in restricted Linux sandbox`;
+- Issue #44 received one correlated authoritative result comment and closed;
+- identical replay Issue #45 closed without a second result comment;
+- conflicting same-task Issue #46 returned `task_conflict` with `attempts=0`
+  and closed, proving no second task execution;
+- malformed Issue #43, missing required `base_sha`, was rejected and closed
+  without execution before the corrected request;
+- existing Homelab control remained independent: external `runtime.health`
+  Issue #47 and `core.health` Issue #48 both completed and closed normally.
+
+The generated coding patch remained local/uncommitted. No push, PR, merge,
+deployment or remote approval was performed by the coding task.
+
+Accepted v0.1 scope remains intentionally narrow: fixed `personal-ai-brain`
+mapping, fixed execution profile/backend, and remote edits limited to
+`state_quality.py` plus `test_state_quality.py`. Multi-project routing,
+remote approvals, automated review/correction, autonomous publication/deployment,
+local/API provider routing and budget-aware scheduling remain separate milestones.
