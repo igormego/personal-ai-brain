@@ -10,7 +10,7 @@ from uuid import uuid4
 import pytest
 
 from personal_ai_brain.control import Capability, Redactor, Rejected, Registry, build_registry, no_arguments, parse_request
-from personal_ai_brain.control_worker import Worker, bounded_result, durable_json, health
+from personal_ai_brain.control_worker import Worker, bounded_result, durable_json, health, load_json
 from personal_ai_brain.github_issues import GitHubIssues, REPOSITORY, TITLE, TransportError
 
 
@@ -88,6 +88,55 @@ def test_duplicate_id_and_completed_issue_never_execute_again(tmp_path):
     assert len(calls) == 1 and len(transport.comments) == 2
 
 
+
+
+def test_conflicting_replay_same_request_id_is_rejected_without_reexecution(tmp_path):
+    original = request()
+    changes = dict(original)
+    changes["requested_by"] = "different_caller"
+    calls = []
+    worker, transport = make_worker(tmp_path, [json.dumps(original), json.dumps(changes)],
+                                    lambda args: calls.append(args) or {"ok": True})
+    worker.tick()
+    assert len(calls) == 1
+    assert [r[1]["status"] for r in transport.comments] == [
+        "capability_completed", "request_rejected",
+    ]
+    assert transport.comments[1][1]["error"] == "request_conflict"
+    first = load_json(tmp_path / "requests" / (original["request_id"] + ".json"))
+    assert first["status"] == "capability_completed"
+    assert len(first["payload_hash"]) == 64
+
+
+def test_conflicting_arguments_do_not_borrow_other_request_truth(tmp_path):
+    original = request()
+    # Both select valid read-only arguments, but one request ID cannot refer
+    # to two logical project lookups.
+    changes = dict(original)
+    changes["requested_at"] = (datetime.now(timezone.utc) -
+                               timedelta(seconds=10)).isoformat()
+    calls = []
+    worker, transport = make_worker(tmp_path, [json.dumps(original), json.dumps(changes)],
+                                    lambda args: calls.append(args))
+    worker.tick()
+    assert len(calls) == 1
+    assert transport.comments[1][1]["status"] == "request_rejected"
+    assert transport.comments[1][1]["error"] == "request_conflict"
+
+
+def test_matching_replay_after_worker_restart_returns_saved_result(tmp_path):
+    payload = json.dumps(request())
+    calls = []
+    worker, transport = make_worker(tmp_path, [payload], lambda args: calls.append(args) or {"ok": 1})
+    worker.tick()
+    second = 2
+    transport.issues[second] = dict(number=second, title=TITLE, state="open", body=payload)
+    restarted = Worker(tmp_path, transport, worker.registry, worker.redactor)
+    restarted.tick()
+    assert calls == [{}]
+    assert transport.comments[-1][1]["status"] == "duplicate"
+    assert transport.comments[-1][1]["result"] == {"ok": 1}
+
 def test_failed_delivery_retries_result_without_reexecution(tmp_path):
     calls = []
     worker, transport = make_worker(tmp_path, [json.dumps(request())], lambda args: calls.append(args))
@@ -107,7 +156,11 @@ def test_interrupted_reservation_is_not_reexecuted(tmp_path):
                  {"status": "processing", "transport_issue": "previous", "request_id": data["request_id"]})
     worker.tick()
     assert not calls
-    assert transport.comments[0][1]["original_status"] == "capability_execution_failed"
+    # A reservation created before the hash migration has no trustworthy
+    # payload binding. Preserve it and fail closed rather than assume a replay.
+    assert transport.comments[0][1]["status"] == "request_rejected"
+    assert transport.comments[0][1]["error"] == "request_conflict"
+    assert load_json(tmp_path / "requests" / (data["request_id"] + ".json"))["status"] == "processing"
 
 
 def test_exception_sanitized_worker_continues_and_correlates(tmp_path):
