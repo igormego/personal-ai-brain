@@ -37,44 +37,55 @@ def private_acl(path):
         raise RuntimeError('private_acl_required')
 
 
-# Fixed validator runs all task code under the accepted restrictive Linux sandbox.
-# No task-controlled test command, paths, environment, or unrestricted output.
+# Trusted policy is supplied by the installed worker, never imported from task code.
+# Both editable files map to one pure, socket-free test module. No fallback suite.
 VALIDATE = r'''
-import json, pathlib, re, subprocess, sys, tempfile, os, resource
+import hashlib, json, pathlib, re, subprocess, sys, tempfile, os, resource
 cwd, base = sys.argv[1:]
 os.chdir(cwd)
+allowed = {'src/personal_ai_brain/state_quality.py', 'tests/test_state_quality.py'}
 def git(*args):
     r=subprocess.run(['/usr/bin/git','-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false',
         '-c','diff.external=','-c','core.worktree='+cwd,*args],capture_output=True,timeout=30)
-    if r.returncode or len(r.stdout)>65536: raise RuntimeError('git_validation_failed')
-    return r.stdout.decode().strip()
-if git('rev-parse','HEAD') != base: raise RuntimeError('unexpected_commit')
-if git('ls-files','--others','--exclude-standard'): raise RuntimeError('untracked_files')
-git('diff','--check')
-rows=git('diff','HEAD','--numstat','--no-ext-diff','--no-textconv').splitlines()
-files=[]; additions=deletions=0
-for row in rows:
-    a,d,p=row.split('\t')
-    if not re.fullmatch(r'(src/personal_ai_brain/[a-z0-9_]+\.py|tests/test_[a-z0-9_]+\.py|docs/[a-zA-Z0-9_-]+\.md|README\.md)',p):
-        raise RuntimeError('change_scope_denied')
-    if pathlib.Path(p).is_symlink(): raise RuntimeError('symlink_denied')
-    files.append(p); additions+=int(a); deletions+=int(d)
-if not files or len(files)>32 or additions+deletions>3000: raise RuntimeError('change_size_denied')
-fd,name=tempfile.mkstemp(prefix='.pab-validation-',dir=cwd)
-try:
-    with os.fdopen(fd,'wb') as log:
+    if r.returncode or len(r.stdout)>1048576: raise RuntimeError('git_validation_failed')
+    return r.stdout
+
+def inspect():
+    if git('rev-parse','HEAD').decode().strip() != base: raise RuntimeError('unexpected_commit')
+    if git('ls-files','--others','--exclude-standard'): raise RuntimeError('untracked_files')
+    git('diff','HEAD','--check')
+    rows=git('diff','HEAD','--numstat','--no-renames','--no-ext-diff','--no-textconv').decode().splitlines()
+    files=[]; additions=deletions=0
+    for row in rows:
+        a,d,p=row.split('\t')
+        if p not in allowed: raise RuntimeError('change_scope_denied')
+        path=pathlib.Path(p)
+        if path.is_symlink() or path.resolve()!=pathlib.Path(cwd)/p:
+            raise RuntimeError('symlink_denied')
+        if not path.is_file(): raise RuntimeError('file_required')
+        if git('ls-tree',base,'--',p).split()[0]!=b'100644': raise RuntimeError('regular_file_required')
+        files.append(p); additions+=int(a); deletions+=int(d)
+    if not files or len(files)>2 or additions+deletions>3000: raise RuntimeError('change_size_denied')
+    # Compare complete patch bytes, not just numstat: same-size edits must fail too.
+    patch=git('diff','HEAD','--binary','--no-renames','--no-ext-diff','--no-textconv')
+    return files,additions,deletions,hashlib.sha256(patch).hexdigest()
+
+before=inspect()
+with tempfile.TemporaryDirectory(prefix='.pab-validation-',dir=cwd) as temporary:
+    name=pathlib.Path(temporary)/'output'
+    with name.open('wb') as log:
         def limits(): resource.setrlimit(resource.RLIMIT_FSIZE,(1048576,1048576))
-        r=subprocess.run(['/usr/bin/python3','-m','pytest','-q','-p','no:cacheprovider'],
+        r=subprocess.run(['/usr/bin/python3','-m','pytest','-q','-p','no:cacheprovider',
+             '--basetemp',str(pathlib.Path(temporary)/'pytest'), 'tests/test_state_quality.py'],
              stdout=log,stderr=subprocess.STDOUT,timeout=180,preexec_fn=limits)
     if r.returncode: raise RuntimeError('sandboxed_tests_failed')
-    with open(name,'rb') as log:
-        log.seek(max(0,os.path.getsize(name)-4096)); tail=log.read().decode(errors='replace')
-    matches=re.findall(r'(\d+) passed',tail)
+    if name.stat().st_size>1048576: raise RuntimeError('test_output_limit')
+    with name.open('rb') as log:
+        log.seek(max(0,name.stat().st_size-4096)); tail=log.read().decode(errors='replace')
+    matches=re.findall(r'(?m)^(\d{1,6}) passed(?: in [0-9.]+s)?\s*$',tail)
     if not matches: raise RuntimeError('missing_test_summary')
-finally: pathlib.Path(name).unlink(missing_ok=True)
-if git('rev-parse','HEAD')!=base: raise RuntimeError('unexpected_commit')
-if git('diff','HEAD','--numstat','--no-ext-diff','--no-textconv').splitlines()!=rows:
-    raise RuntimeError('tests_changed_tree')
+if inspect()!=before: raise RuntimeError('tests_changed_tree')
+files,additions,deletions,_=before
 print(json.dumps(dict(files_changed=files,additions=additions,deletions=deletions,
                      test_summary=matches[-1]+' tests passed in restricted Linux sandbox')))
 '''

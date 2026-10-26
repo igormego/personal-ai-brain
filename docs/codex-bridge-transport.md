@@ -42,14 +42,37 @@ must equal the trusted local HEAD; the worker does not fetch or change that HEAD
 Malformed requests close without echoing their bodies or executing anything;
 a sanitized rejection reason remains in the private delivery store.
 
-The v0.1 trusted completion validator permits bounded edits to existing tracked
-Python source/tests, top-level Markdown docs and README: at most 32 files and 3000
-changed lines. New untracked files, symlinks, dependency/policy/config changes and
-changes to HEAD are rejected. All repository tests are rerun in the accepted Linux
-sandbox with a fixed command, bounded output and deadline. Test output is never
-posted. The result reports a local patch and test count, not a fabricated commit;
-`commit_sha` is optional and absent for this validator. Requests should explicitly
-say to leave changes uncommitted. No task changes are pushed, PR'd, merged or deployed.
+The v0.1 trusted completion validator accepts changes only to these existing
+tracked files; both map to the same fixed pytest selection:
+
+| Remote-edit allowlist | Fixed test selection |
+| --- | --- |
+| `src/personal_ai_brain/state_quality.py` | `tests/test_state_quality.py` |
+| `tests/test_state_quality.py` | `tests/test_state_quality.py` |
+
+This pure state-quality module is the smallest useful coding surface for external
+acceptance. Documentation-only requests and all other source/test/config paths
+are rejected. In particular, broker, transport, runtime and security policy are
+not remotely editable. The installed Windows worker supplies the policy directly;
+request/model text and task checkout code cannot replace it.
+
+The fixed command is `/usr/bin/python3 -m pytest -q -p no:cacheprovider
+--basetemp <validator-owned-task-local-temp> tests/test_state_quality.py`. It runs
+inside the unchanged root-deny, network-disabled Linux sandbox. The full suite,
+including Unix-socket tests, remains the CI and exact-tree Homelab implementation
+regression gate, not the remote completion command.
+
+At most two files and 3000 changed lines are allowed. HEAD, untracked files,
+symlinks, regular files and `git diff HEAD --check` are checked before and after
+tests. The complete patch digest must remain unchanged, including same-size
+mutations. Test output is capped at 1 MiB, never transported, and removed with
+validator-owned temporary files. The deadline remains 180 seconds; failures never
+produce successful completion. Only a fixed test-count summary is returned.
+The result reports a local patch; `commit_sha` is absent. Requests must leave
+changes uncommitted. No task changes are pushed, PR'd, merged or deployed.
+
+The first external acceptance must make a harmless real coding change within
+this allowlist and add appropriate state-quality coverage; docs-only is insufficient.
 
 ## Results, replay and failure
 
