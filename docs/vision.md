@@ -4,6 +4,45 @@ Personal AI Brain is a local-first personal multi-agent platform.
 
 Its purpose is not merely to answer questions over notes. It should become an operational layer that understands durable project state, coordinates specialist agents, uses tools safely, maintains useful memory, and helps execute Igor's real workflows.
 
+## Two complementary products — decision recorded 2026-10-26
+
+We are intentionally building **two related but distinct products**, not choosing
+one at the expense of the other:
+
+1. **Personal Assistant (the everyday product).** One natural-language entry
+   point across ChatGPT and, later, WhatsApp. It helps Igor plan his day, capture
+   ideas, resume hobbies, use current project context and delegate bounded work
+   through approved capabilities. Its success is measured by useful outcomes,
+   reduced coordination and less manual context-switching. Product direction:
+   [Personal Assistant MVP](personal-assistant-mvp.md).
+2. **Personal AI Brain / Agent Platform (the product-building system).** Project
+   OS, specialist ownership, reusable capability contracts, safe tool access,
+   agent execution paths, durable state, permissions, tests, audit and deployment
+   gates. It is valuable **in its own right**: it enables Igor to build, evaluate,
+   extend and maintain the Personal Assistant and other project agents without
+   manually managing every integration and handoff.
+
+These tracks are complementary: the Assistant requests an approved ability; the
+platform and relevant specialist own its implementation and safeguards. An example
+of the **future desired workflow**, not an already enabled autonomous feature:
+Igor asks for gaming-database recommendations; the platform identifies the gaming
+specialist, scopes the integration, prepares/tests a bounded capability, obtains
+any required approval, verifies a controlled deployment and only then makes the
+capability available through the Assistant. Specialist chats can remain human work
+surfaces; they are not presumed externally callable APIs.
+
+**Engineering-value guardrail:** Each implementation milestone should deliver
+a demonstrably useful capability, remove a concrete blocker/risk, or enable an
+identified reusable platform function with an explicit consumer and verifiable
+acceptance. Avoid creating infrastructure merely because a new abstraction is
+interesting. At the same time, **exploration and learning are legitimate goals**
+and need not immediately become deliverables, quotas or tickets. Keep separate
+labels for exploration, approved work, tested code and deployed capability.
+
+**Boundary:** This clarifies product ownership and prioritization; it does not
+merge the two tracks, create a new autonomous agent/workstream, expand permissions,
+authorize automatic deployment or supersede current milestone gates.
+
 ## End-state
 
 The intended mature system contains specialized agents with explicit responsibilities, for example:
