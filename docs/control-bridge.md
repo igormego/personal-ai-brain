@@ -46,6 +46,7 @@ Do not grant repository access expecting `requested_by` to restrict it.
 | `core.report` | `{}` | Fresh Markdown report and health summary |
 | `core.rollup_proposals` | `{}` | Fresh proposals, never applied |
 | `runtime.logs_tail` | `{}` or `{"lines":30}` | Fixed Core service log, 1–100 lines, at most 4096 output bytes |
+| `project_os.status` (source merged, live deployment pending) | `{"project_id":"homelab"}` or `{"project_id":"homelab","workstream_id":"media-automation"}` | One bounded status/gate/next action from Core project map; explicit freshness and source findings |
 
 Every registry entry declares an ID, description, risk level, argument schema and
 validator, handler and side-effect class. Only `read_only` / `none` entries can
@@ -53,6 +54,31 @@ register in this version. Core handlers reuse deterministic collection functions
 and the existing GET-only reader, without writing Core files or source content.
 Local private audit writes and Issues result/close operations are infrastructure
 effects of the bridge, not user-selectable mutation capabilities.
+
+## Assistant Project OS status and request-conflict checkpoint — 2026-10-26
+
+The read-only `project_os.status` source and tests were merged in PR #32
+(`c4ca92f0`; 494 tests passed). Only logical IDs are accepted: `project_id`
+and optional `workstream_id`. The capability reuses the existing Core
+collection and reports project phase, gate, exact next action, verification
+age/freshness and source integrity finding codes. No caller-controlled repository,
+path, URL, ref, shell command or domain write is added.
+
+PR #33 (`f9f93ab4`; 497 tests passed) strengthens the existing durable
+`pab-control/v0.1` request identity: new request records bind the UUID
+to a canonical SHA-256 of the *complete* validated request. Same-ID,
+different-body replay now fails closed with `request_conflict` and no
+handler invocation. Historical reservations without a verifiable payload hash
+are preserved, not migrated or re-executed, and their replays fail closed.
+An exact duplicate of a post-upgrade request still reuses saved result truth.
+
+**Deployment status: not yet live-accepted.** The external ChatGPT test in
+private Issue #51 returned `request_rejected / unknown_capability` from the
+still-running older Homelab worker. Review the runtime checkout/image drift
+before any controlled update; use the platform-owned [deployment gate](https://github.com/igormego/personal-ai-brain/issues/34).
+Do not treat successful GitHub CI as evidence of a live deploy. Keep all
+existing control audit records and unrelated runtime services unchanged.
+The project-facing Gateway acceptance remains tracked in [Issue #25](https://github.com/igormego/personal-ai-brain/issues/25).
 
 ## Result and idempotency
 
