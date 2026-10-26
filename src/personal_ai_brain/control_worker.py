@@ -2,6 +2,7 @@
 import argparse
 from contextlib import contextmanager
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -94,6 +95,11 @@ class Worker:
             try:
                 request = parse_request(issue.get("body"))
                 correlation = request["request_id"]
+                # Bind the durable UUID to the entire original validated request.
+                # A replay with changed fields must not borrow prior task truth.
+                payload_hash = hashlib.sha256(json.dumps(
+                    request, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+                ).encode("utf-8")).hexdigest()
                 record.update(request_id=correlation, capability=request["capability"],
                               requested_by=request["requested_by"], requested_at=request["requested_at"])
                 capability, arguments = self.registry.resolve(request["capability"], request["arguments"])
@@ -101,13 +107,21 @@ class Worker:
                 request_path = self.state / "requests" / (correlation + ".json")
                 existing = load_json(request_path)
                 if existing:
-                    if existing["status"] == "processing":
-                        existing.update(status="capability_execution_failed", error="interrupted_execution_not_retried", execution_end=timestamp())
-                        self.save(request_path, existing)
-                    record.update(status="duplicate", original_status=existing["status"],
-                                  original_issue=existing["transport_issue"], result=existing.get("result"))
+                    if existing.get("payload_hash") != payload_hash:
+                        # Old pre-upgrade reservations cannot be verified; reject
+                        # rather than treating an unbound UUID as a safe replay.
+                        # Never overwrite or replay the original execution truth.
+                        record.update(status="request_rejected", error="request_conflict")
+                    else:
+                        if existing["status"] == "processing":
+                            existing.update(status="capability_execution_failed",
+                                            error="interrupted_execution_not_retried",
+                                            execution_end=timestamp())
+                            self.save(request_path, existing)
+                        record.update(status="duplicate", original_status=existing["status"],
+                                      original_issue=existing["transport_issue"], result=existing.get("result"))
                 else:
-                    record.update(status="processing", execution_start=timestamp())
+                    record.update(payload_hash=payload_hash, status="processing", execution_start=timestamp())
                     self.save(request_path, record)  # fsync BEFORE any handler invocation.
                     try:
                         with deadline():
