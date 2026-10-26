@@ -173,7 +173,14 @@ def test_cancel_during_execution_is_received_concurrently(setup):
 def test_original_registry_unchanged_and_new_operations_explicit(tmp_path):
     old = build_registry(tmp_path, None, Redactor())
     new = build_registry(tmp_path, None, Redactor(), Client())
-    assert len(old.capabilities) == 6 and len(new.capabilities) == 9
+    assert set(old.capabilities) == {
+        'runtime.health', 'core.health', 'core.snapshot',
+        'core.report', 'core.rollup_proposals', 'runtime.logs_tail',
+        'project_os.status',
+    }
+    assert set(new.capabilities) == set(old.capabilities) | {
+        'work.submit', 'work.status', 'work.cancel',
+    }
     for name, cap in old.capabilities.items():
         other = new.capabilities[name]
         assert cap.argument_schema == other.argument_schema
