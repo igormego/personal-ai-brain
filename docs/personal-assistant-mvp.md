@@ -48,6 +48,35 @@ Examples:
 
 The two surfaces are adapters, not separate assistants. Durable user/project/domain truth remains in the authoritative systems rather than being copied into per-channel chat memory.
 
+## Long-term assistant experience — clarified 2026-10-26
+
+This is an **approved product/UX direction**, not a claim of implemented features and not an expansion of Gateway v0.1 scope. The desired experience is **one everyday assistant** for personal planning, project coordination, hobbies and general questions. Igor should not have to choose a specialist chat, project repository or technical service before asking.
+
+Representative requests and intended routing:
+
+| Igor asks | Long-term behavior |
+| --- | --- |
+| "What's on today? When should we work on projects?" | Read available calendar, commitments, Project OS priorities and agreed personal planning preferences; distinguish current information from stale assumptions. |
+| "Plan today's workout according to our rules." | Retrieve the agreed training rules and relevant progress; propose a plan, not invent missing workout or health data. |
+| "What's next in the homelab? Implement it." | Read authoritative project state; hand work to the approved project capability/execution path under the specialist owner's permissions; request approval where required, verify and report the result. No implicit admin/SSH access. |
+| "Check my games database and recommend something." | Use a connected authoritative gaming catalog and known preferences when available; report unavailable sources. |
+| "We're leveling up in Pathfinder." | Resume from durable character/build/progression decisions without relying on the assistant to remember an entire old chat verbatim. |
+| "Answer this question about the universe." | Answer conversationally on the rich ChatGPT surface, using research when needed, without unnecessarily invoking an agent. |
+
+### Intent routing and specialist delegation
+
+The assistant decides between: **answer directly**, **read an explicit domain capability**, **propose a plan**, or **delegate an approved bounded action**. A specialist project's ChatGPT conversation is a useful human work surface, **not an assumed addressable API or execution endpoint**. Delegation must use real, implemented, capability-owned contracts; progress and execution evidence must return through the normal audit/correlation boundaries. Do not invent specialist agents just to mirror existing chat names.
+
+### Cross-surface continuity and existing ChatGPT chats
+
+Igor wants both a natural single entry point and the ability to continue working in his existing focused ChatGPT chats (e.g. Homelab, Pathfinder, Recipes). Preserve those conversations as useful specialist interfaces, **while durable decisions and project/domain truth live in their existing authoritative sources**. Record only useful outcomes/checkpoints, provenance and relevant preferences; do not copy complete conversations into a new database by default.
+
+Do **not** assume an external WhatsApp/API workflow can append messages to an arbitrary existing ChatGPT conversation or synchronize its native transcript. That capability is unverified and must not be promised. Cross-surface continuity should first mean **shared factual context and resumable work**, not mirrored chat transcripts. If the user resumes a specialist chat, the chat should be able to retrieve the same current state; full transcript synchronization is a separate feasibility question.
+
+### Product boundary and sequence
+
+These scenarios are a **north-star experience**, not v0.1 acceptance criteria. Keep the already approved order: close Remote Transport acceptance; deliver one authenticated ChatGPT-side request and one read-only Project OS capability; accept the common gateway contract; add a WhatsApp adapter; expand read-only domains; approve each write/delegation capability separately. No broad autonomous orchestration, new memory database or permission expansion is authorized by this section.
+
 ## Architectural principles
 
 1. **One assistant, multiple surfaces.** ChatGPT and WhatsApp use the same backend contracts and durable state.
