@@ -63,6 +63,35 @@ Representative requests and intended routing:
 | "We're leveling up in Pathfinder." | Resume from durable character/build/progression decisions without relying on the assistant to remember an entire old chat verbatim. |
 | "Answer this question about the universe." | Answer conversationally on the rich ChatGPT surface, using research when needed, without unnecessarily invoking an agent. |
 
+### Mobile-first capture / brain dump — clarified 2026-10-26
+
+The everyday assistant should work **from a phone through a natural WhatsApp conversation**. Igor should be able to send a fragmented message or voice note immediately, even when away from his computer, and should not have to decide in advance which application, chat, project or task list owns it.
+
+The desired flow is:
+
+```text
+text / voice note / photo / forwarded context
+→ trusted capture with source + timestamp
+→ classify as fact, appointment, task, idea or requested action
+→ normalize dates, owners, deadlines, context and dependencies
+→ ask only for missing decisive information
+→ propose or execute through an explicitly approved capability
+→ verify the outcome in its authoritative destination
+→ reply with a concise confirmation, next question or honest pending status
+```
+
+**Representative future use cases** (illustrations, not events or actions the user is currently asking to schedule):
+
+- **Appointment dump:** “Lekár mi dal termín o mesiac.” Capture the appointment intention, recover an explicit date/time/place from provided text, photo or subsequent message, and avoid inventing one from “o mesiac”. If needed, ask a short follow-up; with an approved calendar-write capability, create the calendar event and optionally an agreed reminder. Medical *appointment logistics* should be privacy-minimized and opt-in; do not record diagnoses, treatments or medical records in WhatsApp by default.
+- **Meeting changed:** “Vo štvrtok pribudla porada. Treba pripraviť tú prezentáciu, o ktorej sme hovorili.” Ground the calendar date and meeting details, recover the relevant existing project discussion/document from a supported authoritative source (not presumed access to all historical chat transcripts), establish the deliverable and deadline, and create a task/brief. Later, when an explicit document/presentation creation and delivery capability is accepted, prepare the presentation or hand off the actual work to the appropriate connected execution surface; confirm what was actually created and where it is available.
+- **Unstructured inbox:** “Napadlo mi X, možno do receptov, pripomeň mi to potom.” Safely capture to the correct owned inbox and acknowledge; where the destination is uncertain, retain a generic pending item without inventing project commitments.
+
+Core UX principle: **capture now, organize later, follow through when authorized**. Quick capture should not need a formal command, category or wizard, and should not trigger a long questionnaire. A reply should separate `captured`, `planned`, `scheduled`, `delegated`, `completed` and `needs_confirmation`; never report success from intent parsing alone.
+
+Mobile use does not depend on keeping the user's laptop awake if the user has explicitly chosen an always-on hosted/shared backend. Laptop-only offline modes must state honestly when background reminders and asynchronous processing are unavailable. The same backend request/capability contracts should be reused on ChatGPT and WhatsApp.
+
+**Scope boundary:** This is a product priority for the eventual WhatsApp/mobile experience, **not a claim that a WhatsApp adapter, shared chat transcript synchronization, memory, calendar writes or presentation-generation automation is implemented**, and not permission to bypass existing Gateway v0.1, identity/authentication, privacy or per-capability approval gates. After the first read-only gateway/WhatsApp transport slice is proven, prioritize *safe inbox capture and calendar/task follow-through* as early useful capabilities rather than expanding every domain first.
+
 ### Intent routing and specialist delegation
 
 The assistant decides between: **answer directly**, **read an explicit domain capability**, **propose a plan**, or **delegate an approved bounded action**. A specialist project's ChatGPT conversation is a useful human work surface, **not an assumed addressable API or execution endpoint**. Delegation must use real, implemented, capability-owned contracts; progress and execution evidence must return through the normal audit/correlation boundaries. Do not invent specialist agents just to mirror existing chat names.
