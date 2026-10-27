@@ -173,7 +173,7 @@ def test_provider_receives_a_copy_not_mutable_registry_policy():
     calls = []
     registry = registry_with_handlers(calls)
 
-    def provider(_message, hints):
+    def provider(_message, hints, _context):
         hints[0].argument_schema["required"].append("path")
         return model_output("invoke_read_only", capability="project_os.status",
                             arguments={"project_id": "homelab"})
