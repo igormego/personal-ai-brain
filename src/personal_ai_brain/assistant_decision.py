@@ -115,7 +115,7 @@ def decide(
     value = _decode(raw)
     action = value.get("action")
 
-    if action in _FIXED_RESPONSES:
+    if isinstance(action, str) and action in _FIXED_RESPONSES:
         if set(value) != {"action"}:
             raise DecisionRejected("model_decision_invalid")
         return DecisionPlan(
