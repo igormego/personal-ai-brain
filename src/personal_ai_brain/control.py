@@ -127,7 +127,7 @@ class Registry:
         return capability, capability.validate(arguments)
 
 
-def build_registry(core_state: Path, reader_factory, redactor, work_client=None):
+def build_registry(core_state: Path, reader_factory, redactor, work_client=None, media_plan_provider=None):
     def runtime_health(_):
         health, code = runtime.health(core_state, core_state / "heartbeat.json")
         last = health.get("last_run", {})
@@ -200,6 +200,39 @@ def build_registry(core_state: Path, reader_factory, redactor, work_client=None)
     caps.append(Capability("runtime.logs_tail", "Bounded redacted Core lifecycle log", "read_only",
                            {"type": "object", "additionalProperties": False, "properties": {"lines": {"type": "integer", "minimum": 1, "maximum": 100}}},
                            log_arguments, logs_tail))
+    if media_plan_provider is not None:
+        # An operator must provide a trusted plan-only adapter; the existing
+        # production worker does not wire one. This registry cannot request,
+        # download, reacquire, write Seerr data or alter ARR configuration.
+        from .assistant_media_selector import MovieSelectorRejected, validate_movie_selector
+        from .assistant_media_plan import MediaPlanUnavailable, get_media_plan
+
+        def validate_media_selector(value):
+            try:
+                return validate_movie_selector(value)
+            except (MovieSelectorRejected, ValueError, TypeError, RecursionError):
+                raise Rejected("invalid_movie_selector") from None
+
+        def media_plan(arguments):
+            try:
+                return get_media_plan(arguments, media_plan_provider)
+            except MediaPlanUnavailable:
+                raise CapabilityFailed("media_plan_unavailable") from None
+
+        caps.append(Capability(
+            "media.plan_movie",
+            "Read-only fixed movie request preflight; never submits a film",
+            "read_only",
+            {"oneOf": [
+                {"type": "object", "additionalProperties": False,
+                 "required": ["tmdb_id"], "properties": {
+                     "tmdb_id": {"type": "integer", "minimum": 1}}},
+                {"type": "object", "additionalProperties": False,
+                 "required": ["title", "year"], "properties": {
+                     "title": {"type": "string"}, "year": {"type": "integer"}}},
+            ]},
+            validate_media_selector, media_plan,
+        ))
     if work_client is not None:
         from .work_handoff import arguments as work_arguments
         from .work_contract import Rejected as WorkRejected

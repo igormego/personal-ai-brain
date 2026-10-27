@@ -100,6 +100,34 @@ outbound delivery into a normal ChatGPT conversation remains unverified.
 [Personal Assistant Gateway #25](https://github.com/igormego/personal-ai-brain/issues/25)
 stays OPEN. No WhatsApp adapter or additional permissions are enabled.
 
+## Optional Assistant movie planning bridge — source-only, NOT deployed (2026-10-27)
+
+The source-level `media.plan_movie` hook is registered **only when a trusted
+`media_plan_provider` is supplied** to `build_registry`. The production control
+worker currently supplies no such provider; an external Issues request will still
+receive `unknown_capability`. There is no `media.request_movie` write capability.
+
+The source adapter in `assistant_media_plan.py` invokes only the existing Homelab
+`tools/movie-intelligence/plan-cli.mjs` using a fixed, operator-owned Node binary,
+absolute script path, exact sanitized selector fields, no shell, no inherited
+environment, and a bounded execution timeout/output. It validates an allowlisted
+non-mutating result. The Homelab CLI itself calls only the accepted Seerr
+`plan_movie_request` path; it has **no `--execute` flag** and no arbitrary network
+request, command or server options.
+
+Production integration is NOT authorized by this source merge. The operator must
+first verify a pinned immutable CLI/source revision, Node >=24.14, existing private
+Movie Intelligence DB read-only access, Seerr/Radarr GET connectivity, least-privilege
+credentials and isolation; no new mounts, users or secrets are introduced here.
+Also preserve the pending [control restart/durable-Compose gate #34](https://github.com/igormego/personal-ai-brain/issues/34)
+before another control image update.
+
+A returned `requestable` plan means only that the existing wrapper's read-only
+preflight regards a movie as requestable. It does **not** authorize a Seerr POST,
+acquisition, a new Radarr search or a download. [Media Request Issue #38](https://github.com/igormego/personal-ai-brain/issues/38)
+owns future production planning acceptance and the separate, durable authorized
+movie-write capability.
+
 ## Result and idempotency
 
 The worker posts a JSON result in a fenced issue comment and closes the issue.
