@@ -1,0 +1,5 @@
+services:
+  control:
+    build: !reset null
+    image: sha256:06d57e7a8f32995bddc077dcbd94dad850ace15c531914bf38626e08c3484770
+    pull_policy: never
