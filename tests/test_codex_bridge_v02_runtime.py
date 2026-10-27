@@ -79,9 +79,9 @@ def test_v02_worker_only_consumes_v02_and_preserves_result_once(tmp_path):
                 "additions": 5, "deletions": 0,
                 "test_summary": "126 tests passed in restricted Linux sandbox",
             })
-        return rt.envelope_v02({"status": task["state"], "attempts": task["attempts"],
-                                "files_changed": task.get("result",{}).get("files_changed",[]),
-                                "test_summary": task.get("result",{}).get("test_summary")}, item)
+        return {"status": task["state"], "attempts": task["attempts"],
+                "files_changed": task.get("result",{}).get("files_changed",[]),
+                "test_summary": task.get("result",{}).get("test_summary")}
     # Worker formatter applies the sanitized versioned envelope to raw execution.
     def execution(ledger, item):
         result = run(ledger, item)
@@ -89,7 +89,8 @@ def test_v02_worker_only_consumes_v02_and_preserves_result_once(tmp_path):
     worker = t.Worker(tmp_path/"transport", ledger, mailbox, execution,
                       title=PROTOCOL, parser=parse_request,
                       formatter=rt.envelope_v02, marker_version="v2")
-    worker.tick()
+    with pytest.raises(t.TransportError, match="delivery_reconcile"):
+        worker.tick()
     assert len(calls) == 1
     assert mailbox.rows[1]["state"] == "open"
     assert mailbox.posts == 1
