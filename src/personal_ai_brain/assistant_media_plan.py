@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import unicodedata
 from typing import Callable, Mapping
 
 from .assistant_media_selector import MAX_TMDB_ID, validate_movie_selector
@@ -83,7 +84,7 @@ def sanitize_media_plan(selector: object, raw: object) -> dict:
         tmdb_id, title, year = identity["tmdb_id"], identity["title"], identity["year"]
         if type(tmdb_id) is not int or not 1 <= tmdb_id <= MAX_TMDB_ID:
             _unavailable()
-        if type(title) is not str or not title.strip() or any(ord(c) < 32 for c in title):
+        if type(title) is not str or not title.strip() or any(unicodedata.category(c).startswith('C') for c in title):
             _unavailable()
         try:
             if len(title.encode("utf-8")) > MAX_TITLE_BYTES:
@@ -174,9 +175,10 @@ class FixedNodeMoviePlanner:
                 proc.stdout.decode("utf-8"), object_pairs_hook=_pairs_unique,
                 parse_constant=lambda _: _unavailable(),
             )
-            return sanitize_media_plan(selected, raw)
+            sanitize_media_plan(selected, raw)
+            return raw
         except (OSError, ValueError, UnicodeError, subprocess.TimeoutExpired,
-                RecursionError) as exc:
+                RecursionError):
             raise MediaPlanUnavailable("media_plan_unavailable") from None
 
 
