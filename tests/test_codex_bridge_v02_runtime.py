@@ -34,7 +34,7 @@ def test_separate_v02_ledger_maps_trusted_project_and_preserves_replay(tmp_path)
     same_task = p | {"request_id": str(uuid.uuid4())}
     assert ledger.submit(same_task) == task
     with pytest.raises(ValueError, match="task_conflict"):
-        ledger.submit(same_task | {"goal": "different"})
+        ledger.submit(same_task | {"request_id": str(uuid.uuid4()), "goal": "different"})
 
     old = Ledger(tmp_path/"old")
     with pytest.raises(ValueError, match="unknown_project"):
