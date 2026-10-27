@@ -132,9 +132,7 @@ def allowed_change(project_id: object, path: object) -> bool:
         return False
     if project_id == "homelab-infrastructure":
         return (len(parts) >= 3 and parts[:2] == ["tools", "movie-intelligence"]
-                and suffix in {".mjs", ".js", ".py", ".md", ".json", ".txt"}
-                and parts[-1] not in {"plan-cli.mjs", "request-cli.mjs", "seerr-request.mjs", "reacquire.mjs", "reacquire-http.mjs",
-                                     "reacquire-journal.mjs", "archive.py"})
+                and suffix in {".mjs", ".js", ".py", ".md", ".json", ".txt"})
     return False
 
 
