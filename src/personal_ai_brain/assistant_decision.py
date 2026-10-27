@@ -14,6 +14,7 @@ import json
 from typing import Callable
 
 from .assistant_contract import AssistantRequest
+from .assistant_decision_context import DecisionContext
 from .control import Registry, Rejected, unique_object
 
 
@@ -53,7 +54,7 @@ class DecisionPlan:
 # A provider accepts only the current message and a bounded, trusted catalog.
 # It must return one JSON object as a string; no direct tool invocation is
 # permitted. A real provider owns its own timeout, token cap and budget.
-DecisionProvider = Callable[[str, tuple[CapabilityHint, ...]], str]
+DecisionProvider = Callable[[str, tuple[CapabilityHint, ...], DecisionContext | None], str]
 
 
 def _catalog(registry: Registry) -> tuple[CapabilityHint, ...]:
@@ -95,6 +96,8 @@ def decide(
     request: AssistantRequest,
     registry: Registry,
     provider: DecisionProvider,
+    *,
+    context: DecisionContext | None = None,
 ) -> DecisionPlan:
     """Validate a model proposal; produce an inert, correlated decision plan.
 
@@ -104,12 +107,14 @@ def decide(
     """
     if not isinstance(request, AssistantRequest) or not isinstance(registry, Registry):
         raise DecisionRejected("trusted_input_required")
+    if context is not None and not isinstance(context, DecisionContext):
+        raise DecisionRejected("trusted_context_required")
     if not callable(provider):
         raise DecisionRejected("provider_unavailable")
 
     catalog = _catalog(registry)
     try:
-        raw = provider(request.message, catalog)
+        raw = provider(request.message, catalog, context)
     except Exception:
         raise DecisionRejected("provider_unavailable") from None
     value = _decode(raw)
@@ -138,6 +143,12 @@ def decide(
         raise
     except Exception:
         raise DecisionRejected("decision_denied") from None
+
+    if name == "project_os.status":
+        if context is None:
+            raise DecisionRejected("context_unavailable")
+        if not context.permits(arguments):
+            raise DecisionRejected("decision_denied")
 
     return DecisionPlan(
         request.request_id, request.payload_hash, "invoke_read_only",
