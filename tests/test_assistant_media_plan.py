@@ -71,6 +71,8 @@ def test_known_non_requestable_decisions_are_not_misreported(decision, reason):
     {"decision": "requested"},
     {"decision": "download_in_progress"},
     {"decision": "requestable", "identity": None},
+    {"decision": "requestable", "evidence": None},
+    {"decision": "requestable", "reason": "media_policy_dependency"},
     {"mutation_attempted": True},
     {"evidence": {"private_path": "/secret"}},
     {"evidence": {
