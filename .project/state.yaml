@@ -37,9 +37,11 @@ current_state: >
   and owner review remain separate from the restricted coding worker.
 
 exact_next_action: >
-  Close Issue #46 upon recording independently verified draft-PR acceptance.
-  Keep both accepted draft PRs OPEN and UNMERGED until a separate review and
-  merge decision; no automatic merge or deployment approval is implied.
+  Issue #46 is COMPLETED and CLOSED after independently verified draft-PR
+  acceptance. Keep both draft PRs OPEN and UNMERGED; separately review
+  Homelab PR #34 and PAB PR #50 and obtain explicit merge authorization
+  if/when the owner wants to integrate these validated code changes.
+  No automatic merge or deployment approval is implied.
   Select next bounded Remote Codex v0.2 coding milestone within its current
   allowlisted repos/files. Personal Assistant #25, Homelab control #34 and
   media #38 require separate explicit permission/deployment milestones.
