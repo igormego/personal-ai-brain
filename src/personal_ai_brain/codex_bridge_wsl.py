@@ -93,7 +93,8 @@ class WslBackend:
         return expected
 
 
-def run_local(ledger, payload, *, validate_completion=None, timeout=120):
+def run_local(ledger, payload, *, validate_completion=None, timeout=120,
+              trusted_backend=None, trusted_source=None):
     """Intentionally invoked local API; no listener, poller or task-selected backend.
 
     The validator is trusted operator code, never supplied by the task payload.
@@ -105,7 +106,8 @@ def run_local(ledger, payload, *, validate_completion=None, timeout=120):
     if task["state"] != "submitted":
         return public_result(task)
     try:
-        client = AppServer(execution_backend=BACKEND)
+        client = (AppServer(execution_backend=BACKEND) if trusted_backend is None
+                  else AppServer(trusted_backend=trusted_backend))
     except Exception:
         try:
             ledger.transition(task["task_id"], "submitted", "reserved")
@@ -119,7 +121,8 @@ def run_local(ledger, payload, *, validate_completion=None, timeout=120):
     try:
         try:
             task = execute(ledger, payload, client, timeout=timeout,
-                           validate_completion=validate_completion)
+                           validate_completion=validate_completion,
+                           trusted_source=trusted_source)
         except ValueError as error:
             if str(error) != "state_conflict":
                 raise

@@ -61,9 +61,17 @@ def bridge_environment():
 
 
 class AppServer:
-    def __init__(self, executable=None, *, execution_backend=None):
+    def __init__(self, executable=None, *, execution_backend=None, trusted_backend=None):
         self.workspace_backend = None
-        if execution_backend is not None:
+        if trusted_backend is not None:
+            from .codex_bridge_wsl import WslBackend
+            # Only a trusted code-created WSL backend; never a caller option.
+            if (execution_backend is not None or executable is not None
+                    or not isinstance(trusted_backend, WslBackend)):
+                raise ValueError("untrusted_backend")
+            self.workspace_backend = trusted_backend
+            args = trusted_backend.launch_args()
+        elif execution_backend is not None:
             from .codex_bridge_wsl import select_backend
             self.workspace_backend = select_backend(execution_backend)
             if executable is not None:
@@ -284,7 +292,7 @@ class AppServer:
             self.close_lock.release()
 
 
-def execute(ledger, payload, client, timeout=120, validate_completion=None):
+def execute(ledger, payload, client, timeout=120, validate_completion=None, trusted_source=None):
     """Reserve exactly once. Caller-supplied factory/bind are trusted local code."""
     task = ledger.submit(payload)
     if task["state"] != "submitted":
@@ -305,7 +313,8 @@ def execute(ledger, payload, client, timeout=120, validate_completion=None):
     client.server_request_handler = server_request
     try:
         from .codex_bridge_workspace import prepare, git
-        approved_base = git("rev-parse", "HEAD")
+        approved_base = (trusted_source.head() if trusted_source is not None
+                         else git("rev-parse", "HEAD"))
         if task["base_sha"] != approved_base:
             raise ValueError("base_not_approved")
         backend = getattr(client, "workspace_backend", None)

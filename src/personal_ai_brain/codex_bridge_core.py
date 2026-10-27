@@ -90,7 +90,11 @@ def atomic(path, data):
 
 class Ledger:
     """One atomic snapshot serializes invocation and execution reservations."""
-    def __init__(self, root):
+    def __init__(self, root, *, validator=None, repository_for=None):
+        # The default v0.1 behavior remains unchanged. v0.2 explicitly injects
+        # installed trusted policy and maps project ID to a fixed repository.
+        self.validator = validator or validate
+        self.repository_for = repository_for or (lambda _project_id: REPOSITORY)
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
         self.path = self.root / "ledger.json"
@@ -104,7 +108,8 @@ class Ledger:
         return state
 
     def submit(self, payload):
-        payload = validate(payload)
+        payload = self.validator(payload)
+        repository = self.repository_for(payload["project_id"])
         task_payload = {k: v for k, v in payload.items() if k != "request_id"}
         request_hash, task_hash = digest(payload), digest(task_payload)
         with locked(self.root / "ledger.lock"):
@@ -119,7 +124,7 @@ class Ledger:
                 raise ValueError("task_conflict")
             if task is None:
                 task = {**task_payload, "request_id": payload["request_id"],
-                        "payload_hash": task_hash, "repository": REPOSITORY,
+                        "payload_hash": task_hash, "repository": repository,
                         "state": "submitted", "attempts": 0, "thread_id": None,
                         "turn_id": None, "created_at": now(), "updated_at": now(),
                         "failure_class": None}
