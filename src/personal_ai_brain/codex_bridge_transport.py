@@ -186,7 +186,17 @@ def worker_lock(path):
 
 
 class Worker:
-    def __init__(self, root, ledger, client, execute):
+    def __init__(self, root, ledger, client, execute, *,
+                 title=PROTOCOL, parser=parse_request, formatter=envelope, marker_version="v1"):
+        # v0.1 defaults remain compatible with existing workers.
+        if title not in {PROTOCOL, "pab-codex/v0.2"} or marker_version not in {"v1", "v2"}:
+            raise ValueError("unknown_transport_protocol")
+        if (title == PROTOCOL) != (marker_version == "v1"):
+            raise ValueError("mixed_transport_versions")
+        self.title = title
+        self.parser = parser
+        self.formatter = formatter
+        self.marker_version = marker_version
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
         self.ledger, self.client, self.execute = ledger, client, execute
@@ -202,13 +212,13 @@ class Worker:
         self.client.verify()
         issues = self.client.issues()
         for issue in issues:
-            if issue.get('title') != PROTOCOL or 'pull_request' in issue:
+            if issue.get('title') != self.title or 'pull_request' in issue:
                 continue
             number = issue.get('number')
             if type(number) is not int or number < 1:
                 raise TransportError('invalid_issue')
             issue = self.client.issue(number)
-            if issue.get('title') != PROTOCOL or issue.get('state') != 'open' or 'pull_request' in issue:
+            if issue.get('title') != self.title or issue.get('state') != 'open' or 'pull_request' in issue:
                 continue
             self.process(number, issue.get('body'))
         atomic(self.root / 'health.json', {'status': 'healthy', 'checked_at': now(),
@@ -217,7 +227,7 @@ class Worker:
     def process(self, number, body):
         state = self.load()
         try:
-            payload = parse_request(body)
+            payload = self.parser(body)
         except (ValueError, TypeError, RecursionError, UnicodeError):
             # No echo of malformed input, no executable reservation, no ambiguous POST.
             if len(state['rejected']) >= 4096 and str(number) not in state['rejected']:
@@ -248,14 +258,14 @@ class Worker:
                 if str(error) not in {'request_conflict', 'task_conflict', 'base_not_approved'}:
                     raise
                 result = {'status': 'failed', 'attempts': 0, 'failure_class': str(error)}
-            result = envelope(result, payload)
-            marker = '<!-- pab-codex-result:v1:' + rid + ' -->'
+            result = self.formatter(result, payload)
+            marker = '<!-- pab-codex-result:' + self.marker_version + ':' + rid + ' -->'
             record.update(phase='ready', body=marker + '\n```json\n' + json.dumps(result, sort_keys=True) + '\n```')
             self.save(state)
         original = record['issue']
         if record['phase'] != 'delivered':
             comments = self.client.comments(original)
-            marker = '<!-- pab-codex-result:v1:' + rid + ' -->'
+            marker = '<!-- pab-codex-result:' + self.marker_version + ':' + rid + ' -->'
             matching = [c for c in comments if c.get('body', '').startswith(marker) and
                         c.get('user', {}).get('id') == self.client.owner_id]
             if len(matching) > 1 or (matching and matching[0]['body'] != record['body']):
