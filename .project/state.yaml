@@ -6,51 +6,53 @@ project:
   owner: "Project OS & Agent Architecture chat"
 
 status: "active"
-phase: "remote-codex-v02-external-coding-accepted-recovery-pending"
+phase: "remote-codex-v02-live-accepted-limited-scope"
 
 current_gate: >
-  Remote Codex v0.2 is installed as a separate limited-user Windows worker with
-  protected ledger and fixed offline WSL profiles. Independent external ChatGPT
-  coding acceptance succeeded in both approved repos on 2026-10-27 (private
-  Issues #64/#65); exact replay and request/task conflict probes #66-#68 closed
-  without a second observed coding execution. The local operator must still
-  inspect authoritative v0.2 ledger and retained patches and verify recovery
-  on one controlled post-execution v0.2-only restart. Keep Issue #41 OPEN and
-  do not call the milestone fully LIVE before that gate. v0.1 remains healthy.
-  Core read-only, Assistant Gateway #25, control hardening #34 and media #38
-  remain separately gated; no autonomous PR/push/deploy, remote SSH or broad
-  agent permissions are enabled.
+  Remote Codex v0.2 is LIVE_ACCEPTED as a narrowly scoped, outbound-only
+  GitHub Issues coding capability for the two fixed repositories, with limited
+  Windows user-context worker, isolated offline Debian WSL workspaces and
+  approved source/test paths. Independent ChatGPT Issues #64 and #65 passed
+  real coding tasks. Replay/conflict Issues #66-#68 and, after the v0.2-only
+  restart, Issues #69-#71 demonstrated idempotency and conflict rejection.
+  Operator confirmed original WSL patch/ledger integrity, task attempts=1
+  and no extra execution/delivery across restart (Issue #41 comment
+  #6446789732). Issue #41 acceptance is completed, separate v0.1 retained.
+  No commits, pushes, PR publishing, merge, deployment, production SSH,
+  broad repository changes, remote approvals or generic remote commands
+  are enabled. A distinct trusted patch-review/publishing workflow and
+  Personal Assistant #25, Homelab control #34 and media #38 remain gated.
 
 current_state: >
-  The accepted v0.1 outbound Windows/WSL coding bridge remains healthy and
-  isolated. PRs #42/#43/#44/#45 delivered Remote Codex v0.2 source, dedicated
-  clean operator-controlled clones and restricted per-repository test profiles;
-  merged v0.2 PAB source base 960790968b1cd4b7a76950236128d152e83cdedc,
-  Homelab source base ba84d8e2edd778d93e05632adbc5ac391413b85c.
-  The separate PersonalAIBrain-CodexTransport-v02 limited user-context task
-  passed credential/ACL/sandbox checks and a controlled idle restart. ChatGPT
-  submitted real v0.2 Issues #64 (PAB strict verification-date parsing) and
-  #65 (Homelab status matching regression coverage). Both closed with exactly
-  one correlated worker result: attempts=1, succeeded, fixed restricted sandbox
-  profile summaries of 256 and 19 tests respectively. #66 identical replay
-  and #67 request UUID/payload conflict closed without additional comments;
-  #68 same task UUID with changed payload produced task_conflict and attempts=0.
-  These are GitHub-visible worker reports, not independent host inspection of
-  retained WSL patches or audit ledger. All coding changes remain uncommitted
-  in disposable WSL workspaces; no PR or repository publication occurred.
-  Operator post-execution restart and recovery verification remain pending.
+  Remote Codex v0.2 source PRs #42-#45 merged and tested (773 WSL / 326
+  Windows regressions, 236 PAB / 15 Homelab live sandbox baseline checks).
+  The dedicated limited Windows v0.2 Scheduled Task and v0.1 both run
+  independently. ChatGPT independently submitted private coding Issues #64
+  (PAB state-quality canonical date validation, two files, 256 sandbox
+  executions) and #65 (Homelab Movie Intelligence status regression, one
+  test file, 19 sandbox tests); each closed with one correlated owner result
+  showing succeeded/attempts=1. #66 exact replay closed with no comment;
+  #67 changed same-request payload closed with no comment; #68 fresh request,
+  altered existing task payload gave task_conflict/attempts=0. Local Codex
+  then verified both retained uncommitted WSL patches, immutable source HEADs,
+  ledgers and successful v0.2-only post-execution restart, without changing
+  v0.1. Independent ChatGPT post-restart Issues #69 (PAB exact replay) and
+  #70 (Homelab exact replay) closed with zero comments, while source result
+  comment IDs on #64/#65 remained identical; #71 returned one correlated
+  task_conflict/attempts=0. No new coding turn was requested by these probes.
+  Original source patches remain local/uncommitted and require owner-reviewed
+  publication before reaching GitHub main; operator ledger review supports
+  one execution attempt each. Issue #41 closed after final acceptance.
+  Production Homelab, Assistant Gateway, security scopes and v0.1 unchanged.
 
 exact_next_action: >
-  In the authorized Codex Desktop Local/local-homelab-admin environment,
-  inspect retained v0.2 WSL patches for tasks
-  0fbaa0b9-b0f6-43b4-9a48-d8deb7f53d5d and
-  69281226-fa60-4bbf-b83c-bd93f574d35d, compare actual v0.2 ledger
-  attempts/records with GitHub Issues #64-#68, preserve the v0.1 audit and
-  conduct one controlled v0.2-only idle post-execution restart. Verify no
-  old task replay or duplicate delivery and document sanitized evidence
-  on Issue #41. Then independently recheck replay/transport from ChatGPT.
-  Only after recovery acceptance mark v0.2 LIVE; PR publication/review
-  and new agent capabilities remain separate gated follow-ups.
+  Use the accepted remote coding lane for bounded changes in the two
+  operator-pinned trusted repositories, selecting only approved source/test
+  paths and the exact local main SHA. Separately define an owner-reviewed
+  transfer/review/PR publishing step for the retained #64 and #65 uncommitted
+  WSL patches, without granting the model GitHub Contents write permissions
+  or automatic deployment. Keep the existing #25/#34/#38 domain milestones
+  separate. Do not interpret a successful remote code result as merged code.
 
 blockers: []
 
@@ -63,7 +65,7 @@ dependencies:
 important_open_loops:
   - "COMPLETED: Credentialless Coding Agent Broker v0.1 foundation; Local Bridge durable core, request/task idempotency, dispatcher, approval_required, bounded lifecycle/recovery, WSL2 backend, managed ChatGPT auth, Linux workspace isolation and internal real coding acceptance. See docs/codex-bridge-checkpoint.md."
   - "COMPLETED: Remote Transport v0.1 is live-accepted. PR #23 implemented the outbound Windows Issues mailbox; PR #31 repaired restricted completion validation; external ChatGPT Issues #44-#48 proved execution, replay/conflict safety and Homelab coexistence."
-  - "REMOTE CODEX v0.2: LOCAL INSTALLED / EXTERNAL TWO-REPO CODING ACCEPTED 2026-10-27. PRs #42/#43/#44/#45 merged; 773 WSL and 326 Windows regression tests, 236 PAB and 15 Homelab local sandbox checks at activation. ChatGPT-origin private Issues #64 and #65 completed exactly one coding task per repository with 256/19 fixed sandbox tests; #66 identical replay and #67 changed-payload request conflict closed without new comments; #68 distinct-request same-task conflict returned attempts=0. Separate limited Windows worker, private durable ledger, clean independent sources and v0.1 preservation confirmed by operator readiness; post-execution restart/host ledger audit remain unverified. No source publication, SSH, production deployment or unrestricted repo editing; Issue #41 remains OPEN."
+  - "COMPLETED: Remote Codex v0.2 LIVE_ACCEPTED 2026-10-27, Issue #41. PRs #42/#43/#44/#45 merged. Real ChatGPT coding acceptance #64/#65 succeeded once each, 256/19 offline sandbox tests. Pre-restart replay/conflicts #66-#68 and post-restart replay/conflict #69-#71 passed; operator verified preserved WSL patches, one execution attempt each, unchanged v0.1/v0.2 ledger/delivery hashes across one v0.2-only restart. Approval/publishing/deployment remains separate and disabled; current remote editing uses only fixed bounded allowlists and exact local HEADs."
   - "PENDING SEPARATE milestones: remote approval workflow, automatic ChatGPT review/correction loop, autonomous PR/merge/deploy, OpenAI API provider, local LLM provider, provider router and budget-aware scheduling."
   - "PERSONAL ASSISTANT: Project OS read-only status transport externally accepted via Issues #54-#58; Core-owned root quality reconciliation #37 complete with live current freshness #61/#62. Gateway native authenticated ChatGPT adapter/delivery Issue #25 and control restart/durable Compose Issue #34 remain OPEN. Media Request #38 SOURCE MILESTONE: strict selector PR #39 merged (568 CI tests); Homelab existing Seerr controller now has separate source-only plan-cli.mjs from homelab-infrastructure PR #32 (ba84d8e, 126 offline tests), and Personal AI Brain has opt-in fixed read-only planner provider and bounded media.plan_movie registry from PR #40 (d52d13f, 599 CI tests). Neither new media capability nor any write is deployed to production; current control worker does not inject provider. Next: operator-reviewed read-only Homelab wiring/pinning and live plan acceptance, respecting #34, private mounts and credentials. Authenticated movie request writes require separate per-movie durable uncertain-POST controls/authorization. No film request, download or WhatsApp activation."
   - "Codex Cloud pab-homelab-dev: VERIFIED_WITH_WARNING on 2026-10-12 for repository-only PAB/Homelab development; task lifecycle and surface selection recorded in docs/codex-environments.md. Absolute SSH absence remains uncertified after a configuration-only proxy response; pwsh requires the saved startup PATH export and is not on default PATH. No live Homelab acceptance implied."
@@ -85,19 +87,19 @@ important_open_loops:
 portfolio:
   milestone: true
   signal: >
-    ChatGPT <-> remote Codex v0.2 has independently executed one accepted
-    repository coding task in each of two fixed projects through outbound
-    GitHub Issues -> limited Windows worker -> isolated Debian WSL model ->
-    fixed offline validation -> sanitized correlated GitHub result. Per-task
-    result claims one execution, and replay/request/task conflict probes
-    closed with no additional execution reported. Generated patches remain
-    local and uncommitted; post-execution operator recovery and code review
-    are still pending. No PR publication, Homelab production execution or
-    general administrative access is granted.
+    ChatGPT <-> Remote Codex v0.2 is LIVE_ACCEPTED for two fixed,
+    sandbox-restricted repositories, with successful independent remote
+    coding requests and verified offline tests, GitHub-correlated results,
+    conflict/replay controls and restart-persistent durable at-most-once
+    execution. The approved output is an uncommitted local WSL patch, not
+    merged source; PR publishing/review, general remote shell/SSH, Homelab
+    execution and autonomous deployment are NOT part of this capability.
 
 verification:
   last_verified: "2026-10-27"
   sources:
+    - "2026-10-27 independent post-restart ChatGPT external verification: #69 exact replay of PAB task #64 and #70 exact replay of Homelab task #65 both closed without any result comment, original #64/#65 each retained original single correlated comment ID, and #71 new request/same PAB task with changed payload closed with one owner result task_conflict, attempts=0. No new coding turn requested by probes. Issue #41 final acceptance."
+    - "2026-10-27 operator post-execution recovery: Issue #41 comment #6446789732 reported v0.2-only worker restart at 15:56 UTC, preserved per-task attempts=1, unchanged thread/turn IDs, retained patch digest, immutable base SHA, byte-identical v0.1/v0.2 ledger and delivery snapshots, no repeated coding or duplicate comments, both worker health polls; no code publication."
     - "2026-10-27 independent ChatGPT v0.2 acceptance: private Issues #64 (PAB; state_quality.py and test; status=succeeded attempts=1, 256 restricted tests) and #65 (Homelab; status.test.mjs; status=succeeded attempts=1, 19 restricted tests) each CLOSED with one correlated worker result. #66 identical replay closed no new result comment, #67 changed same UUID closed no comment, #68 same task/different request returned task_conflict attempts=0 and CLOSED. GitHub-visible evidence only; no direct WSL ledger/patch inspection or post-execution restart. Issue #41 comment #6446521133."
     - "2026-10-27 Codex Local readiness checkpoint Issue #41 comment #6446147253: PR #45 merged 960790968b1cd4b7a76950236128d152e83cdedc after green CI; 773 WSL and 326 Windows regressions, 236 PAB and 15 Homelab real sandbox tests, source isolation, ACL/credentials, limited v0.2 task and idle restart passed; v0.1 unchanged. Not external coding acceptance by itself."
     - "2026-10-27 durable-truth sync: Issue #25 title/body updated to native ChatGPT adapter pending after live project_os.status acceptance; Issue #34 updated to deployed/accepted with only stable Compose/image pin plus controlled restart/recovery remaining; Issue #41 updated to SOURCE_READY / LOCAL ACTIVATION PENDING. No runtime behavior, permissions or deployment changed by this sync."
