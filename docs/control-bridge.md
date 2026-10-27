@@ -160,6 +160,10 @@ second worker with an independent directory against the same queue. These action
 would discard the deduplication boundary. Multi-host/distributed execution is out
 of scope. Request/issue audit records have manual retention and must be preserved.
 
+## Current pinned Homelab deployment
+
+For the accepted Issue #34 runtime, use the [durable pin and rollback runbook](control-deployment-issue34.md). Its stable configuration supersedes the generic build commands below for that host.
+
 ## Deployment and credentials
 
 From the repository on Homelab:
