@@ -17,7 +17,7 @@ def request(project="personal-ai-brain", **overrides):
 
 def test_opt_in_catalog_owns_repository_and_local_paths():
     assert set(TRUSTED_PROJECTS) == {"personal-ai-brain", "homelab-infrastructure"}
-    assert project_for("personal-ai-brain").windows_checkout == r"C:\Projects\personal-ai-brain"
+    assert project_for("personal-ai-brain").windows_checkout == r"C:\Projects\RemoteCodex-v02\sources\personal-ai-brain"
     assert project_for("homelab-infrastructure").test_profile == "movie-intelligence-node"
     assert project_for("personal-ai-brain").test_profile == "pab-pytest"
     assert PROTOCOL == "pab-codex/v0.2"
