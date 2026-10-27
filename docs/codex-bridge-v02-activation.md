@@ -41,8 +41,8 @@ Body is raw JSON (no Markdown fences):
 Accepted initial projects: `personal-ai-brain` and
 `homelab-infrastructure`. A request may select ONLY one fixed project ID.
 The installed operator policy maps it to
-`C:\Projects\personal-ai-brain` or
-`C:\Projects\homelab-infrastructure` and a fixed offline test profile;
+`C:\Projects\RemoteCodex-v02\sources\personal-ai-brain` or
+`C:\Projects\RemoteCodex-v02\sources\homelab-infrastructure` and a fixed offline test profile;
 neither checkout nor test command is a request field.
 
 Fresh lowercase UUIDv4 IDs and the *exact* 40-character lowercase canonical
@@ -55,8 +55,8 @@ No commit/push/PR/merge/production deployment occurs.
 ## Local owner/operator gate (requires Codex Local / local-homelab-admin)
 
 1. Refresh [AGENTS.md](../AGENTS.md) and Issue #41. Inspect
-   `C:\Projects\personal-ai-brain` and
-   `C:\Projects\homelab-infrastructure` main HEADs, clean trusted source
+   `C:\Projects\RemoteCodex-v02\sources\personal-ai-brain` and
+   `C:\Projects\RemoteCodex-v02\sources\homelab-infrastructure` main HEADs, clean trusted source
    and saved local/uncommitted work. Never discard user changes to make a
    deployment appear ready.
 2. Confirm the v0.2 source/CI hashes and the only intended shared v0.1 code
@@ -113,3 +113,21 @@ production credentials, Docker, Seerr/Radarr actions or direct SSH belongs to
 a **separate authorized operator/domain capability**, not a widened GitHub
 coding Issue. PR publication by a separate trusted reviewer/publisher is a
 future milestone; do not grant the model GitHub write tokens.
+
+## Dedicated source ownership
+
+Use independent operator-created HTTPS clones under `C:\Projects\RemoteCodex-v02\sources`.
+Never use linked worktrees, alternate object stores, or symlinks to development
+checkouts. The original development checkouts and v0.1 installation are preserved.
+The PAB clone also supplies the v0.2 installed runtime, using a separate Python
+environment; do not repoint the v0.1 editable installation or Scheduled Task.
+
+The operator pins each clone to reviewed `main`, with exact canonical origin
+`https://github.com/igormego/<repository>.git` and HEAD equal to the locally
+recorded `origin/main`. Runtime checks reject dirty/untracked files, wrong origin,
+wrong branch and unapproved HEAD. Remote execution performs no fetch or repair.
+Only a separate operator action may fetch, review and fast-forward sources.
+Store no credentials/private configuration in these clones. Apply protected
+owner/SYSTEM/Administrators ACLs and verify the WSL root-deny sandbox cannot read
+or write either Windows source clone before activation. Task code receives only
+committed Git objects in a separate disposable Linux checkout.

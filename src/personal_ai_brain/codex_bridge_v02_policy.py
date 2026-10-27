@@ -30,10 +30,10 @@ class TrustedProject:
 TRUSTED_PROJECTS = {
     "personal-ai-brain": TrustedProject(
         "personal-ai-brain", "igormego/personal-ai-brain",
-        r"C:\Projects\personal-ai-brain", "pab-pytest"),
+        r"C:\Projects\RemoteCodex-v02\sources\personal-ai-brain", "pab-pytest"),
     "homelab-infrastructure": TrustedProject(
         "homelab-infrastructure", "igormego/homelab-infrastructure",
-        r"C:\Projects\homelab-infrastructure", "movie-intelligence-node"),
+        r"C:\Projects\RemoteCodex-v02\sources\homelab-infrastructure", "movie-intelligence-node"),
 }
 
 # Paths that control execution, credentials, releases or the safety boundary are

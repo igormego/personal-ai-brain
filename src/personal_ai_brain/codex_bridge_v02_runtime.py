@@ -56,12 +56,22 @@ class TrustedV02Backend(WslBackend):
         return result.stdout.decode("ascii", errors="strict").strip()
 
     def head(self) -> str:
+        # Dedicated independent clones only; never follow development worktrees.
+        if self._git("rev-parse", "--is-inside-work-tree") != "true":
+            raise ValueError("trusted_checkout_unavailable")
+        if self._git("config", "--get", "remote.origin.url") != (
+                "https://github.com/" + self.project.repository + ".git"):
+            raise ValueError("trusted_checkout_wrong_repository")
+        if self._git("status", "--porcelain", "--untracked-files=all"):
+            raise ValueError("trusted_checkout_dirty")
         branch = self._git("branch", "--show-current")
         if branch != "main":
             raise ValueError("trusted_checkout_not_main")
         sha = self._git("rev-parse", "HEAD")
         if not re.fullmatch(r"[0-9a-f]{40}", sha):
             raise ValueError("trusted_checkout_unavailable")
+        if self._git("rev-parse", "refs/remotes/origin/main") != sha:
+            raise ValueError("trusted_checkout_unapproved_revision")
         return sha
 
     def prepare(self, task_id: str, approved_base: str) -> dict:
