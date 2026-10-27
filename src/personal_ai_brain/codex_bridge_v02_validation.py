@@ -135,8 +135,20 @@ before = inspect_tree()
 with tempfile.TemporaryDirectory(prefix='.pab-v02-validate-',dir=cwd) as directory:
     log_path = pathlib.Path(directory)/'tests.log'
     if profile.test_profile == 'pab-pytest':
+        names = ('state_quality', 'assistant_media_selector', 'assistant_contract',
+                 'assistant_result', 'rollup_proposal')
+        mandatory = pathlib.Path(directory)/'mandatory'
+        mandatory.mkdir()
+        tests = []
+        for name in names:
+            relative = 'tests/test_' + name + '.py'
+            # Immutable base tests cannot be deleted/disabled by a task patch.
+            target = mandatory/('test_' + name + '.py')
+            target.write_bytes(git('show', base + ':' + relative))
+            tests.extend([str(target), relative])
         command = ['/usr/bin/python3','-m','pytest','-q','-p','no:cacheprovider',
-                   '--basetemp',str(pathlib.Path(directory)/'pytest'), 'tests']
+                   '--import-mode=importlib',
+                   '--basetemp',str(pathlib.Path(directory)/'pytest'), *tests]
         expression = r'(?m)^([0-9]{1,6}) passed in [0-9.]+s\s*$'
     elif profile.test_profile == 'movie-intelligence-node':
         tests = [root/'tools/movie-intelligence/test'/name for name in (

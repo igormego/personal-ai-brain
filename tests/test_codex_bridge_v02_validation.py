@@ -27,7 +27,8 @@ def disposable(tmp_path):
     _git(folder, "config", "user.name", "Test")
     _git(folder, "config", "user.email", "test@example.invalid")
     (folder/"tests").mkdir()
-    (folder/"tests"/"test_smoke.py").write_text("def test_smoke(): assert 2+2==4\n")
+    for name in ('state_quality','assistant_media_selector','assistant_contract','assistant_result','rollup_proposal'):
+        (folder/'tests'/('test_'+name+'.py')).write_text('def test_smoke(): assert 2+2==4\n')
     (folder/"README.md").write_text("# Test\n")
     _git(folder, "add", ".")
     _git(folder, "commit", "-qm", "base")
@@ -65,19 +66,19 @@ def test_script_is_trusted_compilable_policy_included():
 def test_real_disposable_repository_accepts_new_module(disposable):
     folder, _, _ = disposable
     (folder/"src"/"personal_ai_brain").mkdir(parents=True)
-    (folder/"src"/"personal_ai_brain"/"new_feature.py").write_text("answer = 42\n")
+    (folder/"src"/"personal_ai_brain"/"state_quality.py").write_text("answer = 42\n")
     r = _validate_local(disposable)
     assert r.returncode == 0, r.stderr[-1500:]
     p = json.loads(r.stdout)
-    assert p["files_changed"] == ["src/personal_ai_brain/new_feature.py"]
+    assert p["files_changed"] == ["src/personal_ai_brain/state_quality.py"]
     assert p["additions"] == 1 and p["deletions"] == 0
-    assert p["test_summary"] == "1 tests passed in restricted Linux sandbox"
+    assert p["test_summary"] == "10 tests passed in restricted Linux sandbox"
 
 
 def test_disposable_repo_accepts_edits_in_more_than_two_files(disposable):
     folder, _, _ = disposable
     (folder/"src"/"personal_ai_brain").mkdir(parents=True)
-    for name in ("first.py", "second.py", "third.py"):
+    for name in ("state_quality.py", "assistant_result.py", "rollup_proposal.py"):
         (folder/"src"/"personal_ai_brain"/name).write_text("a = 3\n")
     r = _validate_local(disposable)
     assert r.returncode == 0, r.stderr[-1500:]
@@ -103,12 +104,12 @@ def test_disposable_repo_denies_unsafe_new_files_before_tests(disposable, unsafe
 def test_changed_test_execution_mutating_source_fails(disposable):
     folder, _, _ = disposable
     (folder/"src"/"personal_ai_brain").mkdir(parents=True)
-    target = folder/"src"/"personal_ai_brain"/"new.py"
+    target = folder/"src"/"personal_ai_brain"/"state_quality.py"
     target.write_text("answer = 1\n")
-    (folder/"tests"/"test_smoke.py").write_text(
+    (folder/"tests"/"test_state_quality.py").write_text(
         "from pathlib import Path\n"
         "def test_smoke():\n"
-        "    Path('src/personal_ai_brain/new.py').write_text('answer = 2\\n')\n"
+        "    Path('src/personal_ai_brain/state_quality.py').write_text('answer = 2\\n')\n"
         "    assert True\n"
     )
     r = _validate_local(disposable)
@@ -119,7 +120,7 @@ def test_changed_test_execution_mutating_source_fails(disposable):
 def test_disposable_repo_denies_symlink_new_file(disposable):
     folder, _, _ = disposable
     source = folder/"README.md"
-    p = folder/"src"/"personal_ai_brain"/"bad.py"
+    p = folder/"src"/"personal_ai_brain"/"state_quality.py"
     p.parent.mkdir(parents=True)
     p.symlink_to(source)
     r = _validate_local(disposable)
@@ -141,7 +142,7 @@ def test_trusted_win_validator_uses_fixed_sandbox_no_shell(monkeypatch):
     def fake(argv, **kwargs):
         calls.append((argv, kwargs))
         response = {
-            "files_changed": ["src/personal_ai_brain/new_feature.py"],
+            "files_changed": ["src/personal_ai_brain/state_quality.py"],
             "additions": 2, "deletions": 0,
             "test_summary": "7 tests passed in restricted Linux sandbox",
         }
@@ -189,3 +190,11 @@ def test_subprocess_failure_never_exposes_untrusted_output(monkeypatch, result):
                         lambda *a, **k: result)
     with pytest.raises(RuntimeError, match="^v02_completion_validation_failed$"):
         validate_completion(_workspace(), "personal-ai-brain")
+
+
+def test_disabling_patched_tests_keeps_mandatory_base(disposable):
+    folder,_,_=disposable
+    (folder/'tests/test_state_quality.py').write_text('# task disabled tests\n')
+    r=_validate_local(disposable)
+    assert r.returncode==0,r.stderr[-1000:]
+    assert json.loads(r.stdout)['test_summary']=='9 tests passed in restricted Linux sandbox'

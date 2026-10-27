@@ -126,10 +126,10 @@ def allowed_change(project_id: object, path: object) -> bool:
     if parts[0] == "docs":
         return suffix in {".md", ".txt"}
     if project_id == "personal-ai-brain":
-        if parts[0] == "src" and len(parts) >= 3 and parts[1] == "personal_ai_brain":
-            return suffix in _ALLOWED_SOURCE_EXTENSIONS and not parts[-1].startswith(_PAB_SECURITY_PREFIXES)
-        if parts[0] == "tests" and len(parts) >= 2:
-            return suffix == ".py" and not parts[-1].startswith(("test_codex_bridge_", "test_control", "test_builder_auth"))
+        modules = {'state_quality', 'assistant_media_selector',
+                   'assistant_contract', 'assistant_result', 'rollup_proposal'}
+        return path in ({'src/personal_ai_brain/'+name+'.py' for name in modules} |
+                        {'tests/test_'+name+'.py' for name in modules})
         return False
     if project_id == "homelab-infrastructure":
         # Socket-free status gate cannot authorize HTTP/media mutation modules.

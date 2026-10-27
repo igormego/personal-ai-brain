@@ -60,9 +60,9 @@ def test_reject_invalid_identity_and_text(overrides):
 
 
 @pytest.mark.parametrize("project,path", [
-    ("personal-ai-brain", "src/personal_ai_brain/assistant_media_plan.py"),
-    ("personal-ai-brain", "src/personal_ai_brain/new_service.py"),
-    ("personal-ai-brain", "tests/test_assistant_media_plan.py"),
+    ("personal-ai-brain", "src/personal_ai_brain/assistant_media_selector.py"),
+    ("personal-ai-brain", "src/personal_ai_brain/rollup_proposal.py"),
+    ("personal-ai-brain", "tests/test_assistant_media_selector.py"),
     ("personal-ai-brain", "docs/design/new-feature.md"),
     ("homelab-infrastructure", "tools/movie-intelligence/model.mjs"),
     ("homelab-infrastructure", "tools/movie-intelligence/test/status.test.mjs"),
@@ -109,7 +109,7 @@ def test_homelab_guarded_scope(path):
 
 
 def test_bounded_change_list_rejects_duplicates_and_overlarge():
-    files = ["src/personal_ai_brain/assistant_media_plan.py", "tests/test_assistant_media_plan.py"]
+    files = ["src/personal_ai_brain/assistant_media_selector.py", "tests/test_assistant_media_selector.py"]
     assert approved_changes("personal-ai-brain", files, additions=100, deletions=20) == sorted(files)
     for value in ([], files+files, ["deploy/run.sh"], ["src/../etc/passwd"]):
         with pytest.raises(ValueError, match="change_scope_denied"):

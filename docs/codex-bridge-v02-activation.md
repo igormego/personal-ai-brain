@@ -163,3 +163,15 @@ O_NOFOLLOW, pinned SHA256, descriptor-path version check, descriptor-path test
 execution with pass_fds, then close in finally. The host root/ancestor check
 remains separate. The effective sandbox mounts /usr read-only; its writable
 virtual root is not host-root write access.
+
+## Restricted PAB pure-module gate
+
+Only state_quality.py, assistant_media_selector.py, assistant_contract.py,
+assistant_result.py and rollup_proposal.py under src/personal_ai_brain and their
+corresponding tests/test_<module>.py files are remotely editable, plus existing
+permitted documentation. No other application-module wildcard is allowed.
+The fixed pytest profile runs all five test files and mandatory copies read from
+the committed base Git objects, using importlib mode and task-local scratch.
+Deleting/disabling patched tests cannot remove the original mandatory tests.
+Results count only the actual restricted executions, never the full CI suite.
+Normal GitHub CI still executes the unchanged full repository suite.
