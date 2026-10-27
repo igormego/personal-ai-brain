@@ -46,7 +46,7 @@ Do not grant repository access expecting `requested_by` to restrict it.
 | `core.report` | `{}` | Fresh Markdown report and health summary |
 | `core.rollup_proposals` | `{}` | Fresh proposals, never applied |
 | `runtime.logs_tail` | `{}` or `{"lines":30}` | Fixed Core service log, 1–100 lines, at most 4096 output bytes |
-| `project_os.status` (source merged, live deployment pending) | `{"project_id":"homelab"}` or `{"project_id":"homelab","workstream_id":"media-automation"}` | One bounded status/gate/next action from Core project map; explicit freshness and source findings |
+| `project_os.status` (live ChatGPT transport-accepted 2026-10-27; recovery gate pending) | `{"project_id":"homelab"}` or `{"project_id":"homelab","workstream_id":"media-automation"}` | One bounded status/gate/next action from Core project map; explicit freshness and source findings |
 
 Every registry entry declares an ID, description, risk level, argument schema and
 validator, handler and side-effect class. Only `read_only` / `none` entries can
@@ -72,13 +72,33 @@ handler invocation. Historical reservations without a verifiable payload hash
 are preserved, not migrated or re-executed, and their replays fail closed.
 An exact duplicate of a post-upgrade request still reuses saved result truth.
 
-**Deployment status: not yet live-accepted.** The external ChatGPT test in
-private Issue #51 returned `request_rejected / unknown_capability` from the
-still-running older Homelab worker. Review the runtime checkout/image drift
-before any controlled update; use the platform-owned [deployment gate](https://github.com/igormego/personal-ai-brain/issues/34).
-Do not treat successful GitHub CI as evidence of a live deploy. Keep all
-existing control audit records and unrelated runtime services unchanged.
-The project-facing Gateway acceptance remains tracked in [Issue #25](https://github.com/igormego/personal-ai-brain/issues/25).
+**Live status transport accepted (2026-10-27); operational and full Gateway gates remain open.**
+The earlier external Issue #51 returned `unknown_capability` against the old
+worker. The operator subsequently deployed the approved six-module control image,
+including the fail-closed source-read fix PR #36, without altering the Core,
+Windows bridge, unrelated services or production audit. The operator's
+[deployment evidence](https://github.com/igormego/personal-ai-brain/issues/34#issuecomment-6434876689)
+pins the active image to
+`sha256:06d57e7a8f32995bddc077dcbd94dad850ace15c531914bf38626e08c3484770`.
+
+Independent ChatGPT submissions [#54–#58](https://github.com/igormego/personal-ai-brain/issues/34#issuecomment-6434937635)
+proved bounded Project OS project/workstream replies, correct correlation and
+issue closure, an unavailable-project failure, identical replay using saved truth
+and changed-payload `request_conflict`. Real source quality was surfaced:
+Homelab project freshness was `unknown` (`state_required_field_missing`) and
+media-automation was `stale`, **not** falsely treated as current. A subsequent
+fresh `runtime.health` [Issue #59](https://github.com/igormego/personal-project-brain/issues/59)
+also completed and closed.
+
+**Do not treat this as full Gateway acceptance or permanent deployment readiness.**
+[Platform gate #34](https://github.com/igormego/personal-ai-brain/issues/34)
+remains OPEN pending operator-controlled restart/recovery and moving the
+deployment Compose override out of a temporary `/tmp` staging directory.
+The accepted historical ledger must not be rewritten or replayed. The pure
+ChatGPT-side codec PR #35 is not an activated native authenticated adapter;
+outbound delivery into a normal ChatGPT conversation remains unverified.
+[Personal Assistant Gateway #25](https://github.com/igormego/personal-ai-brain/issues/25)
+stays OPEN. No WhatsApp adapter or additional permissions are enabled.
 
 ## Result and idempotency
 
