@@ -525,7 +525,8 @@ class ProjectStateQualityChecker:
     @staticmethod
     def _parse_date(value: str) -> date | None:
         try:
-            return date.fromisoformat(value)
+            parsed = date.fromisoformat(value)
+            return parsed if parsed.isoformat() == value else None
         except ValueError:
             return None
 
