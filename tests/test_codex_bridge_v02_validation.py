@@ -58,7 +58,7 @@ def test_script_is_trusted_compilable_policy_included():
     assert "sandboxed_tests_failed" in script
     assert "git('diff','HEAD','--check'" in script
     assert "subprocess.run(command" in script
-    assert "/usr/bin/node" in script
+    assert "/usr/local/bin/pab-v02-node-v24.22.1" in script
     assert "requests" not in script
 
 

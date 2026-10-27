@@ -131,3 +131,15 @@ Store no credentials/private configuration in these clones. Apply protected
 owner/SYSTEM/Administrators ACLs and verify the WSL root-deny sandbox cannot read
 or write either Windows source clone before activation. Task code receives only
 committed Git objects in a separate disposable Linux checkout.
+
+## Pinned v0.2 Node runtime
+
+The Movie Intelligence gate uses only `/usr/local/bin/pab-v02-node-v24.22.1`,
+installed by the trusted operator from the official Linux architecture-matched
+Node v24.22.1 archive after checksum verification. Only the node binary is needed;
+no npm packages, PATH update or system Node replacement is required. Host verification requires a
+root-owned regular non-symlink file and root-owned non-writable ancestors. The
+unprivileged host probe is separate from sandbox verification of the exact binary
+SHA256 and version; namespace UID65534 is never interpreted as root. Missing,
+inaccessible or wrong-version binaries fail closed inside the unchanged sandbox.
+The existing `/usr/bin/node` and v0.1 remain untouched.

@@ -19,6 +19,44 @@ from . import codex_bridge_v02_policy as policy
 WSL_ROOT = "/home/pabbridge/bridge-v02"
 MAX_RESULT_BYTES = 16384
 
+def verify_host_node():
+    """Runs as the existing unprivileged WSL operator, outside user namespaces."""
+    import os
+    import pathlib
+    import stat
+    path = pathlib.Path('/usr/local/bin/pab-v02-node-v24.22.1')
+    for item in [path, *path.parents]:
+        metadata = item.lstat()
+        expected = stat.S_ISREG if item == path else stat.S_ISDIR
+        if (not expected(metadata.st_mode) or metadata.st_uid != 0 or
+                metadata.st_mode & 0o022 or os.access(item, os.W_OK)):
+            raise RuntimeError('pinned_node_host_untrusted')
+
+
+def pinned_node():
+    """Sandbox identity check; namespace UID values confer no ownership trust."""
+    import hashlib
+    import pathlib
+    import stat
+    import subprocess
+    path = pathlib.Path('/usr/local/bin/pab-v02-node-v24.22.1')
+    try:
+        mode = path.lstat()
+        if not stat.S_ISREG(mode.st_mode) or mode.st_mode & 0o022:
+            raise RuntimeError('pinned_node_untrusted')
+        if hashlib.sha256(path.read_bytes()).hexdigest() != (
+                'e32e2d16081cf644f88392934288086e7662529d0d43277c34f7aad2207cfafb'):
+            raise RuntimeError('pinned_node_digest')
+        result = subprocess.run([str(path), '--version'], stdout=subprocess.PIPE,
+                                stderr=subprocess.DEVNULL, timeout=10, check=False,
+                                env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8'})
+        if result.returncode or result.stdout != b'v24.22.1\n':
+            raise RuntimeError('pinned_node_version')
+    except (OSError, subprocess.TimeoutExpired):
+        raise RuntimeError('pinned_node_unavailable') from None
+    return str(path)
+
+
 # Executed only by trusted Windows-side validate_completion() through the fixed
 # WSL Codex sandbox. No calls to shell, network, ssh, Docker or publisher.
 _BODY = r'''
@@ -104,7 +142,7 @@ with tempfile.TemporaryDirectory(prefix='.pab-v02-validate-',dir=cwd) as directo
         tests = sorted((root/'tools/movie-intelligence/test').glob('*.test.mjs'))
         if not tests or len(tests)>100:
             raise RuntimeError('trusted_tests_missing')
-        command = ['/usr/bin/node','--test','--test-reporter=tap',
+        command = [pinned_node(),'--test','--test-reporter=tap',
                    *map(str,tests)]
         expression = r'(?m)^# pass ([0-9]{1,6})\s*$'
     else:
@@ -138,7 +176,7 @@ def validator_script() -> str:
     # Uses the *installed trusted policy module*, never imports or executes the
     # Codex-edited task checkout's policy. Keep policy+validator versions pinned.
     source = inspect.getsource(policy)
-    script = source + "\n" + _BODY
+    script = source + "\n" + inspect.getsource(pinned_node) + "\n" + _BODY
     compile(script, "<trusted_v02_validator>", "exec")
     return script
 
@@ -164,6 +202,16 @@ def validate_completion(workspace: object, project_id: object) -> dict:
             cwd != WSL_ROOT + "/tasks/" + task or
             workspace["branch"] != "codex/bridge-task-" + task):
         raise ValueError("invalid_workspace")
+
+    if profile.test_profile == 'movie-intelligence-node':
+        # Fixed host verification contains no task fields and needs no root launch.
+        host = subprocess.run(
+            [*PREFIX, '/usr/bin/python3', '-c',
+             inspect.getsource(verify_host_node) + '\nverify_host_node()'],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            timeout=15, check=False)
+        if host.returncode:
+            raise RuntimeError('pinned_node_host_untrusted')
 
     args = [*PREFIX, "/usr/local/bin/codex"]
     for setting in OVERRIDES:
