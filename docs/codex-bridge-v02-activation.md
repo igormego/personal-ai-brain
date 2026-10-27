@@ -131,3 +131,47 @@ Store no credentials/private configuration in these clones. Apply protected
 owner/SYSTEM/Administrators ACLs and verify the WSL root-deny sandbox cannot read
 or write either Windows source clone before activation. Task code receives only
 committed Git objects in a separate disposable Linux checkout.
+
+## Pinned v0.2 Node runtime
+
+The Movie Intelligence gate uses only `/usr/local/bin/pab-v02-node-v24.22.1`,
+installed by the trusted operator from the official Linux architecture-matched
+Node v24.22.1 archive after checksum verification. Only the node binary is needed;
+no npm packages, PATH update or system Node replacement is required. Host verification requires a
+root-owned regular non-symlink file and root-owned non-writable ancestors. The
+unprivileged host probe is separate from sandbox verification of the exact binary
+SHA256 and version; namespace UID65534 is never interpreted as root. Missing,
+inaccessible or wrong-version binaries fail closed inside the unchanged sandbox.
+The existing `/usr/bin/node` and v0.1 remain untouched.
+
+## Restricted Homelab status gate
+
+The remote gate runs only `tools/movie-intelligence/test/status.test.mjs` with
+Node's fixed in-process test runner. It reports the actual selected test count,
+not the full Movie Intelligence suite. Remotely editable code is limited to
+`model.mjs`, `get_movie_status.mjs`, `fixtures.mjs`, and `test/status.test.mjs`
+under `tools/movie-intelligence`; existing documentation remains allowed.
+HTTP adapters, SQLite adapters, request/reacquisition modules and their tests are
+not remotely editable. Existing HTTP/security integration tests remain unchanged
+in the Homelab repository and normal CI; no security coverage is silently skipped
+while permitting edits to the uncovered implementation. No Homelab code/test
+change is required for this conservative first profile.
+
+The validator supplies task-local TMPDIR inside its TemporaryDirectory and removes
+it on success/failure. Node verification/test execution uses one opened inode:
+O_NOFOLLOW, pinned SHA256, descriptor-path version check, descriptor-path test
+execution with pass_fds, then close in finally. The host root/ancestor check
+remains separate. The effective sandbox mounts /usr read-only; its writable
+virtual root is not host-root write access.
+
+## Restricted PAB pure-module gate
+
+Only state_quality.py, assistant_media_selector.py, assistant_contract.py,
+assistant_result.py and rollup_proposal.py under src/personal_ai_brain and their
+corresponding tests/test_<module>.py files are remotely editable, plus existing
+permitted documentation. No other application-module wildcard is allowed.
+The fixed pytest profile runs all five test files and mandatory copies read from
+the committed base Git objects, using importlib mode and task-local scratch.
+Deleting/disabling patched tests cannot remove the original mandatory tests.
+Results count only the actual restricted executions, never the full CI suite.
+Normal GitHub CI still executes the unchanged full repository suite.

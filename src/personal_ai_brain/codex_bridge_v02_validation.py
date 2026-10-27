@@ -19,6 +19,44 @@ from . import codex_bridge_v02_policy as policy
 WSL_ROOT = "/home/pabbridge/bridge-v02"
 MAX_RESULT_BYTES = 16384
 
+def verify_host_node():
+    """Runs as the existing unprivileged WSL operator, outside user namespaces."""
+    import os
+    import pathlib
+    import stat
+    path = pathlib.Path('/usr/local/bin/pab-v02-node-v24.22.1')
+    for item in [path, *path.parents]:
+        metadata = item.lstat()
+        expected = stat.S_ISREG if item == path else stat.S_ISDIR
+        if (not expected(metadata.st_mode) or metadata.st_uid != 0 or
+                metadata.st_mode & 0o022 or os.access(item, os.W_OK)):
+            raise RuntimeError('pinned_node_host_untrusted')
+
+
+def pinned_node():
+    """Sandbox identity check; namespace UID values confer no ownership trust."""
+    import hashlib
+    import pathlib
+    import stat
+    import subprocess
+    path = pathlib.Path('/usr/local/bin/pab-v02-node-v24.22.1')
+    try:
+        mode = path.lstat()
+        if not stat.S_ISREG(mode.st_mode) or mode.st_mode & 0o022:
+            raise RuntimeError('pinned_node_untrusted')
+        if hashlib.sha256(path.read_bytes()).hexdigest() != (
+                'e32e2d16081cf644f88392934288086e7662529d0d43277c34f7aad2207cfafb'):
+            raise RuntimeError('pinned_node_digest')
+        result = subprocess.run([str(path), '--version'], stdout=subprocess.PIPE,
+                                stderr=subprocess.DEVNULL, timeout=10, check=False,
+                                env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8'})
+        if result.returncode or result.stdout != b'v24.22.1\n':
+            raise RuntimeError('pinned_node_version')
+    except (OSError, subprocess.TimeoutExpired):
+        raise RuntimeError('pinned_node_unavailable') from None
+    return str(path)
+
+
 # Executed only by trusted Windows-side validate_completion() through the fixed
 # WSL Codex sandbox. No calls to shell, network, ssh, Docker or publisher.
 _BODY = r'''
@@ -97,14 +135,29 @@ before = inspect_tree()
 with tempfile.TemporaryDirectory(prefix='.pab-v02-validate-',dir=cwd) as directory:
     log_path = pathlib.Path(directory)/'tests.log'
     if profile.test_profile == 'pab-pytest':
+        names = ('state_quality', 'assistant_media_selector', 'assistant_contract',
+                 'assistant_result', 'rollup_proposal')
+        mandatory = pathlib.Path(directory)/'mandatory'
+        mandatory.mkdir()
+        tests = []
+        for name in names:
+            relative = 'tests/test_' + name + '.py'
+            # Immutable base tests cannot be deleted/disabled by a task patch.
+            target = mandatory/('test_' + name + '.py')
+            target.write_bytes(git('show', base + ':' + relative))
+            tests.extend([str(target), relative])
         command = ['/usr/bin/python3','-m','pytest','-q','-p','no:cacheprovider',
-                   '--basetemp',str(pathlib.Path(directory)/'pytest'), 'tests']
+                   '--import-mode=importlib',
+                   '--basetemp',str(pathlib.Path(directory)/'pytest'), *tests]
         expression = r'(?m)^([0-9]{1,6}) passed in [0-9.]+s\s*$'
     elif profile.test_profile == 'movie-intelligence-node':
-        tests = sorted((root/'tools/movie-intelligence/test').glob('*.test.mjs'))
+        tests = [root/'tools/movie-intelligence/test'/name for name in (
+            'status.test.mjs',)]
+        if not all(p.is_file() for p in tests):
+            raise RuntimeError('trusted_tests_missing')
         if not tests or len(tests)>100:
             raise RuntimeError('trusted_tests_missing')
-        command = ['/usr/bin/node','--test','--test-reporter=tap',
+        command = [pinned_node(),'--test','--test-isolation=none','--test-reporter=tap',
                    *map(str,tests)]
         expression = r'(?m)^# pass ([0-9]{1,6})\s*$'
     else:
@@ -116,10 +169,30 @@ with tempfile.TemporaryDirectory(prefix='.pab-v02-validate-',dir=cwd) as directo
         # environment. Suppress Python bytecode files that would otherwise
         # contaminate the validated patch after successful tests.
         test_env = {'PATH':'/usr/bin:/bin', 'LANG':'C.UTF-8', 'HOME':cwd,
-                    'PYTHONDONTWRITEBYTECODE':'1'}
-        r = subprocess.run(command, stdout=handle, stderr=subprocess.STDOUT,
-                           env=test_env, timeout=240, check=False,
-                           preexec_fn=limit_output)
+                    'PYTHONDONTWRITEBYTECODE':'1', 'TMPDIR':directory}
+        node_fd = None
+        try:
+            if profile.test_profile == 'movie-intelligence-node':
+                # Bind hash, version and test execution to one opened inode.
+                node_fd = os.open('/usr/local/bin/pab-v02-node-v24.22.1',
+                                  os.O_RDONLY | os.O_NOFOLLOW)
+                with os.fdopen(os.dup(node_fd),'rb') as binary:
+                    digest = hashlib.sha256(binary.read()).hexdigest()
+                if digest != 'e32e2d16081cf644f88392934288086e7662529d0d43277c34f7aad2207cfafb':
+                    raise RuntimeError('pinned_node_digest')
+                executable = '/proc/self/fd/' + str(node_fd)
+                version = subprocess.run([executable,'--version'], pass_fds=(node_fd,),
+                    stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,env=test_env,
+                    timeout=10,check=False)
+                if version.returncode or version.stdout != b'v24.22.1\n':
+                    raise RuntimeError('pinned_node_version')
+                command[0] = executable
+            r = subprocess.run(command, stdout=handle, stderr=subprocess.STDOUT,
+                               env=test_env, timeout=240, check=False,
+                               pass_fds=() if node_fd is None else (node_fd,),
+                               preexec_fn=limit_output)
+        finally:
+            if node_fd is not None: os.close(node_fd)
     if r.returncode != 0 or log_path.stat().st_size > 1_048_576:
         raise RuntimeError('sandboxed_tests_failed')
     tail = log_path.read_bytes()[-8192:].decode('utf-8',errors='replace')
@@ -138,7 +211,7 @@ def validator_script() -> str:
     # Uses the *installed trusted policy module*, never imports or executes the
     # Codex-edited task checkout's policy. Keep policy+validator versions pinned.
     source = inspect.getsource(policy)
-    script = source + "\n" + _BODY
+    script = source + "\n" + inspect.getsource(pinned_node) + "\n" + _BODY
     compile(script, "<trusted_v02_validator>", "exec")
     return script
 
@@ -164,6 +237,16 @@ def validate_completion(workspace: object, project_id: object) -> dict:
             cwd != WSL_ROOT + "/tasks/" + task or
             workspace["branch"] != "codex/bridge-task-" + task):
         raise ValueError("invalid_workspace")
+
+    if profile.test_profile == 'movie-intelligence-node':
+        # Fixed host verification contains no task fields and needs no root launch.
+        host = subprocess.run(
+            [*PREFIX, '/usr/bin/python3', '-c',
+             inspect.getsource(verify_host_node) + '\nverify_host_node()'],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            timeout=15, check=False)
+        if host.returncode:
+            raise RuntimeError('pinned_node_host_untrusted')
 
     args = [*PREFIX, "/usr/local/bin/codex"]
     for setting in OVERRIDES:
