@@ -98,8 +98,11 @@ portfolio:
     autonomous publication and broader project routing are pending.
 
 verification:
-  last_verified: "2026-10-26"
+  last_verified: "2026-10-27"
   sources:
+    - "2026-10-27 durable-truth sync: Issue #25 title/body updated to native ChatGPT adapter pending after live project_os.status acceptance; Issue #34 updated to deployed/accepted with only stable Compose/image pin plus controlled restart/recovery remaining; Issue #41 updated to SOURCE_READY / LOCAL ACTIVATION PENDING. No runtime behavior, permissions or deployment changed by this sync."
+    - "2026-10-27 Remote Codex v0.2 source milestone: PR #42 merged as baf7283d and PR #43 as d3ec3b7; CI reported 743 passed. v0.2 remains uninstalled/unaccepted locally; v0.1 remains live."
+    - "2026-10-27 Personal Assistant read-only Project OS status slice: external ChatGPT Issues #54-#58 accepted live transport/status/replay/conflict behavior. Issue #34 remains open only for durable deployment pin and controlled restart/recovery; Issue #25 remains open for native authenticated ChatGPT adapter/delivery."
     - "2026-10-26 external ChatGPT Local Bridge acceptance: private Issue #44 request 0349729a-b6d2-4524-ab0e-492088304024 / task 8ee760bf-ee69-4804-b9e9-c532cac1decc succeeded with attempts=1; exactly state_quality.py + test_state_quality.py changed; 9 tests passed in restricted Linux sandbox; Issue closed with one correlated sanitized result."
     - "2026-10-26 replay/conflict acceptance: identical Issue #45 closed with no new result comment while original #44 retained exactly one authoritative result; conflicting same-task Issue #46 returned status=failed, failure_class=task_conflict, attempts=0 and closed."
     - "2026-10-26 fail-closed request validation: Issue #43 omitted required base_sha and was closed without result/execution before the corrected external acceptance request."
