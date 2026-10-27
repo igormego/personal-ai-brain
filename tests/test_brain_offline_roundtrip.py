@@ -187,7 +187,8 @@ def test_status_message_reaches_actual_handler_and_correlated_result(monkeypatch
     assert answer.request_id == req.request_id
     assert answer.request_hash == req.payload_hash
     assert answer.freshness == "current"
-    assert "media-automation" in answer.text
+    assert issues.result(issue)[1]["result"]["workstream_id"] == "media-automation"
+    assert "Homelab / Media Automation" in answer.text
     assert "Verify the TV poster" in answer.text
     assert "not-model-visible" not in answer.text
     audit = load_json(tmp_path / "control" / "requests" / (req.request_id + ".json"))
