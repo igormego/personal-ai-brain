@@ -189,3 +189,51 @@ mapping, fixed execution profile/backend, and remote edits limited to
 `state_quality.py` plus `test_state_quality.py`. Multi-project routing,
 remote approvals, automated review/correction, autonomous publication/deployment,
 local/API provider routing and budget-aware scheduling remain separate milestones.
+
+## Remote Codex v0.2 — broad development source milestone (not installed)
+
+[Issue #41](https://github.com/igormego/personal-ai-brain/issues/41)
+owns the separate v0.2 opt-in expansion. The accepted `pab-codex/v0.1`
+Windows task, request title, ledger and two-file validator are unchanged.
+
+The new **source-only** `pab-codex/v0.2` contract uses a separate exact Issue title
+and `execution_profile: sandboxed-repo-dev`. It accepts only:
+`request_id`, `task_id`, `project_id`, `execution_profile`, `goal`,
+`acceptance_criteria`, `base_sha`, plus fixed `transport_version` and
+`operation=codex.submit`. Identity/base freshness is still strict.
+
+The trusted catalog (installed code, never Issue fields) maps two initial
+projects to canonical Windows checkouts and offline test profiles:
+
+| Project ID | Trusted checkout | Offline test gate |
+| --- | --- | --- |
+| `personal-ai-brain` | `C:\Projects\personal-ai-brain` | full fixed PAB pytest suite |
+| `homelab-infrastructure` | `C:\Projects\homelab-infrastructure` | fixed Movie Intelligence Node tests |
+
+The sandboxed patch validator allows **new and edited** application code,
+tests and documentation across approved paths, not merely two source files.
+Sensitive control/bridge files, `.github`, `.codex`, `AGENTS.md`, config,
+deployment/Compose, secrets, migrations, binaries and credentials remain
+blocked. The early Homelab executable scope is the complete tested
+`tools/movie-intelligence/` module. Adding a different domain requires a
+trusted fixed test profile, not a caller-supplied command.
+
+The v0.2 completion validator is **not** a model instruction: it checks exact
+workspace UUID/base, allowed tracked and new files, regular-file/no-symlink and
+text-only content, bounded additions/deletions/files, patch/content stability,
+and a successful fixed offline suite. Tests run only in the inherited
+root-denied/no-network Codex sandbox with a minimal secret-free environment.
+Only sanitized file counts, approved relative paths and a fixed test summary
+may enter durable completion truth. No commit/push/PR/deploy or arbitrary
+shell, network, SSH, Docker, API key or remote approval is supplied.
+
+**Current reality:** These are merged-or-staged **source and offline contracts**,
+not a running v0.2 worker. Before activation the operator still must integrate
+and validate a separate WSL source-materialization and task/ledger binding for
+the selected trusted repo, a separately versioned outbound worker and its
+durable result-delivery namespace, and a pinned Windows user-context
+installation that cannot alter v0.1. Do not submit v0.2 Issues expecting
+execution yet. Only after local installation and independent ChatGPT-origin
+acceptance can this be marked LIVE. Auto-publication of PRs is a separate
+later capability, not part of the sandboxed coding task.
+
