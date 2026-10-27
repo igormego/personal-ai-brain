@@ -67,7 +67,7 @@ def test_known_non_requestable_decisions_are_not_misreported(decision, reason):
 
 @pytest.mark.parametrize("bad", [
     {"identity": {"tmdb_id": 244787, "title": "Whiplash", "year": 2014}},
-    {"identity": {"tmdb_id": 244786, "title": "Whiplash", "year": 2015}},
+    {"identity": {"tmdb_id": 244786, "title": "Whiplash", "year": True}},
     {"decision": "requested"},
     {"decision": "download_in_progress"},
     {"decision": "requestable", "identity": None},
@@ -87,6 +87,14 @@ def test_provider_malformed_or_mutation_result_fails_closed(bad):
     result.update(bad)
     with pytest.raises(MediaPlanUnavailable, match="^media_plan_unavailable$"):
         get_media_plan({"tmdb_id": 244786}, lambda _: result)
+
+
+def test_title_and_year_lookup_requires_matching_resolved_year():
+    with pytest.raises(MediaPlanUnavailable, match="^media_plan_unavailable$"):
+        get_media_plan(
+            {"title": "Whiplash", "year": 2014},
+            lambda _: wire(identity={"tmdb_id": 244786, "title": "Whiplash", "year": 2015}),
+        )
 
 
 def test_provider_exception_never_exposes_secret():
