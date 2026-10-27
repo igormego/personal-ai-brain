@@ -40,8 +40,6 @@ def disposable(tmp_path):
         repr(str(folder.parent) + "/"),
     )
     script = script.replace("'/usr/bin/python3'", repr(sys.executable))
-    # Synthetic fixture-only diagnostics; never included in installed validator.
-    script = script.replace("raise RuntimeError('change_scope_denied')", "raise RuntimeError('change_scope_denied: ' + repr(name))")
     return folder, base, script
 
 
