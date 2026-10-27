@@ -157,6 +157,11 @@ def build_registry(core_state: Path, reader_factory, redactor, work_client=None)
         # no repository/ref/path input and can never invoke coding or writes.
         reader = reader_factory()
         _agent, snapshot, _proposals = runtime.collect(reader)
+        # Reuse the same source-read failure gate as core.snapshot: a partially
+        # collected snapshot must never be presented as a fresh project status.
+        status, _ = runtime.classify(snapshot, reader.read_failures)
+        if status == "source_read_failure":
+            raise CapabilityFailed("source_read_failure")
         try:
             return select_project_status(snapshot, arguments)
         except StatusRejected:

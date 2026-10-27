@@ -1,5 +1,6 @@
 from datetime import date, datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
@@ -8,7 +9,7 @@ from personal_ai_brain.assistant_contract import normalize_request
 from personal_ai_brain.assistant_project_os import (
     StatusRejected, answer_project_status, select_project_status, validate_selector,
 )
-from personal_ai_brain.control import Redactor, Rejected, build_registry
+from personal_ai_brain.control import CapabilityFailed, Redactor, Rejected, build_registry
 from personal_ai_brain.core_agent import CoreSnapshot, Finding, StateRecord
 
 
@@ -155,7 +156,7 @@ def test_registered_read_only_handler_reuses_core_collector_without_new_reader(m
         calls.append(reader)
         return None, state, []
     monkeypatch.setattr(control.runtime, "collect", collect)
-    reader = object()
+    reader = SimpleNamespace(read_failures=0)
     registry = build_registry(Path("/does-not-matter"), lambda: reader, Redactor())
     capability, arguments = registry.resolve("project_os.status", {"project_id": "homelab"})
     assert capability.risk_level == "read_only"
@@ -165,6 +166,45 @@ def test_registered_read_only_handler_reuses_core_collector_without_new_reader(m
     assert calls == [reader]
     with pytest.raises(Rejected, match="invalid_project_selector"):
         registry.resolve("project_os.status", {"project_id": "homelab", "repository": "other"})
+
+
+
+@pytest.mark.parametrize("read_failures,findings", [
+    (1, ()),
+    (0, (Finding("error", "state_unreadable", "Unrelated Project",
+                 "Source API unavailable"),)),
+])
+def test_status_handler_refuses_partially_collected_core_snapshot(
+        monkeypatch, read_failures, findings):
+    import personal_ai_brain.control as control
+
+    # A selected project may appear valid in a partial snapshot; a failed
+    # Core source read anywhere must not be presented as a fresh response.
+    state = snapshot(record(), findings=findings)
+    monkeypatch.setattr(control.runtime, "collect",
+                        lambda reader: (None, state, []))
+    reader = SimpleNamespace(read_failures=read_failures)
+    registry = build_registry(Path("/unused"), lambda: reader, Redactor())
+    capability, arguments = registry.resolve("project_os.status",
+                                             {"project_id": "homelab"})
+    with pytest.raises(CapabilityFailed, match="source_read_failure"):
+        capability.handler(arguments)
+
+
+def test_status_handler_allows_non_source_quality_findings(monkeypatch):
+    import personal_ai_brain.control as control
+
+    state = snapshot(record(), findings=[
+        Finding("warning", "state_required_field_missing", "Unrelated Project",
+                "Non-source quality finding"),
+    ])
+    monkeypatch.setattr(control.runtime, "collect",
+                        lambda reader: (None, state, []))
+    reader = SimpleNamespace(read_failures=0)
+    registry = build_registry(Path("/unused"), lambda: reader, Redactor())
+    capability, arguments = registry.resolve("project_os.status",
+                                             {"project_id": "homelab"})
+    assert capability.handler(arguments)["project_id"] == "homelab"
 
 
 def test_registry_has_no_new_write_surface():
