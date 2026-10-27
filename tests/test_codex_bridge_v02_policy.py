@@ -64,9 +64,9 @@ def test_reject_invalid_identity_and_text(overrides):
     ("personal-ai-brain", "src/personal_ai_brain/new_service.py"),
     ("personal-ai-brain", "tests/test_assistant_media_plan.py"),
     ("personal-ai-brain", "docs/design/new-feature.md"),
-    ("homelab-infrastructure", "tools/movie-intelligence/new-feature.mjs"),
-    ("homelab-infrastructure", "tools/movie-intelligence/test/new-feature.test.mjs"),
-    ("homelab-infrastructure", "tools/movie-intelligence/seerr-request.mjs"),
+    ("homelab-infrastructure", "tools/movie-intelligence/model.mjs"),
+    ("homelab-infrastructure", "tools/movie-intelligence/test/status.test.mjs"),
+    ("homelab-infrastructure", "tools/movie-intelligence/get_movie_status.mjs"),
     ("homelab-infrastructure", "docs/homelab/overview.md"),
     ("homelab-infrastructure", "README.md"),
 ])
@@ -119,3 +119,8 @@ def test_bounded_change_list_rejects_duplicates_and_overlarge():
             approved_changes("personal-ai-brain", files, additions=n, deletions=0)
     with pytest.raises(ValueError, match="change_scope_denied"):
         approved_changes("personal-ai-brain", files*33, additions=1, deletions=0)
+
+
+@pytest.mark.parametrize('path',['radarr.mjs','seerr-request.mjs','sqlite.mjs','reacquire.mjs','test/adapters.test.mjs','test/seerr-request.test.mjs','new-feature.mjs'])
+def test_uncovered_homelab_security_scope_denied(path):
+    assert not allowed_change('homelab-infrastructure','tools/movie-intelligence/'+path)

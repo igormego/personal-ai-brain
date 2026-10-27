@@ -49,3 +49,15 @@ def test_host_checks_each_parent(monkeypatch,bad_parent):
         return SimpleNamespace(st_uid=1000 if self.as_posix()==bad_parent else 0,st_mode=0o100755 if file else 0o40755)
     monkeypatch.setattr(Path,'lstat',metadata);monkeypatch.setattr(os,'access',lambda *a:False)
     with pytest.raises(RuntimeError,match='pinned_node_host_untrusted'):v.verify_host_node()
+
+
+def test_descriptor_execution_and_task_local_scratch_are_fixed():
+    script=v.validator_script()
+    assert "'TMPDIR':directory" in script
+    assert 'os.O_RDONLY | os.O_NOFOLLOW' in script
+    assert "'/proc/self/fd/' + str(node_fd)" in script
+    assert 'pass_fds=() if node_fd is None else (node_fd,)' in script
+    assert 'finally:\n            if node_fd is not None: os.close(node_fd)' in script
+    assert "'status.test.mjs'," in script
+    assert "'adapters.test.mjs'" not in script
+    assert "'seerr-request.test.mjs'" not in script

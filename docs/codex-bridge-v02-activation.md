@@ -143,3 +143,23 @@ unprivileged host probe is separate from sandbox verification of the exact binar
 SHA256 and version; namespace UID65534 is never interpreted as root. Missing,
 inaccessible or wrong-version binaries fail closed inside the unchanged sandbox.
 The existing `/usr/bin/node` and v0.1 remain untouched.
+
+## Restricted Homelab status gate
+
+The remote gate runs only `tools/movie-intelligence/test/status.test.mjs` with
+Node's fixed in-process test runner. It reports the actual selected test count,
+not the full Movie Intelligence suite. Remotely editable code is limited to
+`model.mjs`, `get_movie_status.mjs`, `fixtures.mjs`, and `test/status.test.mjs`
+under `tools/movie-intelligence`; existing documentation remains allowed.
+HTTP adapters, SQLite adapters, request/reacquisition modules and their tests are
+not remotely editable. Existing HTTP/security integration tests remain unchanged
+in the Homelab repository and normal CI; no security coverage is silently skipped
+while permitting edits to the uncovered implementation. No Homelab code/test
+change is required for this conservative first profile.
+
+The validator supplies task-local TMPDIR inside its TemporaryDirectory and removes
+it on success/failure. Node verification/test execution uses one opened inode:
+O_NOFOLLOW, pinned SHA256, descriptor-path version check, descriptor-path test
+execution with pass_fds, then close in finally. The host root/ancestor check
+remains separate. The effective sandbox mounts /usr read-only; its writable
+virtual root is not host-root write access.

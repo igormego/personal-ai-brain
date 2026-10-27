@@ -132,8 +132,13 @@ def allowed_change(project_id: object, path: object) -> bool:
             return suffix == ".py" and not parts[-1].startswith(("test_codex_bridge_", "test_control", "test_builder_auth"))
         return False
     if project_id == "homelab-infrastructure":
-        return (len(parts) >= 3 and parts[:2] == ["tools", "movie-intelligence"]
-                and suffix in {".mjs", ".js", ".py", ".md", ".json", ".txt"})
+        # Socket-free status gate cannot authorize HTTP/media mutation modules.
+        return path in {
+            'tools/movie-intelligence/model.mjs',
+            'tools/movie-intelligence/get_movie_status.mjs',
+            'tools/movie-intelligence/fixtures.mjs',
+            'tools/movie-intelligence/test/status.test.mjs',
+        } or (parts[:2] == ['tools','movie-intelligence'] and suffix in {'.md','.txt'})
     return False
 
 

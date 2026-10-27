@@ -139,10 +139,13 @@ with tempfile.TemporaryDirectory(prefix='.pab-v02-validate-',dir=cwd) as directo
                    '--basetemp',str(pathlib.Path(directory)/'pytest'), 'tests']
         expression = r'(?m)^([0-9]{1,6}) passed in [0-9.]+s\s*$'
     elif profile.test_profile == 'movie-intelligence-node':
-        tests = sorted((root/'tools/movie-intelligence/test').glob('*.test.mjs'))
+        tests = [root/'tools/movie-intelligence/test'/name for name in (
+            'status.test.mjs',)]
+        if not all(p.is_file() for p in tests):
+            raise RuntimeError('trusted_tests_missing')
         if not tests or len(tests)>100:
             raise RuntimeError('trusted_tests_missing')
-        command = [pinned_node(),'--test','--test-reporter=tap',
+        command = [pinned_node(),'--test','--test-isolation=none','--test-reporter=tap',
                    *map(str,tests)]
         expression = r'(?m)^# pass ([0-9]{1,6})\s*$'
     else:
@@ -154,10 +157,30 @@ with tempfile.TemporaryDirectory(prefix='.pab-v02-validate-',dir=cwd) as directo
         # environment. Suppress Python bytecode files that would otherwise
         # contaminate the validated patch after successful tests.
         test_env = {'PATH':'/usr/bin:/bin', 'LANG':'C.UTF-8', 'HOME':cwd,
-                    'PYTHONDONTWRITEBYTECODE':'1'}
-        r = subprocess.run(command, stdout=handle, stderr=subprocess.STDOUT,
-                           env=test_env, timeout=240, check=False,
-                           preexec_fn=limit_output)
+                    'PYTHONDONTWRITEBYTECODE':'1', 'TMPDIR':directory}
+        node_fd = None
+        try:
+            if profile.test_profile == 'movie-intelligence-node':
+                # Bind hash, version and test execution to one opened inode.
+                node_fd = os.open('/usr/local/bin/pab-v02-node-v24.22.1',
+                                  os.O_RDONLY | os.O_NOFOLLOW)
+                with os.fdopen(os.dup(node_fd),'rb') as binary:
+                    digest = hashlib.sha256(binary.read()).hexdigest()
+                if digest != 'e32e2d16081cf644f88392934288086e7662529d0d43277c34f7aad2207cfafb':
+                    raise RuntimeError('pinned_node_digest')
+                executable = '/proc/self/fd/' + str(node_fd)
+                version = subprocess.run([executable,'--version'], pass_fds=(node_fd,),
+                    stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,env=test_env,
+                    timeout=10,check=False)
+                if version.returncode or version.stdout != b'v24.22.1\n':
+                    raise RuntimeError('pinned_node_version')
+                command[0] = executable
+            r = subprocess.run(command, stdout=handle, stderr=subprocess.STDOUT,
+                               env=test_env, timeout=240, check=False,
+                               pass_fds=() if node_fd is None else (node_fd,),
+                               preexec_fn=limit_output)
+        finally:
+            if node_fd is not None: os.close(node_fd)
     if r.returncode != 0 or log_path.stat().st_size > 1_048_576:
         raise RuntimeError('sandboxed_tests_failed')
     tail = log_path.read_bytes()[-8192:].decode('utf-8',errors='replace')
