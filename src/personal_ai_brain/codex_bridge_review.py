@@ -46,7 +46,7 @@ def digest(data):
 
 
 def run_git(checkout, *args):
-    r = subprocess.run(['git','-C',str(checkout),'-c','core.hooksPath=/dev/null',
+    r = subprocess.run(['git','-C',str(checkout),'-c','core.longpaths=true','-c','core.hooksPath=/dev/null',
         '-c','core.fsmonitor=false','-c','diff.external=',*args],
         capture_output=True,timeout=60)
     if r.returncode or len(r.stdout)>MAX_PATCH:
