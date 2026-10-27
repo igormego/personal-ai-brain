@@ -6,7 +6,7 @@ project:
   owner: "Project OS & Agent Architecture chat"
 
 status: "active"
-phase: "remote-codex-v02-live-patch-review-accepted-publisher-pending"
+phase: "remote-codex-v02-owner-publisher-implemented-acceptance-pending"
 
 current_gate: >
   Remote Codex v0.2 is LIVE_ACCEPTED as a narrowly scoped, outbound-only
@@ -21,8 +21,9 @@ current_gate: >
   No commits, pushes, PR publishing, merge, deployment, production SSH,
   broad repository changes, remote approvals or generic remote commands
   are enabled. Read-only isolated patch review/staging is now operator-accepted via PR #47
-  and both retained task packets; publication still awaits separate owner approval,
-  a reviewed publisher, and PAB stale-base resolution. Personal Assistant #25,
+  and both retained task packets. A separate trusted operator draft publisher and
+  explicit current-main transfer are implemented; per-patch owner approval and
+  real draft-PR acceptance remain pending. Personal Assistant #25,
   Homelab control #34 and media #38 remain gated.
 
 current_state: >
@@ -48,17 +49,13 @@ current_state: >
   Production Homelab, Assistant Gateway, security scopes and v0.1 unchanged.
 
 exact_next_action: >
-  Issue #46: trusted operator review/staging is now implemented in merged
-  PR #47 and two immutable local packet manifests; implement a separate
-  checksum/owner-approval-bound draft-PR publisher without changing v0.1/v0.2
-  coding workers or introducing unattended publication. Before PAB patch #64
-  promotion, explicitly resolve stale source base using a newly reviewed
-  current-main staging/revalidation; GitHub compare on 2026-10-27 found both
-  intended PAB target files unchanged between original base and main,
-  but that is not approval or full patch conflict review. Homelab #65's base
-  matched GitHub main at the same check; read its complete local diff before
-  requesting task-specific approval. Never publish either patch without its
-  explicit checksum-bound owner approval; confirm current HEAD again at write.
+  Issue #46: accept the merged trusted publisher with nonpublishing local tests,
+  explicitly stage/revalidate the PAB original patch against exact current main,
+  and inspect both complete target review packets. Require separate owner approval
+  binding repository, task, original base/checksum, target commit/checksum and
+  exact branch before any coding patch push or draft PR. Then perform an approved
+  real draft-PR acceptance; keep Issue #46 open until that gate passes. Neither
+  worker receives publication credentials, permissions or an approval handler.
   Keep separate #25/#34/#38 domain milestones gated.
 
 blockers: []
@@ -73,7 +70,8 @@ important_open_loops:
   - "COMPLETED: Credentialless Coding Agent Broker v0.1 foundation; Local Bridge durable core, request/task idempotency, dispatcher, approval_required, bounded lifecycle/recovery, WSL2 backend, managed ChatGPT auth, Linux workspace isolation and internal real coding acceptance. See docs/codex-bridge-checkpoint.md."
   - "COMPLETED: Remote Transport v0.1 is live-accepted. PR #23 implemented the outbound Windows Issues mailbox; PR #31 repaired restricted completion validation; external ChatGPT Issues #44-#48 proved execution, replay/conflict safety and Homelab coexistence."
   - "COMPLETED: Remote Codex v0.2 LIVE_ACCEPTED 2026-10-27, Issue #41. PRs #42/#43/#44/#45 merged. Real ChatGPT coding acceptance #64/#65 succeeded once each, 256/19 offline sandbox tests. Pre-restart replay/conflicts #66-#68 and post-restart replay/conflict #69-#71 passed; operator verified preserved WSL patches, one execution attempt each, unchanged v0.1/v0.2 ledger/delivery hashes across one v0.2-only restart. Approval/publishing/deployment remains separate and disabled; current remote editing uses only fixed bounded allowlists and exact local HEADs."
-  - "REMOTE CODEX PATCH REVIEW #46: PR #47 merged 2026-10-27 (a2c01835cc23fff588e1102d209506bec65d47f4). Operator-only review/staging CLI prepared two owner-protected, original-base WSL patch packets; 15 Windows and 788 WSL tests plus GitHub CI passed. PAB #64 packet patch hash 1f6adbad31a1801f4963db31dd5e76b1dedb1343e1a367acdfed36e100ddeec1 (stale branch base, requires separately reviewed current-main resolution); Homelab #65 patch hash 57d3295bc7037a7ea5b97288a38c23fdb5be48e2f06937cffffaa64a7b2cc15e (source base current at last check). No owner approval for either task, push, PR or merge; trusted publisher not yet implemented. Issue #46 OPEN."
+  - "HISTORICAL PATCH REVIEW CHECKPOINT #46: PR #47 merged 2026-10-27 (a2c01835cc23fff588e1102d209506bec65d47f4). Operator-only review/staging CLI prepared two owner-protected, original-base WSL patch packets; 15 Windows and 788 WSL tests plus GitHub CI passed. PAB #64 packet patch hash 1f6adbad31a1801f4963db31dd5e76b1dedb1343e1a367acdfed36e100ddeec1 (stale branch base, requires separately reviewed current-main resolution); Homelab #65 patch hash 57d3295bc7037a7ea5b97288a38c23fdb5be48e2f06937cffffaa64a7b2cc15e (source base current at last check). At this checkpoint no owner approval or task publication existed and publisher implementation was pending. Superseded by the next source milestone; Issue #46 remains OPEN."
+  - "ISSUE #46 SOURCE MILESTONE: owner-controlled review/staging and draft publisher implemented separately from workers. Protected exact-patch approval, explicit current-main transfer, offline sandbox revalidation and durable uncertain-write reconciliation are required. No retained coding patch is approved or published; real draft-PR acceptance remains pending."
   - "PENDING SEPARATE milestones: remote approval workflow, automatic ChatGPT review/correction loop, autonomous PR/merge/deploy, OpenAI API provider, local LLM provider, provider router and budget-aware scheduling."
   - "PERSONAL ASSISTANT: Project OS read-only status transport externally accepted via Issues #54-#58; Core-owned root quality reconciliation #37 complete with live current freshness #61/#62. Gateway native authenticated ChatGPT adapter/delivery Issue #25 and control restart/durable Compose Issue #34 remain OPEN. Media Request #38 SOURCE MILESTONE: strict selector PR #39 merged (568 CI tests); Homelab existing Seerr controller now has separate source-only plan-cli.mjs from homelab-infrastructure PR #32 (ba84d8e, 126 offline tests), and Personal AI Brain has opt-in fixed read-only planner provider and bounded media.plan_movie registry from PR #40 (d52d13f, 599 CI tests). Neither new media capability nor any write is deployed to production; current control worker does not inject provider. Next: operator-reviewed read-only Homelab wiring/pinning and live plan acceptance, respecting #34, private mounts and credentials. Authenticated movie request writes require separate per-movie durable uncertain-POST controls/authorization. No film request, download or WhatsApp activation."
   - "Codex Cloud pab-homelab-dev: VERIFIED_WITH_WARNING on 2026-10-12 for repository-only PAB/Homelab development; task lifecycle and surface selection recorded in docs/codex-environments.md. Absolute SSH absence remains uncertified after a configuration-only proxy response; pwsh requires the saved startup PATH export and is not on default PATH. No live Homelab acceptance implied."
