@@ -1,9 +1,14 @@
 # Remote Codex v0.2 — Local installation and acceptance handoff
 
-**Status:** source available for review; NOT installed, activated or independently
-accepted. [Issue #41](https://github.com/igormego/personal-ai-brain/issues/41)
-is the authoritative execution gate. v0.1 remains live/accepted and must stay
-untouched until v0.2 acceptance is complete.
+**Status (2026-10-27): LIVE_ACCEPTED for two fixed restricted repository profiles.**
+[Issue #41](https://github.com/igormego/personal-ai-brain/issues/41) records
+independent ChatGPT real coding acceptance (#64/#65), replay/conflict checks
+(#66–#68), the operator's v0.2-only post-execution restart and immutable
+ledger/patch verification, and ChatGPT post-restart replay/conflict (#69–#71).
+v0.1 remains live and unchanged. Generated coding patches remain local and
+uncommitted; GitHub PR publication, merge and production deployment are NOT
+part of this accepted worker. The installation and acceptance procedure below
+is retained as the recovery/reinstallation runbook.
 
 ## Why this is a separate opt-in worker
 
