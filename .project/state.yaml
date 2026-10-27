@@ -6,16 +6,18 @@ project:
   owner: "Project OS & Agent Architecture chat"
 
 status: "active"
-phase: "chatgpt-codex-remote-bridge-v01-accepted"
+phase: "remote-codex-v02-source-ready-local-activation-pending"
 
 current_gate: >
   Remote Transport Activation v0.1 and independent external ChatGPT-originated
   acceptance are COMPLETED as of 2026-10-26. The accepted path is private GitHub
   Issues -> outbound-only Windows worker -> durable Local Bridge ledger -> isolated
   Debian WSL2 Codex execution -> fixed restricted completion validation -> correlated
-  sanitized GitHub result. Remote approvals, automatic review/correction,
-  autonomous publication/deployment and multi-project routing remain disabled.
-  Core Agent stays read-only.
+  sanitized GitHub result. The separate Remote Codex v0.2 multi-project coding
+  source is merged and CI-verified (PRs #42 and #43) for two trusted repositories,
+  but the new Windows/WSL worker is NOT INSTALLED or live accepted. Live v0.1
+  remains unchanged. Remote approvals, automatic review/correction and
+  autonomous PR publication/deployment remain disabled. Core Agent stays read-only.
 
 current_state: >
   Local Bridge v0.1 durable core remains accepted. Remote transport is now live
@@ -34,16 +36,26 @@ current_state: >
   closed. Generated coding changes remain local/uncommitted and were not pushed,
   PR'd, merged or deployed. Personal Assistant contracts remain separate; Issue #25
   is no longer blocked by Remote Transport acceptance but still requires its own
-  capability/runtime milestone.
+  capability/runtime milestone. On 2026-10-27 Remote Codex v0.2 trusted source
+  PR #42 merged as baf7283d (strict separate request contract, approved
+  personal-ai-brain and homelab-infrastructure mappings, broad guarded
+  source/test/doc scopes and offline WSL completion validator). Companion
+  PR #43 merged as d3ec3b7 (separate versioned Windows Issues worker, durable
+  ledger/result namespace, committed Git-bundle WSL materialization and trusted
+  per-project code/test execution). CI: 743 passed. This is SOURCE_ONLY,
+  not a claim of an installed worker or a successful external v0.2 Codex turn.
 
 exact_next_action: >
-  Define the next bounded expansion of the accepted remote-coding capability:
-  multi-project trusted mappings/authorization so specialist chats can target
-  additional approved repositories without arbitrary repo/path selection. Keep
-  each repository opt-in and separately validated. In parallel, the Personal
-  Assistant owner may resume Issue #25 now that its #22 dependency is satisfied.
-  Do not add remote approvals, autonomous publication/deployment or budget-aware
-  routing implicitly; each remains a separate milestone.
+  At Igor's next authorized Codex Desktop Local/local-homelab-admin session,
+  execute the pinned local readiness/install procedure in
+  docs/codex-bridge-v02-activation.md for Issue #41: review the exact merged
+  code/checkouts, verify isolated Debian WSL Codex and fixed Python/Node
+  test profiles, create protected v0.2 ledger/delivery directories, check
+  existing narrow GitHub Issues token/ACL and empty v0.2 queue, install a
+  separate user-context v0.2 task without touching v0.1. Then perform independent
+  ChatGPT-originated benign coding acceptance on BOTH approved repositories,
+  replay/conflict and restart/recovery before marking v0.2 LIVE. No remote
+  approval or autonomous PR publication/merge/deploy is included.
 
 blockers: []
 
@@ -56,7 +68,8 @@ dependencies:
 important_open_loops:
   - "COMPLETED: Credentialless Coding Agent Broker v0.1 foundation; Local Bridge durable core, request/task idempotency, dispatcher, approval_required, bounded lifecycle/recovery, WSL2 backend, managed ChatGPT auth, Linux workspace isolation and internal real coding acceptance. See docs/codex-bridge-checkpoint.md."
   - "COMPLETED: Remote Transport v0.1 is live-accepted. PR #23 implemented the outbound Windows Issues mailbox; PR #31 repaired restricted completion validation; external ChatGPT Issues #44-#48 proved execution, replay/conflict safety and Homelab coexistence."
-  - "PENDING: Multi-project trusted mappings/authorization, remote approval workflow, automatic ChatGPT review/correction loop, autonomous PR/merge/deploy, OpenAI API provider, local LLM provider, provider router and budget-aware scheduling."
+  - "REMOTE CODEX v0.2: SOURCE_READY on 2026-10-27. Trusted project/patch-policy PR #42 (baf7283d) and separate opt-in Windows/WSL remote runtime PR #43 (d3ec3b7) merged with 743 CI tests. Initial approved repo IDs personal-ai-brain + homelab-infrastructure; broader code/tests/docs in offline sandbox; no production SSH, credentials, publishing or install. Issue #41 OPEN pending actual Windows owner installation, two-repo external acceptance and restart/replay checks. v0.1 accepted worker/ledger preserved."
+  - "PENDING SEPARATE milestones: remote approval workflow, automatic ChatGPT review/correction loop, autonomous PR/merge/deploy, OpenAI API provider, local LLM provider, provider router and budget-aware scheduling."
   - "PERSONAL ASSISTANT: Project OS read-only status transport externally accepted via Issues #54-#58; Core-owned root quality reconciliation #37 complete with live current freshness #61/#62. Gateway native authenticated ChatGPT adapter/delivery Issue #25 and control restart/durable Compose Issue #34 remain OPEN. Media Request #38 SOURCE MILESTONE: strict selector PR #39 merged (568 CI tests); Homelab existing Seerr controller now has separate source-only plan-cli.mjs from homelab-infrastructure PR #32 (ba84d8e, 126 offline tests), and Personal AI Brain has opt-in fixed read-only planner provider and bounded media.plan_movie registry from PR #40 (d52d13f, 599 CI tests). Neither new media capability nor any write is deployed to production; current control worker does not inject provider. Next: operator-reviewed read-only Homelab wiring/pinning and live plan acceptance, respecting #34, private mounts and credentials. Authenticated movie request writes require separate per-movie durable uncertain-POST controls/authorization. No film request, download or WhatsApp activation."
   - "Codex Cloud pab-homelab-dev: VERIFIED_WITH_WARNING on 2026-10-12 for repository-only PAB/Homelab development; task lifecycle and surface selection recorded in docs/codex-environments.md. Absolute SSH absence remains uncertified after a configuration-only proxy response; pwsh requires the saved startup PATH export and is not on default PATH. No live Homelab acceptance implied."
   - "Codex local-homelab-admin: Local acceptance VERIFIED_WITH_WARNINGS on 2026-10-13; installed project environment/action schema confirmed, exact user-context SSH probe passed; UI recognition, fresh Worktree execution and organization policy remain unverified. Canonical checkouts and preserved worktrees established; old task roots, generated ledger artifacts, referenced SSH-key candidate and auth ACL review remain preserved/pending. Ledger README additions are already represented or superseded in canonical documentation. See docs/codex-environments.md."
