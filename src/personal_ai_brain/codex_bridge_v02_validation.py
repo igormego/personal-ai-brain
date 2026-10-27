@@ -112,8 +112,14 @@ with tempfile.TemporaryDirectory(prefix='.pab-v02-validate-',dir=cwd) as directo
     with log_path.open('wb') as handle:
         def limit_output():
             resource.setrlimit(resource.RLIMIT_FSIZE,(1_048_576,1_048_576))
+        # Keep executed repository tests inside a minimal, credential-free
+        # environment. Suppress Python bytecode files that would otherwise
+        # contaminate the validated patch after successful tests.
+        test_env = {'PATH':'/usr/bin:/bin', 'LANG':'C.UTF-8', 'HOME':cwd,
+                    'PYTHONDONTWRITEBYTECODE':'1'}
         r = subprocess.run(command, stdout=handle, stderr=subprocess.STDOUT,
-                           timeout=240, check=False, preexec_fn=limit_output)
+                           env=test_env, timeout=240, check=False,
+                           preexec_fn=limit_output)
     if r.returncode != 0 or log_path.stat().st_size > 1_048_576:
         raise RuntimeError('sandboxed_tests_failed')
     tail = log_path.read_bytes()[-8192:].decode('utf-8',errors='replace')
