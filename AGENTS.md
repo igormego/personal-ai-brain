@@ -20,6 +20,15 @@ Optimize for useful verified work per token. Do not trade away correctness, safe
 - Stop research once evidence is sufficient; add more only when it materially improves confidence or coverage.
 - Prefer deterministic reusable operations, cached/structured artifacts, and existing Skills where they safely reduce repeated LLM work.
 
+### Risk-based execution and verification
+
+- Classify the actual change, not the entire project: routine text/docs/metadata, ordinary tested code, or security/authorization/runtime/data/deployment. Scale review and preflight accordingly.
+- For routine, reversible changes, inspect the focused diff and run only applicable mandatory checks; do not launch a full environment/security audit when nothing relevant changed.
+- For ordinary code, run focused tests plus repository-required CI. For security boundaries, credentials, remote execution, deployments or destructive changes, retain the full relevant preflight and regression evidence.
+- Fixed sandbox validators, required CI, permission boundaries and explicit approval gates are never optional merely to save tokens. Reuse previously verified unchanged evidence rather than re-proving it in every task.
+- Continue a Codex task for the same bounded change; use a fresh task for a genuinely unrelated milestone instead of accumulating irrelevant context. Keep durable state in the authoritative project files.
+- Prefer autonomous execution of already authorized, low-risk steps, and concise result/problem/next-action reporting. Avoid ceremonial planning, repeated confirmation and full log dumps unless they materially help.
+
 If extra retrieval, verification, or documentation will not materially change the answer, reduce meaningful risk, or create reusable value, skip it.
 
 ## Temporal context awareness
