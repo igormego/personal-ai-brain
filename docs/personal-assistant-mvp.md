@@ -1,6 +1,6 @@
 # Personal Assistant MVP
 
-_Status: approved product direction; implementation not yet started._
+_Status: approved product direction; first read-only Project OS control slice deployed and externally transport-tested on 2026-10-27. Full Gateway and WhatsApp are not accepted._
 
 ## Product goal
 
@@ -125,11 +125,20 @@ The accepted Local Bridge v0.1, durable task identity, idempotency, bounded exec
 
 However, the Local Bridge is currently a bounded **coding/Codex** path, not the Personal Assistant runtime. The new assistant must not silently repurpose `codex.submit` as a general-purpose action bus.
 
-The immediate existing PAB milestone remains:
+The bounded Windows Local Bridge transport and independent external ChatGPT
+acceptance were completed on 2026-10-26. The separate read-only
+`project_os.status` capability was subsequently deployed to the Homelab control
+worker and independently exercised over private GitHub Issues #54–#58 on
+2026-10-27. The work preserves transport separation: `pab-codex/v0.1` is still
+the restricted Windows coding path, whereas `pab-control/v0.1` runs the
+read-only status capability on Homelab.
 
-> Remote Transport Activation + independent external ChatGPT acceptance for the already implemented Local Bridge transport.
-
-After that boundary is accepted, Personal Assistant work can reuse the proven transport/idempotency/security patterns while introducing its own explicit assistant capability contracts.
+That proves an **actual ChatGPT-triggered control transport vertical slice**, but
+does not automatically connect normal conversation turns to the pure codec or
+prove outbound native ChatGPT reply delivery. The control platform's
+[restart/durable deployment gate #34](https://github.com/igormego/personal-ai-brain/issues/34)
+and the Assistant's [authenticated adapter/delivery gate #25](https://github.com/igormego/personal-ai-brain/issues/25)
+remain open. Do not expand to WhatsApp or generalized writes by implication.
 
 ## MVP capability scope
 
@@ -317,7 +326,8 @@ toward:
 
 ## Ownership and next step
 
-This document is a product/design handoff, not accepted implementation state.
+This document records approved product direction and a **partially implemented,
+externally transport-tested** first slice. It is not full Gateway acceptance.
 
 Recommended specialist owner:
 
@@ -325,6 +335,12 @@ Recommended specialist owner:
 
 That specialist should use the Personal AI Brain repository and current PAB Project State as its technical foundation, while respecting the existing Agent Platform owner’s security and transport boundaries.
 
-First specialist task:
+Current specialist next action:
 
-> Read current PAB state and the accepted Local Bridge/remote-transport documentation. Close or explicitly defer the current external ChatGPT transport acceptance gate, then design the smallest Personal Assistant Gateway v0.1 slice above. Do not introduce WhatsApp implementation until the transport-independent request/capability contract is clear.
+> Preserve the independently tested read-only Project OS transport; after the
+> operator closes the controlled restart and durable deployment gate #34,
+> deliver a genuinely authenticated ChatGPT-side adapter and reply path under
+> Gateway #25. Verify correlation, authorization, delivery uncertainty and
+> existing audit truth against the live capability. The merged pure codec
+> is not yet an active connector or runtime adapter. WhatsApp remains a
+> separate later acceptance step.
