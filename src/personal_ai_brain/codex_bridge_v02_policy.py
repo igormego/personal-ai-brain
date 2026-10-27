@@ -115,7 +115,8 @@ def allowed_change(project_id: object, path: object) -> bool:
     parts = path.split("/")
     if any(part in _BLOCKED_PARTS or part.startswith(".") for part in parts):
         return False
-    if parts[-1] in _BLOCKED_BASENAMES:
+    if (parts[-1] in _BLOCKED_BASENAMES or
+            re.search(r"secret|token|credential|password|private_key", path, re.IGNORECASE)):
         return False
     suffix = "." + parts[-1].rsplit(".", 1)[1] if "." in parts[-1] else ""
     if suffix in _BLOCKED_SUFFIXES:
