@@ -98,7 +98,8 @@ def sanitize_media_plan(selector: object, raw: object) -> dict:
         if "year" in selected and selected["year"] != year:
             _unavailable()
         identity = {"tmdb_id": tmdb_id, "title": title, "year": year}
-    if decision == "requestable" and identity is None:
+    if decision == "requestable" and (identity is None or raw["evidence"] is None
+                                     or reason != "stable_identity_and_clear_preflight"):
         _unavailable()
 
     evidence = raw["evidence"]
