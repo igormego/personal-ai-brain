@@ -12,6 +12,8 @@ import pytest
 
 from personal_ai_brain.assistant_contract import normalize_request
 from personal_ai_brain.assistant_decision import DecisionRejected, decide
+from personal_ai_brain.assistant_decision_context import build_decision_context
+from personal_ai_brain.core_agent import CoreSnapshot, StateRecord
 from personal_ai_brain.assistant_project_os import validate_selector
 from personal_ai_brain.control import Capability, Registry, no_arguments
 
@@ -51,6 +53,20 @@ def registry_with_handlers(calls):
     ])
 
 
+
+def trusted_context():
+    return build_decision_context(CoreSnapshot(
+        generated_on=NOW.date().isoformat(),
+        records=[StateRecord(
+            project_id="homelab", project_name="Homelab", scope="project",
+            repository="igormego/homelab-infrastructure", path=".project/state.yaml",
+            attention="active", status="active", phase="build",
+            last_verified=NOW.date().isoformat(), sync_status="synced",
+            current_gate="read-only", exact_next_action="verify",
+        )],
+    ), today=NOW.date())
+
+
 def model_output(action, **extra):
     return json.dumps({"action": action, **extra})
 
@@ -61,12 +77,12 @@ def test_project_status_plan_is_correlated_and_does_not_execute():
     req = assistant_request()
     seen = []
 
-    def provider(message, hints):
+    def provider(message, hints, context):
         seen.append((message, hints))
         return model_output("invoke_read_only", capability="project_os.status",
                             arguments={"project_id": "homelab"})
 
-    plan = decide(req, registry, provider)
+    plan = decide(req, registry, provider, context=trusted_context())
     assert (plan.action, plan.capability, plan.arguments) == (
         "invoke_read_only", "project_os.status", {"project_id": "homelab"},
     )
@@ -82,7 +98,7 @@ def test_core_health_plan_does_not_execute():
     plan = decide(
         assistant_request("Je Core Agent zdravý?"),
         registry_with_handlers(calls),
-        lambda _message, _hints: model_output(
+        lambda _message, _hints, _context: model_output(
             "invoke_read_only", capability="core.health", arguments={},
         ),
     )
@@ -100,7 +116,7 @@ def test_no_tool_decisions_are_fixed_and_inert(text, action):
     calls = []
     plan = decide(
         assistant_request(text), registry_with_handlers(calls),
-        lambda _message, _hints: model_output(action),
+        lambda _message, _hints, _context: model_output(action),
     )
     assert plan.action == action
     assert plan.capability is None and plan.arguments is None
@@ -137,7 +153,7 @@ def test_model_decisions_cannot_escalate_or_invent_backend_truth(proposal):
     calls = []
     with pytest.raises(DecisionRejected) as exc:
         decide(assistant_request(), registry_with_handlers(calls),
-               lambda _message, _hints: proposal)
+               lambda _message, _hints, _context: proposal)
     assert str(exc.value) in {"model_decision_invalid", "decision_denied"}
     assert calls == []
 
@@ -145,7 +161,7 @@ def test_model_decisions_cannot_escalate_or_invent_backend_truth(proposal):
 def test_provider_failure_sanitizes_error_and_does_not_execute():
     calls = []
 
-    def provider(_message, _hints):
+    def provider(_message, _hints, _context):
         raise TimeoutError("secret credential leaked in exception")
 
     with pytest.raises(DecisionRejected, match="^provider_unavailable$"):
@@ -162,7 +178,7 @@ def test_provider_receives_a_copy_not_mutable_registry_policy():
         return model_output("invoke_read_only", capability="project_os.status",
                             arguments={"project_id": "homelab"})
 
-    decide(assistant_request(), registry, provider)
+    decide(assistant_request(), registry, provider, context=trusted_context())
     assert registry.capabilities["project_os.status"].argument_schema["required"] == ["project_id"]
     assert calls == []
 
@@ -174,7 +190,7 @@ def test_registry_policy_revocation_is_checked_before_planning():
         registry.capabilities["core.health"], side_effect_class="local_work_handoff",
     )
     with pytest.raises(DecisionRejected, match="^decision_denied$"):
-        decide(assistant_request(), registry, lambda _message, _hints:
+        decide(assistant_request(), registry, lambda _message, _hints, _context:
                model_output("invoke_read_only", capability="core.health", arguments={}))
     assert calls == []
 
@@ -182,6 +198,6 @@ def test_registry_policy_revocation_is_checked_before_planning():
 def test_trusted_request_and_registry_required():
     registry = registry_with_handlers([])
     with pytest.raises(DecisionRejected, match="^trusted_input_required$"):
-        decide({"message": "spoofed"}, registry, lambda _message, _hints: "{}")
+        decide({"message": "spoofed"}, registry, lambda _message, _hints, _context: "{}")
     with pytest.raises(DecisionRejected, match="^provider_unavailable$"):
         decide(assistant_request(), registry, None)
