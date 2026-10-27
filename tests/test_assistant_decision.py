@@ -3,6 +3,7 @@
 These tests intentionally never call the control capability handlers.
 """
 
+from dataclasses import replace
 from datetime import datetime, timezone
 import json
 from uuid import uuid4
@@ -169,7 +170,9 @@ def test_provider_receives_a_copy_not_mutable_registry_policy():
 def test_registry_policy_revocation_is_checked_before_planning():
     calls = []
     registry = registry_with_handlers(calls)
-    registry.capabilities["core.health"].side_effect_class = "local_work_handoff"
+    registry.capabilities["core.health"] = replace(
+        registry.capabilities["core.health"], side_effect_class="local_work_handoff",
+    )
     with pytest.raises(DecisionRejected, match="^decision_denied$"):
         decide(assistant_request(), registry, lambda _message, _hints:
                model_output("invoke_read_only", capability="core.health", arguments={}))
