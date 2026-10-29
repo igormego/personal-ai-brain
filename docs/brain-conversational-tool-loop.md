@@ -37,6 +37,24 @@ For example, a user may ask *“Čo ďalej s Homelabom a ako to súvisí s Recip
 - Source references are appended as a **compact** deterministic footer, deduplicating repeated reads of one project. They indicate recorded Project OS verification, **not a real-time server check**.
 - The provider already totals `input_tokens`/`output_tokens` per turn for the operator; compare measured costs and reliability before selecting a different model or implementing speculative routing caches. No autonomous API spending or new model router is enabled.
 
+## Brain v0.6 optional source-only read routing
+
+The existing conversational loop now has an **off-by-default** second read-only
+tool: `homelab_audit`. It appears in the model's tool list only when the
+trusted caller opts in. Executing it also requires an injected Gateway callback
+and an existing read-only `homelab.audit` registry entry.
+
+The callback delivers a correlated evidence object after checking the private
+transport. Brain then validates the snapshot through the existing
+`host_audit.validate_snapshot` and reports its collection timestamp, never
+presenting the data as a live server check. Only the preapproved empty argument
+object is accepted; unmatched correlation, stale evidence and unsupported tools
+fail closed. Project OS status routing remains unchanged.
+
+This milestone adds no deployment, plugin exposure, scheduler, backend
+credentials or host-control permissions. Gateway #25 and the operator's
+final Issue #67 closeout remain separate prerequisites.
+
 ## Exact limits and owner gates
 
 - Only `project_os.status` is callable in this milestone. The Registry and Core-backed selector context retain control; no file path, repository, URL, shell, media, calendar, Supabase or write tool exposed.
