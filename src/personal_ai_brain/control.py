@@ -127,7 +127,8 @@ class Registry:
         return capability, capability.validate(arguments)
 
 
-def build_registry(core_state: Path, reader_factory, redactor, work_client=None, media_plan_provider=None):
+def build_registry(core_state: Path, reader_factory, redactor, work_client=None,
+                   media_plan_provider=None, host_audit_snapshot: Path | None = None):
     def runtime_health(_):
         health, code = runtime.health(core_state, core_state / "heartbeat.json")
         last = health.get("last_run", {})
@@ -200,6 +201,22 @@ def build_registry(core_state: Path, reader_factory, redactor, work_client=None,
     caps.append(Capability("runtime.logs_tail", "Bounded redacted Core lifecycle log", "read_only",
                            {"type": "object", "additionalProperties": False, "properties": {"lines": {"type": "integer", "minimum": 1, "maximum": 100}}},
                            log_arguments, logs_tail))
+    # The LLM/transport never receives Docker socket, SSH or a snapshot path.
+    # This handler is absent unless the operator explicitly mounted a fixed
+    # collector-produced file and enabled the capability at service startup.
+    if host_audit_snapshot is not None:
+        from .host_audit import AuditUnavailable, read_snapshot
+
+        def homelab_audit(_):
+            try:
+                return read_snapshot(host_audit_snapshot)
+            except AuditUnavailable:
+                raise CapabilityFailed("host_audit_unavailable") from None
+
+        caps.append(Capability(
+            "homelab.audit", "Read recent sanitized Ubuntu inventory snapshot",
+            "read_only", empty_schema, no_arguments, homelab_audit,
+        ))
     if media_plan_provider is not None:
         # An operator must provide a trusted plan-only adapter; the existing
         # production worker does not wire one. This registry cannot request,
