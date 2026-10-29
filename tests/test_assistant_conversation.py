@@ -208,6 +208,22 @@ def test_context_sensitive_followup_receives_bounded_history():
     assert answer.history[0] == history[0]
 
 
+def test_large_conversation_is_trimmed_by_pairs_without_breaking_followup():
+    ctx = build_decision_context(snapshot(), today=TODAY)
+    conversation = ()
+    for i in range(4):
+        req = request(("O" * 3900) + f" question {i}")
+        response_ = run_conversation(
+            req, registry([]), ctx, scripted(final("A" * 3000)),
+            lambda *_: pytest.fail("no tools expected"), history=conversation,
+        )
+        conversation = response_.history
+        assert len(conversation) % 2 == 0
+        assert sum(len(msg.text.encode("utf-8")) for msg in conversation) <= 8192
+        assert conversation[-1].text == "A" * 3000
+        assert conversation[-2].role == "user"
+
+
 def test_direct_chat_works_without_project_lookup():
     req = request("Ahoj! Čo dnes vymyslíme?")
     called = []
