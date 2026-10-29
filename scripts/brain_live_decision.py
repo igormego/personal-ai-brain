@@ -12,6 +12,7 @@ from datetime import date, datetime, timezone
 import json
 from pathlib import Path
 import sys
+import time
 from uuid import uuid4
 
 from personal_ai_brain.assistant_contract import normalize_request
@@ -78,14 +79,20 @@ def main(argv=None):
             trusted_reply_target="manual.acceptance", now=now,
         )
         provider = OpenAIDecisionProvider(args.key_file, allow_paid_call=True)
+        started = time.monotonic()
         plan = decide(request, fixture_registry(), provider, context=fixture_catalog())
+        elapsed_ms = round((time.monotonic() - started) * 1000)
         usage = provider.usage
         print(json.dumps({
             "model": MODEL, "status": "decision_only_not_executed",
+            "elapsed_ms": elapsed_ms,
             "action": plan.action, "capability": plan.capability,
             "arguments": plan.arguments,
             "usage": {"input_tokens": usage.input_tokens,
                       "output_tokens": usage.output_tokens} if usage else None,
+            "estimated_usd_2026_10_29_standard_rates": round(
+                (usage.input_tokens * 0.10 + usage.output_tokens * 0.50) / 1_000_000, 8
+            ) if usage else None,
         }, ensure_ascii=False))
         return 0
     except (DecisionRejected, ModelUnavailable) as error:
