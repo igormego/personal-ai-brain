@@ -20,6 +20,7 @@ from personal_ai_brain.assistant_control_codec import (
 )
 from personal_ai_brain.assistant_decision import DecisionRejected, decide
 from personal_ai_brain.assistant_decision_context import build_decision_context
+from personal_ai_brain.assistant_grounded_reply import compose_project_reply
 from personal_ai_brain.control import Redactor, build_registry
 from personal_ai_brain.control_worker import Worker, load_json
 from personal_ai_brain.core_agent import CoreSnapshot, StateRecord
@@ -194,6 +195,36 @@ def test_status_message_reaches_actual_handler_and_correlated_result(monkeypatch
     audit = load_json(tmp_path / "control" / "requests" / (req.request_id + ".json"))
     assert audit["status"] == "capability_completed"
     assert len(audit["payload_hash"]) == 64
+
+
+def test_complete_offline_cycle_returns_grounded_slovak_answer_without_extra_execution(monkeypatch, tmp_path):
+    """Authenticated result codec -> fact-only model focus -> final Slovak reply."""
+    source = snapshot(gate="Check the media stack before a change")
+    registry, worker, issues, reads = system(monkeypatch, tmp_path, source)
+    req = request("Kde sme skončili s Media Automation a čo ďalej?")
+    issue, decision = plan_and_send(req, source, registry, issues)
+    assert worker.tick()["last_request_status"] == "capability_completed"
+    verified_result = decoded(req, decision, issues, issue)
+
+    focus_calls = []
+    def focus(message, facts):
+        focus_calls.append((message, facts.project_id))
+        return "next_action"
+
+    reply = compose_project_reply(
+        req, decision, verified_result, focus_provider=focus,
+    )
+    assert reply.used_model
+    assert reply.focus == "next_action"
+    assert reply.request_id == req.request_id
+    assert reply.reply_target == req.reply_target
+    assert reply.freshness == "current"
+    assert "Verify the TV poster and report the result" in reply.text
+    assert "Check the media stack before a change" not in reply.text  # workstream gate
+    assert "not-model-visible" not in reply.text
+    assert "Posledné overenie" in reply.text
+    assert len(reads) == 1
+    assert focus_calls == [(req.message, "homelab")]
 
 
 def test_replay_and_conflict_after_worker_restart_do_not_reexecute(monkeypatch, tmp_path):
