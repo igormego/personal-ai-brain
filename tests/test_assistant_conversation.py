@@ -296,6 +296,37 @@ def test_all_proposed_calls_validated_before_any_real_read():
     assert called == []
 
 
+def test_function_call_replay_must_match_authorized_selector():
+    req = request()
+    proposed = call("call_one")
+    bad_replay = ModelStep(None, (proposed,), ({
+        "type": "function_call", "call_id": "call_one", "name": "project_os_status",
+        "arguments": json.dumps({"project_id": "recipe-intelligence", "workstream_id": None}),
+    },))
+    reads = []
+    with pytest.raises(ConversationRejected, match="model_response_invalid"):
+        run_conversation(
+            req, registry([]), build_decision_context(snapshot(), today=TODAY),
+            scripted(bad_replay), lambda *_: reads.append(True),
+        )
+    assert reads == []
+
+
+def test_function_call_id_must_be_unique_across_model_responses():
+    req = request()
+    reads = []
+    with pytest.raises(ConversationRejected, match="model_response_invalid"):
+        run_conversation(
+            req, registry([]), build_decision_context(snapshot(), today=TODAY),
+            scripted(toolstep(call("call_same")), toolstep(call("call_same"))),
+            lambda r, selector: (
+                reads.append(True) or
+                answer_project_status(r, snapshot(), selector, today=TODAY)
+            ),
+        )
+    assert len(reads) == 1
+
+
 def test_bad_correlation_cannot_enter_model_context():
     req = request()
     called = []
