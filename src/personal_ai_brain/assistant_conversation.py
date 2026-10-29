@@ -235,6 +235,7 @@ def run_conversation(
     references: list[SourceReference] = []
     executed: dict[tuple[str, str | None], tuple[str, SourceReference]] = {}
     total_calls = 0
+    all_call_ids: set[str] = set()
 
     for iteration in range(MAX_MODEL_STEPS):
         try:
@@ -289,17 +290,24 @@ def run_conversation(
                     or not 1 <= len(call.call_id) <= 120
                     or not call.call_id.startswith("call_")
                     or not all(c.isascii() and (c.isalnum() or c in "_-") for c in call.call_id)
-                    or call.call_id in seen_ids):
+                    or call.call_id in seen_ids
+                    or call.call_id in all_call_ids):
                 raise ConversationRejected("model_response_invalid")
             seen_ids.add(call.call_id)
             planned.append((call, _selector(call, registry, context)))
-        if not all(
-            isinstance(item, dict) and item.get("type") == "function_call"
-            and item.get("call_id") == call.call_id
-            and item.get("name") == call.name
-            for item, (call, _) in zip(step.replay_items, planned)
-        ):
-            raise ConversationRejected("model_response_invalid")
+        for item, (call, _) in zip(step.replay_items, planned):
+            if (not isinstance(item, dict)
+                    or set(item) != {"type", "call_id", "name", "arguments"}
+                    or item["type"] != "function_call"
+                    or item["call_id"] != call.call_id
+                    or item["name"] != call.name):
+                raise ConversationRejected("model_response_invalid")
+            try:
+                if json.loads(item["arguments"]) != call.arguments:
+                    raise ValueError("mismatch")
+            except (TypeError, ValueError, RecursionError):
+                raise ConversationRejected("model_response_invalid") from None
+        all_call_ids.update(seen_ids)
 
         items.extend(step.replay_items)
         for call, selector in planned:
