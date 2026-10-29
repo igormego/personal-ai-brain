@@ -55,6 +55,32 @@ This milestone adds no deployment, plugin exposure, scheduler, backend
 credentials or host-control permissions. Gateway #25 and the operator's
 final Issue #67 closeout remain separate prerequisites.
 
+## Brain v0.7 — controlled resource directory (source-only)
+
+The direction in [#64](https://github.com/igormego/personal-ai-brain/issues/64)
+is **one reusable resource-read interface**, not one function per Sonarr question,
+Homelab metric or Project OS view. Opt-in `resource_mode=True` replaces the
+v0.5/v0.6 model-visible functions with **one** `resource_read(resource_id)`.
+The trusted Core selector catalog generates exact resource IDs such as
+`project-os/homelab`. The separately opted-in, registered host snapshot
+appears as `homelab/host-snapshot`; it is absent by default.
+
+The model can discover **only preapproved descriptors**, not filesystem paths,
+network URLs, arbitrary APIs or self-created permissions. The executor resolves
+an exact advertised ID and independently checks the existing Registry and
+trusted Gateway callbacks, reusing project source validation, correlated host
+evidence, freshness checks, source attribution and duplicate-read cache. Mixed
+requests still prevalidate the complete batch before any read. Legacy model tool
+names are rejected in resource mode. Maximum two reads and three Responses calls
+per turn are unchanged. The generic read interface does not introduce
+generic write, arbitrary shell, free-form HTTP, Docker, SQL or SSH.
+
+`resource_mode` must be enabled consistently on the model provider and the
+executor by a trusted host. This version adds an offline routing abstraction and
+tests, **not** a new live service, updated ChatGPT plugin, paid model invocation,
+scheduler, or expanded Homelab permissions. Gateway #25 and host audit #67
+retain their separate operational acceptance requirements.
+
 ## Exact limits and owner gates
 
 - The v0.5 default permits only `project_os.status`. Opt-in v0.6 source also accepts `homelab.audit` through an explicitly registered read-only capability and trusted callback, with exactly `{}` arguments. No path, repository, URL, shell, media, calendar, Supabase or write tool is exposed.
