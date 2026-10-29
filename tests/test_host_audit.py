@@ -9,7 +9,7 @@ import pytest
 from personal_ai_brain.control import Redactor, Rejected, build_registry
 from personal_ai_brain.control_worker import Worker
 from personal_ai_brain.host_audit import (
-    AuditUnavailable, _INSPECT_FORMAT, _PS_FORMAT, collect_snapshot,
+    AuditUnavailable, _INSPECT_FORMAT, _PS_FORMAT, _probe_docker, collect_snapshot,
     publish_snapshot, read_snapshot, validate_snapshot,
 )
 from personal_ai_brain.github_issues import TITLE
@@ -130,6 +130,24 @@ def test_host_collector_uses_only_fixed_docker_queries():
     assert len(calls) == 2
     assert "/etc" not in json.dumps(actual)
     assert "secret" not in json.dumps(actual).lower()
+
+
+
+def test_cli_probe_is_pinned_to_local_docker_unix_socket(monkeypatch):
+    import personal_ai_brain.host_audit as module
+
+    def fake_run(argv, **kwargs):
+        assert argv == [
+            "/usr/bin/docker", "--host", "unix:///var/run/docker.sock",
+            "ps", "--format", "{{.Status}}",
+        ]
+        assert kwargs["timeout"] == 5
+        assert kwargs["check"] is False
+        return type("Completed", (), {"returncode": 0, "stdout": "Up 1 hour"})()
+
+    monkeypatch.setenv("DOCKER_HOST", "tcp://untrusted:2375")
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+    assert _probe_docker(["ps", "--format", _PS_FORMAT]) == "Up 1 hour"
 
 
 def test_collector_reports_docker_unavailable_without_guessing():
