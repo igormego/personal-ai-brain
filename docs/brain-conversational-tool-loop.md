@@ -28,12 +28,21 @@ ChatGPT / future WhatsApp
 
 For example, a user may ask *“Čo ďalej s Homelabom a ako to súvisí s Recipe Intelligence?”* The model can request both project facts, compare the returned **recorded** status and make its own clearly qualified recommendation. It may not invent up-to-date status without a tool read, change the Project State, execute Codex, issue shell commands, or claim a proposed change was performed.
 
+## Cost-aware conversational defaults (v0.5.1)
+
+- **One model makes the routing decision and writes the answer.** Do not chain a second intent-classification/focus-model request before the conversation. Direct conversational replies need only one Responses request; a grounded read usually needs one tool-request turn and one final-answer turn.
+- Default replies are **natural, brief Slovak (normally 1–3 sentences)**, answering first without automatic headings, restated input, or filler. Longer explanations remain possible when explicitly requested.
+- `max_output_tokens` is 320 per provider request, with a separate bounded answer-size parser. Project selector catalog contains only ID/workstream/name; verification freshness comes from the actual authenticated tool result, not a potentially stale catalog hint.
+- When the model has already used two tool calls or reached the final provider request, `tool_choice=none` prevents another unnecessary/denied tool proposal. Same trusted tool and correlation policy as v0.5.
+- Source references are appended as a **compact** deterministic footer, deduplicating repeated reads of one project. They indicate recorded Project OS verification, **not a real-time server check**.
+- The provider already totals `input_tokens`/`output_tokens` per turn for the operator; compare measured costs and reliability before selecting a different model or implementing speculative routing caches. No autonomous API spending or new model router is enabled.
+
 ## Exact limits and owner gates
 
 - Only `project_os.status` is callable in this milestone. The Registry and Core-backed selector context retain control; no file path, repository, URL, shell, media, calendar, Supabase or write tool exposed.
 - **2 model-proposed tool calls and 3 Responses requests maximum per user turn.** Duplicate tool selectors inside the same turn reuse one authenticated read (no duplicate execution); all model proposals are checked before any of that batch executes.
 - `store=false`. Prior conversation is an optional caller-controlled, bounded last-8-message tuple; there is **no persistent conversation database**, no invisible external ChatGPT transcript synchronization, and no model-side long-term memory.
-- Exact fixed Responses API endpoint and model from the existing provider (`gpt-6-luna`), `reasoning.effort=none`, `max_output_tokens=512`, strict JSON schema for `project_os_status` function arguments, max input body 32 KiB, max remote response 16 KiB, 20 s per request.
+- Exact fixed Responses API endpoint and model from the existing provider (`gpt-6-luna`), `reasoning.effort=none`, `max_output_tokens=320`, strict JSON schema for `project_os_status` function arguments, max input body 32 KiB, max remote response 16 KiB, 20 s per request.
 - The existing network adapter disables proxy and redirects, has **no retry**, and uses the existing owner-only Linux/WSL credential file (mode `0400`/`0600`) outside GitHub.
 - Model reply is **not** a proof of factual accuracy. Backend validates source/correlation and appends provenance, but free-form answers may still contain mistakes. A stale/unknown/unavailable source must not become a claimed live fact. Never claim full reliability from fake-provider CI.
 - This is not authorization to deploy or enable user-facing data access. Gateway #25 and platform owners retain permission, authentication, source freshness, audit and output delivery responsibility.

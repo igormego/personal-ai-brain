@@ -198,16 +198,24 @@ def _tool_payload(
 def _footnote(sources: tuple[SourceReference, ...]) -> str:
     if not sources:
         return ""
+    # Small, deterministic provenance; don't ask the LLM to restate every fact.
+    seen: set[tuple[str, str | None, str, str, str]] = set()
     items = []
     for source in sources:
+        key = (source.project_id, source.workstream_id,
+               source.status, source.freshness, source.last_verified)
+        if key in seen:
+            continue
+        seen.add(key)
         name = source.project_id + (
             "/" + source.workstream_id if source.workstream_id else ""
         )
-        items.append(f"{name}: {source.status}, {source.freshness}, overené {source.last_verified}")
-    note = "\n\nPodklady (Project OS, nie živá kontrola servera): " + "; ".join(items)
+        items.append(f"{name} [{source.status}, {source.freshness}, {source.last_verified}]")
+    note = "\n\nZdroj: Project OS (záznam, nie live): " + "; ".join(items)
     if any(s.freshness != "current" for s in sources):
         note += "\nPozor: aspoň jeden podklad nie je aktuálne potvrdený."
     return note
+
 
 
 def run_conversation(
