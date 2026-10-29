@@ -13,7 +13,7 @@ import pytest
 
 from personal_ai_brain.assistant_contract import normalize_request
 from personal_ai_brain.assistant_conversation import (
-    ChatMessage, ConversationRejected, ModelStep, ModelToolCall,
+    ChatMessage, ConversationRejected, HostAuditEvidence, ModelStep, ModelToolCall,
     MAX_TOOL_CALLS, run_conversation,
 )
 from personal_ai_brain.assistant_decision_context import build_decision_context
@@ -522,3 +522,158 @@ def test_network_timeout_is_never_automatically_retried(monkeypatch, tmp_path):
         provider(({"role": "user", "content": "Ahoj"},),
                  build_decision_context(snapshot(), today=TODAY))
     assert provider.attempts == 1 and len(tries) == 1
+
+
+# Brain v0.6: second capability family remains source-only and opt-in.
+def audit_call(cid="call_audit", arguments=None):
+    return ModelToolCall(cid, "homelab_audit", {} if arguments is None else arguments)
+
+
+def registry_with_audit():
+    return Registry([*registry([]).capabilities.values(), Capability(
+        "homelab.audit", "recent trusted host snapshot", "read_only", {},
+        lambda args: {} if args == {} else (_ for _ in ()).throw(ValueError()),
+        lambda _: pytest.fail("Brain must never execute Registry handlers"),
+    )])
+
+
+def audit_evidence(req, *, timestamp=None, status="completed"):
+    now = datetime.now(timezone.utc)
+    stamp = timestamp or now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    packet = {
+        "schema_version": "0.1", "collected_at": stamp,
+        "cpu_logical": 8, "memory_mib": {"total": 16000, "available": 9000},
+        "disk_free_gib": {"root": 40, "data": 1200},
+        "docker": {"status": "available", "running": 12, "unhealthy": 0},
+        "control": {
+            "status": "available", "image_id": "sha256:" + "a" * 64,
+            "read_only_rootfs": True, "privileged": False,
+            "no_new_privileges": True, "docker_socket": False,
+            "published_ports": 0,
+        },
+    }
+    return HostAuditEvidence(
+        request_id=req.request_id, request_hash=req.payload_hash,
+        user_id=req.user_id, surface=req.surface,
+        reply_target=req.reply_target, status=status,
+        snapshot=packet if status == "completed" else None,
+    )
+
+
+def test_opt_in_host_snapshot_routed_once_with_compact_provenance():
+    req = request("Koľko je voľnej RAM a sú kontajnery zdravé?")
+    reads = []
+    provider = scripted(toolstep(audit_call()), final("Snapshot ukazuje 9 GB dostupnej pamäte."))
+    result = run_conversation(
+        req, registry_with_audit(), build_decision_context(snapshot(), today=TODAY),
+        provider, lambda *_: pytest.fail("no Project OS read"),
+        read_host_audit=lambda r: reads.append(r.request_id) or audit_evidence(r),
+    )
+    assert reads == [req.request_id] and result.tool_calls == 1
+    assert result.sources == () and "nie živá kontrola" in result.text
+    payload = json.loads(provider.captured[1][0][-1]["output"])
+    assert payload["source"] == "host_collector_snapshot_not_live_probe"
+    assert payload["memory_mib"]["available"] == 9000
+    assert "image_id" not in str(payload)  # Preactivation image is not current.
+
+
+def test_both_capability_families_can_be_selected_in_one_bounded_model_turn():
+    req = request("Porovnaj projektový stav Homelabu a posledný audit.")
+    project_reads, audit_reads = [], []
+    provider = scripted(
+        toolstep(call("call_project"), audit_call("call_host")),
+        final("Projekt napreduje, snapshot neukazuje nezdravé kontajnery."),
+    )
+    reply = run_conversation(
+        req, registry_with_audit(), build_decision_context(snapshot(), today=TODAY),
+        provider, fake_reader(req, snapshot(), project_reads),
+        read_host_audit=lambda r: audit_reads.append(True) or audit_evidence(r),
+    )
+    assert project_reads == [{"project_id": "homelab"}]
+    assert audit_reads == [True] and reply.tool_calls == 2
+    assert "Project OS (záznam, nie live)" in reply.text
+    assert "Host snapshot" in reply.text
+
+
+def test_host_audit_not_advertised_and_not_executed_without_trusted_opt_in():
+    ctx = build_decision_context(snapshot(), today=TODAY)
+    req = request("Skontroluj CPU.")
+    not_enabled = json.loads(_build_request(({"role": "user", "content": req.message},), ctx))
+    enabled = json.loads(_build_request(
+        ({"role": "user", "content": req.message},), ctx, host_audit_enabled=True,
+    ))
+    assert [t["name"] for t in not_enabled["tools"]] == ["project_os_status"]
+    assert [t["name"] for t in enabled["tools"]] == ["project_os_status", "homelab_audit"]
+    assert enabled["tools"][1]["parameters"] == {
+        "type": "object", "properties": {}, "required": [], "additionalProperties": False,
+    }
+    with pytest.raises(ModelUnavailable, match="model_response_invalid"):
+        _parse_step(response(calls=(audit_call(),)))
+    parsed, _usage = _parse_step(
+        response(calls=(audit_call(),)), host_audit_enabled=True,
+    )
+    assert parsed.tool_calls[0].arguments == {}
+    with pytest.raises(ModelUnavailable, match="model_response_invalid"):
+        _parse_step(
+            response(calls=(audit_call(arguments={"command": "id"}),)),
+            host_audit_enabled=True,
+        )
+    with pytest.raises(ConversationRejected, match="tool_denied"):
+        run_conversation(req, registry_with_audit(), ctx,
+                         scripted(toolstep(audit_call())),
+                         lambda *_: pytest.fail("no tool"),)
+    with pytest.raises(ConversationRejected, match="tool_denied"):
+        run_conversation(req, registry([]), ctx, scripted(toolstep(audit_call())),
+                         lambda *_: pytest.fail("no tool"),
+                         read_host_audit=lambda r: pytest.fail("not registered"))
+
+
+def test_mixed_invalid_batch_prevalidated_before_any_project_or_host_read():
+    req = request()
+    called = []
+    with pytest.raises(ConversationRejected, match="tool_denied"):
+        run_conversation(
+            req, registry_with_audit(), build_decision_context(snapshot(), today=TODAY),
+            scripted(toolstep(call("call_project"), audit_call("call_bad", {"path": "/tmp"}))),
+            lambda *_: called.append("project"),
+            read_host_audit=lambda *_: called.append("audit"),
+        )
+    assert called == []
+
+
+def test_host_audit_bad_correlation_and_stale_snapshot_fail_closed():
+    req = request()
+    ctx = build_decision_context(snapshot(), today=TODAY)
+    mismatched = replace(audit_evidence(req), request_hash="wrong")
+    old = (datetime.now(timezone.utc) - timedelta(minutes=31)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    for evidence, error in (
+        (mismatched, "result_correlation"),
+        (audit_evidence(req, timestamp=old), "result_untrusted"),
+        (replace(audit_evidence(req), snapshot={"secret": "not allowed"}), "result_untrusted"),
+    ):
+        provider = scripted(toolstep(audit_call()), final("Invented!"))
+        with pytest.raises(ConversationRejected, match=error):
+            run_conversation(
+                req, registry_with_audit(), ctx, provider,
+                lambda *_: pytest.fail("no project lookup"),
+                read_host_audit=lambda _r: evidence,
+            )
+        assert len(provider.captured) == 1  # Bad evidence never reaches model.
+
+
+def test_host_audit_unavailable_explicit_and_duplicate_read_cached():
+    req = request()
+    ctx = build_decision_context(snapshot(), today=TODAY)
+    provider = scripted(
+        toolstep(audit_call("call_1")), toolstep(audit_call("call_2")),
+        final("Audit je teraz nedostupný."),
+    )
+    reads = []
+    reply = run_conversation(
+        req, registry_with_audit(), ctx, provider,
+        lambda *_: pytest.fail("no project lookup"),
+        read_host_audit=lambda r: reads.append(True) or audit_evidence(r, status="unavailable"),
+    )
+    assert reads == [True] and reply.tool_calls == 2
+    assert "Host audit nedostupný" in reply.text
+    assert "host_audit_unavailable" in provider.captured[-1][0][-1]["output"]
