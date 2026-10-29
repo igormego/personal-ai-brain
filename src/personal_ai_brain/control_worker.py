@@ -208,7 +208,12 @@ def serve(state=STATE, heartbeat=BEAT):
         return 3
     redactor = Redactor((core_token, control_token))
     from .work_handoff import Client
-    registry = build_registry(Path("/core-state"), lambda: RunReader(core_token), redactor, Client())
+    # Activation requires an explicit operator-provided read-only mount.
+    # Ignore every other environment value; do not accept a caller path.
+    audit_file = (Path("/host-audit/snapshot.json")
+                  if os.environ.get("PAB_HOST_AUDIT_ENABLED") == "1" else None)
+    registry = build_registry(Path("/core-state"), lambda: RunReader(core_token),
+                              redactor, Client(), host_audit_snapshot=audit_file)
     def pulse():
         atomic_json(heartbeat, {"time": time.time()})
     worker = Worker(state, GitHubIssues(control_token), registry, redactor, pulse, stop.is_set)
