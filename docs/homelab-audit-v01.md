@@ -1,11 +1,19 @@
 # homelab.audit v0.1 — host snapshot, not an admin API
 
-**Status: SOURCE-ONLY, disabled by default.** Implementation proposal tracked in
-[Issue #65](https://github.com/igormego/personal-ai-brain/issues/65).
-There is no live Homelab collector, no new control-worker mount, no changed
-deployment image, no ChatGPT plugin tool and no verified live audit as a
-consequence of merging the source. The next owner gate is a bounded host-side
-read-only preflight/deployment with rollback.
+**Status (2026-10-29): LIVE read-only control capability; snapshot refresh is manual.**
+Source milestone [#65](https://github.com/igormego/personal-ai-brain/issues/65)
+was followed by an explicitly authorized control-only operator rollout. Independent
+private GitHub verification confirmed authenticated `homelab.audit` results
+[#84](https://github.com/igormego/personal-project-brain/issues/84) and
+[#88](https://github.com/igormego/personal-project-brain/issues/88), invalid-input
+and conflict denials #85/#86, and post-restart duplicate #87 without reexecution.
+[Issue #67](https://github.com/igormego/personal-ai-brain/issues/67) remains OPEN
+for the final operator evidence of the running image and post-replay host/ledger
+invariants; GitHub results alone do not attest current Docker state. The snapshot
+expires after 30 minutes unless manually refreshed; no scheduler exists. A
+stored preactivation `control.image_id` is **not** proof of the current image.
+The existing ChatGPT plugin is still Project OS status-only: no `homelab.audit`
+plugin tool, host administration, Docker socket or autonomous action was enabled.
 
 ## Why two trust zones?
 
@@ -73,7 +81,12 @@ Tests inject fake Docker responses, verify the exact fixed queries and validate
 the full existing `pab-control/v0.1` duplicate/replay and fail-closed status.
 No live Docker, SSH, credentials or paid LLM inference is used in tests.
 
-## Operator acceptance (separate, not implied by source merge)
+## Operator acceptance procedure (historical gates; final closeout pending)
+
+The first controlled rollout and live transport checks completed on 2026-10-29;
+the operator's final post-replay host/ledger attestation is still pending in #67.
+The steps below preserve the approved procedure for future reviewed changes; **do
+not repeat the already verified acceptance requests or redeploy just to close #67**.
 
 1. Recheck current PAB and Homelab `AGENTS.md`, inspect deployed host checkout,
    actual pinned control image and Compose override per
