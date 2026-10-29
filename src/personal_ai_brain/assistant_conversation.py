@@ -18,6 +18,7 @@ from .assistant_grounded_reply import ReplyRejected, _facts
 from .assistant_project_os import StatusRejected, validate_selector
 from .assistant_result import AssistantResult, MAX_TEXT_BYTES
 from .control import Registry
+from .host_audit import AuditUnavailable, validate_snapshot
 
 MAX_MODEL_STEPS = 3
 MAX_TOOL_CALLS = 2
@@ -63,6 +64,22 @@ class SourceReference:
 
 
 @dataclass(frozen=True, slots=True)
+class HostAuditEvidence:
+    """Gateway-authenticated result; model cannot provide this evidence.
+
+    Gateway verifies issue author, UUID, ledger and delivery before constructing
+    this internal correlated object; it never passes raw unverified comments.
+    """
+    request_id: str
+    request_hash: str
+    user_id: str
+    surface: str
+    reply_target: str
+    status: str
+    snapshot: dict | None
+
+
+@dataclass(frozen=True, slots=True)
 class ConversationReply:
     request_id: str
     request_hash: str
@@ -78,6 +95,7 @@ class ConversationReply:
 # The producer MUST verify its source/author and the transport idempotency
 # ledger. This is NOT permission for the Brain to call arbitrary handlers.
 ReadProjectStatus = Callable[[AssistantRequest, dict[str, str]], AssistantResult]
+ReadHostAudit = Callable[[AssistantRequest], HostAuditEvidence]
 ModelProvider = Callable[[tuple[dict, ...], DecisionContext], ModelStep]
 
 
@@ -136,6 +154,77 @@ def _selector(
     except Exception:
         raise ConversationRejected("tool_denied") from None
     return selected
+
+
+def _validated_call(
+    call: ModelToolCall, registry: Registry, context: DecisionContext,
+    read_host_audit: ReadHostAudit | None,
+) -> tuple[str, dict[str, str]]:
+    if not isinstance(call, ModelToolCall):
+        raise ConversationRejected("tool_denied")
+    if call.name == "project_os_status":
+        return "project_os.status", _selector(call, registry, context)
+    if call.name != "homelab_audit" or read_host_audit is None or call.arguments != {}:
+        raise ConversationRejected("tool_denied")
+    try:
+        capability, arguments = registry.resolve("homelab.audit", {})
+        if (capability.id != "homelab.audit"
+                or capability.risk_level != "read_only"
+                or capability.side_effect_class != "none"
+                or arguments != {}):
+            raise ConversationRejected("tool_denied")
+    except ConversationRejected:
+        raise
+    except Exception:
+        raise ConversationRejected("tool_denied") from None
+    return "homelab.audit", {}
+
+
+def _host_payload(
+    request: AssistantRequest, evidence: HostAuditEvidence,
+) -> tuple[str, str]:
+    if (not isinstance(evidence, HostAuditEvidence)
+            or evidence.request_id != request.request_id
+            or evidence.request_hash != request.payload_hash
+            or evidence.user_id != request.user_id
+            or evidence.surface != request.surface
+            or evidence.reply_target != request.reply_target):
+        raise ConversationRejected("result_correlation")
+    if evidence.status == "unavailable" and evidence.snapshot is None:
+        return ('{"status":"unavailable","error_code":"host_audit_unavailable"}',
+                "Host audit nedostupný (žiadna živá kontrola servera).")
+    if evidence.status != "completed" or type(evidence.snapshot) is not dict:
+        raise ConversationRejected("result_untrusted")
+    raw = evidence.snapshot
+    fields = {"schema_version", "collected_at", "cpu_logical",
+              "memory_mib", "disk_free_gib", "docker", "control"}
+    if set(raw) == fields | {"freshness", "source"}:
+        if (raw["freshness"] != "current"
+                or raw["source"] != "host_collector_snapshot_not_live_probe"):
+            raise ConversationRejected("result_untrusted")
+        raw = {name: raw[name] for name in fields}
+    elif set(raw) != fields:
+        raise ConversationRejected("result_untrusted")
+    try:
+        checked = validate_snapshot(raw)  # Enforce 30-minute freshness again.
+    except AuditUnavailable:
+        raise ConversationRejected("result_untrusted") from None
+    # The digest describes a collector-time container, not a live image pin.
+    control = {k: v for k, v in checked["control"].items() if k != "image_id"}
+    payload = {
+        "status": "completed", "collected_at": checked["collected_at"],
+        "freshness": "current", "source": checked["source"],
+        "cpu_logical": checked["cpu_logical"],
+        "memory_mib": checked["memory_mib"],
+        "disk_free_gib": checked["disk_free_gib"],
+        "docker": checked["docker"], "control": control,
+    }
+    output = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    if len(output.encode("utf-8")) > MAX_TOOL_OUTPUT_BYTES:
+        raise ConversationRejected("result_too_large")
+    note = ("Host snapshot z " + checked["collected_at"]
+            + " UTC (nie živá kontrola servera).")
+    return output, note
 
 
 def _tool_payload(
@@ -226,6 +315,7 @@ def run_conversation(
     read_project_status: ReadProjectStatus,
     *,
     history: tuple[ChatMessage, ...] = (),
+    read_host_audit: ReadHostAudit | None = None,
 ) -> ConversationReply:
     """One bounded conversational turn: LLM → permitted reads → LLM reply.
 
@@ -235,13 +325,15 @@ def run_conversation(
     """
     if (not isinstance(request, AssistantRequest) or not isinstance(registry, Registry)
             or not isinstance(context, DecisionContext)
-            or not callable(provider) or not callable(read_project_status)):
+            or not callable(provider) or not callable(read_project_status)
+            or (read_host_audit is not None and not callable(read_host_audit))):
         raise ConversationRejected("trusted_input_required")
 
     items = _history(history)
     items.append({"role": "user", "content": request.message})
     references: list[SourceReference] = []
-    executed: dict[tuple[str, str | None], tuple[str, SourceReference]] = {}
+    executed: dict[tuple[str, str | None, str | None], tuple[str, SourceReference | None, str | None]] = {}
+    audit_notes: list[str] = []
     total_calls = 0
     all_call_ids: set[str] = set()
 
@@ -263,6 +355,8 @@ def run_conversation(
             except UnicodeError:
                 raise ConversationRejected("model_response_invalid") from None
             footnote = _footnote(tuple(references))
+            if audit_notes:
+                footnote += "\n\nZdroj: " + "; ".join(dict.fromkeys(audit_notes))
             final = step.text.strip()
             if len((final + footnote).encode("utf-8")) > MAX_TEXT_BYTES + 600:
                 raise ConversationRejected("reply_too_large")
@@ -302,8 +396,9 @@ def run_conversation(
                     or call.call_id in all_call_ids):
                 raise ConversationRejected("model_response_invalid")
             seen_ids.add(call.call_id)
-            planned.append((call, _selector(call, registry, context)))
-        for item, (call, _) in zip(step.replay_items, planned):
+            capability_name, arguments = _validated_call(call, registry, context, read_host_audit)
+            planned.append((call, capability_name, arguments))
+        for item, (call, _, _) in zip(step.replay_items, planned):
             if (not isinstance(item, dict)
                     or set(item) != {"type", "call_id", "name", "arguments"}
                     or item["type"] != "function_call"
@@ -318,17 +413,31 @@ def run_conversation(
         all_call_ids.update(seen_ids)
 
         items.extend(step.replay_items)
-        for call, selector in planned:
-            key = (selector["project_id"], selector.get("workstream_id"))
+        for call, capability_name, arguments in planned:
+            key = ((capability_name, arguments["project_id"],
+                    arguments.get("workstream_id"))
+                   if capability_name == "project_os.status"
+                   else ("homelab.audit", None, None))
             if key not in executed:
                 try:
-                    result = read_project_status(request, selector)
+                    if capability_name == "project_os.status":
+                        result = read_project_status(request, arguments)
+                        output, source = _tool_payload(request, arguments, result)
+                        executed[key] = output, source, None
+                    else:
+                        assert read_host_audit is not None  # prevalidated
+                        output, note = _host_payload(request, read_host_audit(request))
+                        executed[key] = output, None, note
+                except ConversationRejected:
+                    raise
                 except Exception:
                     # Never guess source truth or leak infrastructure exception.
                     raise ConversationRejected("tool_unavailable") from None
-                executed[key] = _tool_payload(request, selector, result)
-            output, source = executed[key]
-            references.append(source)
+            output, source, note = executed[key]
+            if source is not None:
+                references.append(source)
+            if note is not None:
+                audit_notes.append(note)
             items.append({"type": "function_call_output", "call_id": call.call_id,
                           "output": output})
         total_calls += len(planned)
