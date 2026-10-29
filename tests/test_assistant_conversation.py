@@ -149,8 +149,8 @@ def test_original_slovenian_request_gets_a_freeform_grounded_answer():
     assert answer.surface == "chatgpt" and answer.reply_target == req.reply_target
     assert answer.model_steps == 2 and answer.tool_calls == 1
     assert "Ja by som" in answer.text  # Not deterministically templated
-    assert "Podklady (Project OS" in answer.text
-    assert "homelab: completed, current" in answer.text
+    assert "Zdroj: Project OS (záznam, nie live)" in answer.text
+    assert "homelab [completed, current" in answer.text
     assert answer.sources[0].project_id == "homelab"
     assert answer.sources[0].freshness == "current"
     assert answer.history[-2:] == (
@@ -182,8 +182,8 @@ def test_two_projects_are_read_and_model_compares_them_without_extra_tools():
     )
     assert len(result.sources) == 2 and len(reads) == 2
     assert result.tool_calls == 2 and result.model_steps == 2
-    assert "homelab: completed" in result.text
-    assert "recipe-intelligence: completed" in result.text
+    assert "homelab [completed" in result.text
+    assert "recipe-intelligence [completed" in result.text
     assert [p["type"] for p in provider.captured[1][0][-4:]] == [
         "function_call", "function_call", "function_call_output", "function_call_output"
     ]
@@ -398,7 +398,10 @@ def test_native_responses_schema_stateless_tool_and_text_support():
     body = json.loads(_build_request(({"role": "user", "content": "Čo ďalej s homelabom?"},), ctx))
     assert body["store"] is False
     assert body["reasoning"]["effort"] == "none"
-    assert body["max_output_tokens"] == MAX_OUTPUT_TOKENS
+    assert body["max_output_tokens"] == MAX_OUTPUT_TOKENS == 320
+    assert "1-3 sentences" in body["instructions"]
+    # Selector catalog is enough for routing; freshness is read from the tool.
+    assert '"freshness"' not in body["input"][0]["content"]
     assert body["tools"][0]["strict"] is True
     assert body["tools"][0]["name"] == "project_os_status"
     assert set(body["tools"][0]["parameters"]["required"]) == {
@@ -457,11 +460,54 @@ def test_paid_adapter_explicit_opt_in_and_bounded_calls(monkeypatch, tmp_path):
     assert provider.total_input_tokens == 1000
     assert provider.total_output_tokens == 80
     assert all(p["store"] is False for p in attempts)
+    assert [p["tool_choice"] for p in attempts] == ["auto", "auto"]
     assert attempts[1]["input"][-1]["call_id"] == "call_001"
     provider.attempts = MAX_PROVIDER_REQUESTS
     with pytest.raises(ModelUnavailable, match="model_call_not_authorized"):
         provider(items, context)
     assert len(attempts) == 2
+
+
+def test_tool_budget_forces_plain_final_answer_without_another_tool_call(monkeypatch, tmp_path):
+    import personal_ai_brain.assistant_openai_conversation as module
+    sent = []
+    def fake_post(raw, _secret):
+        body = json.loads(raw)
+        sent.append(body)
+        return response(answer="Rozumiem, ďalší krok je kontrola.")
+    monkeypatch.setattr(module, "_post", fake_post)
+    ctx = build_decision_context(snapshot(), today=TODAY)
+    used_two_tools = (
+        {"role": "user", "content": "Porovnaj Homelab s receptami."},
+        {"type": "function_call_output", "call_id": "call_a", "output": "{}"},
+        {"type": "function_call_output", "call_id": "call_b", "output": "{}"},
+    )
+    provider = OpenAIConversationProvider(key_file(tmp_path), allow_paid_call=True)
+    assert provider(used_two_tools, ctx).text.startswith("Rozumiem")
+    assert sent[-1]["tool_choice"] == "none"
+
+    provider.attempts = MAX_PROVIDER_REQUESTS - 1
+    assert provider(({"role": "user", "content": "Ahoj"},), ctx).text.startswith("Rozumiem")
+    assert sent[-1]["tool_choice"] == "none"
+
+
+def test_model_short_reply_can_be_natural_and_not_templated():
+    text = "Zatiaľ by som dokončil migráciu; monitoring má zmysel až potom."
+    parsed, _usage = _parse_step(response(answer=text))
+    assert parsed.text == text and parsed.tool_calls == ()
+
+
+def test_compact_source_footer_deduplicates_same_project():
+    req = request()
+    provider = scripted(
+        toolstep(call("call_one")), toolstep(call("call_two")),
+        final("Najskôr over migráciu, potom monitoring."),
+    )
+    reply = run_conversation(
+        req, registry([]), build_decision_context(snapshot(), today=TODAY),
+        provider, fake_reader(req, snapshot(), []),
+    )
+    assert reply.text.count("homelab [completed") == 1
 
 
 def test_network_timeout_is_never_automatically_retried(monkeypatch, tmp_path):
