@@ -153,7 +153,8 @@ def _probe_docker(arguments):
     """Operator-side fixed, bounded read. Docker socket NEVER in PAB worker."""
     try:
         output = subprocess.run(
-            [DOCKER_BIN, *arguments], capture_output=True, text=True,
+            [DOCKER_BIN, "--host", "unix:///var/run/docker.sock", *arguments],
+            capture_output=True, text=True,
             timeout=5, check=False,
         )
         if output.returncode != 0 or len(output.stdout) > 16384:
