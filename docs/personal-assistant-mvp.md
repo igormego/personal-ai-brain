@@ -137,8 +137,25 @@ That proves an **actual ChatGPT-triggered control transport vertical slice**, bu
 does not automatically connect normal conversation turns to the pure codec or
 prove outbound native ChatGPT reply delivery. The control platform's
 [restart/durable deployment gate #34](https://github.com/igormego/personal-ai-brain/issues/34)
-and the Assistant's [authenticated adapter/delivery gate #25](https://github.com/igormego/personal-ai-brain/issues/25)
-remain open. Do not expand to WhatsApp or generalized writes by implication.
+is **accepted and closed**. The Assistant's broader
+[authenticated adapter/delivery gate #25](https://github.com/igormego/personal-ai-brain/issues/25)
+remains **open**; no WhatsApp or asynchronous arbitrary-chat delivery is accepted.
+
+**2026-10-29 ChatGPT foreground plugin milestone:** The existing *private personal*
+`personal-ai-brain` ChatGPT plugin was upgraded in place from v0.1.0 to
+**v0.2.0**, and the installed release was read back and verified. Its single
+foreground GitHub-based skill supports two **strict read-only** resource families:
+recorded `project_os.status` and an operator-collected `homelab.audit` snapshot.
+Only bounded private control transport issue creation is permitted; GitHub app
+binding/permissions did not change. The live worker's audit transport was
+independently proven previously through private Issues #84 and #88. **A newly
+installed skill release is not a fresh native @mention execution proof**:
+explicit user-facing `@Personal AI Brain` invocation is still required for
+plugin routing acceptance. Host snapshots expire after **30 minutes** and no
+automatic refresh/scheduler is enabled; a stale snapshot must fail closed.
+Operator host closeout [#67](https://github.com/igormego/personal-ai-brain/issues/67)
+also remains open. No backend Brain v0.7 deployment or persistent cross-surface
+chat delivery occurred as a result of the plugin update.
 
 ## MVP capability scope
 
