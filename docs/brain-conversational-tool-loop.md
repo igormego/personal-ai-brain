@@ -57,7 +57,7 @@ final Issue #67 closeout remain separate prerequisites.
 
 ## Exact limits and owner gates
 
-- Only `project_os.status` is callable in this milestone. The Registry and Core-backed selector context retain control; no file path, repository, URL, shell, media, calendar, Supabase or write tool exposed.
+- The v0.5 default permits only `project_os.status`. Opt-in v0.6 source also accepts `homelab.audit` through an explicitly registered read-only capability and trusted callback, with exactly `{}` arguments. No path, repository, URL, shell, media, calendar, Supabase or write tool is exposed.
 - **2 model-proposed tool calls and 3 Responses requests maximum per user turn.** Duplicate tool selectors inside the same turn reuse one authenticated read (no duplicate execution); all model proposals are checked before any of that batch executes.
 - `store=false`. Prior conversation is an optional caller-controlled, bounded last-8-message tuple; there is **no persistent conversation database**, no invisible external ChatGPT transcript synchronization, and no model-side long-term memory.
 - Exact fixed Responses API endpoint and model from the existing provider (`gpt-6-luna`), `reasoning.effort=none`, `max_output_tokens=320`, strict JSON schema for `project_os_status` function arguments, max input body 32 KiB, max remote response 16 KiB, 20 s per request.
