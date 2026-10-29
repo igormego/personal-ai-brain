@@ -37,9 +37,27 @@ For example, a user may ask *“Čo ďalej s Homelabom a ako to súvisí s Recip
 - Source references are appended as a **compact** deterministic footer, deduplicating repeated reads of one project. They indicate recorded Project OS verification, **not a real-time server check**.
 - The provider already totals `input_tokens`/`output_tokens` per turn for the operator; compare measured costs and reliability before selecting a different model or implementing speculative routing caches. No autonomous API spending or new model router is enabled.
 
+## Brain v0.6 optional source-only read routing
+
+The existing conversational loop now has an **off-by-default** second read-only
+tool: `homelab_audit`. It appears in the model's tool list only when the
+trusted caller opts in. Executing it also requires an injected Gateway callback
+and an existing read-only `homelab.audit` registry entry.
+
+The callback delivers a correlated evidence object after checking the private
+transport. Brain then validates the snapshot through the existing
+`host_audit.validate_snapshot` and reports its collection timestamp, never
+presenting the data as a live server check. Only the preapproved empty argument
+object is accepted; unmatched correlation, stale evidence and unsupported tools
+fail closed. Project OS status routing remains unchanged.
+
+This milestone adds no deployment, plugin exposure, scheduler, backend
+credentials or host-control permissions. Gateway #25 and the operator's
+final Issue #67 closeout remain separate prerequisites.
+
 ## Exact limits and owner gates
 
-- Only `project_os.status` is callable in this milestone. The Registry and Core-backed selector context retain control; no file path, repository, URL, shell, media, calendar, Supabase or write tool exposed.
+- The v0.5 default permits only `project_os.status`. Opt-in v0.6 source also accepts `homelab.audit` through an explicitly registered read-only capability and trusted callback, with exactly `{}` arguments. No path, repository, URL, shell, media, calendar, Supabase or write tool is exposed.
 - **2 model-proposed tool calls and 3 Responses requests maximum per user turn.** Duplicate tool selectors inside the same turn reuse one authenticated read (no duplicate execution); all model proposals are checked before any of that batch executes.
 - `store=false`. Prior conversation is an optional caller-controlled, bounded last-8-message tuple; there is **no persistent conversation database**, no invisible external ChatGPT transcript synchronization, and no model-side long-term memory.
 - Exact fixed Responses API endpoint and model from the existing provider (`gpt-6-luna`), `reasoning.effort=none`, `max_output_tokens=320`, strict JSON schema for `project_os_status` function arguments, max input body 32 KiB, max remote response 16 KiB, 20 s per request.

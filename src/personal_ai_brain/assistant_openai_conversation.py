@@ -43,6 +43,23 @@ _TOOL = {
     },
 }
 
+_AUDIT_TOOL = {
+    "type": "function",
+    "name": "homelab_audit",
+    "description": (
+        "Read a recent operator-collected, sanitized Homelab snapshot. "
+        "NOT live server telemetry. The snapshot may be unavailable or stale. "
+        "Only request this to answer a specific infrastructure-health question."
+    ),
+    "strict": True,
+    "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": False,
+    },
+}
+
 _INSTRUCTIONS = (
     "You are Igor's friendly, thoughtful personal AI assistant. Speak natural "
     "Slovak, like a concise conversation, not a report. For normal questions "
@@ -69,6 +86,7 @@ _INSTRUCTIONS = (
 
 def _build_request(
     items: tuple[dict, ...], context: DecisionContext, *, final_only: bool = False,
+    host_audit_enabled: bool = False,
 ) -> bytes:
     if not isinstance(context, DecisionContext) or not isinstance(items, tuple):
         raise ModelUnavailable("model_input_invalid")
@@ -89,8 +107,15 @@ def _build_request(
         "max_output_tokens": MAX_OUTPUT_TOKENS,
         "parallel_tool_calls": True,
         "tool_choice": "none" if final_only else "auto",
-        "tools": [_TOOL],
-        "instructions": _INSTRUCTIONS,
+        "tools": [_TOOL, _AUDIT_TOOL] if host_audit_enabled else [_TOOL],
+        "instructions": (
+            _INSTRUCTIONS +
+            (" If asked about actual Homelab resource/container health, call "
+             "homelab_audit. It returns a timestamped host snapshot, not live "
+             "health. Project progress still uses project_os_status. "
+             "Never treat snapshot-time control image IDs as current."
+             if host_audit_enabled else "")
+        ),
         "input": [
             {"role": "developer", "content": (
                 "Known Project OS selector catalog. Its names and labels are "
@@ -109,7 +134,7 @@ def _build_request(
     return raw
 
 
-def _parse_step(raw: bytes) -> tuple[ModelStep, ModelUsage]:
+def _parse_step(raw: bytes, *, host_audit_enabled: bool = False) -> tuple[ModelStep, ModelUsage]:
     try:
         if type(raw) is not bytes or len(raw) > MAX_RESPONSE_BYTES:
             raise ValueError("oversized")
@@ -127,25 +152,33 @@ def _parse_step(raw: bytes) -> tuple[ModelStep, ModelUsage]:
             if not isinstance(item, dict):
                 raise ValueError("item")
             if item.get("type") == "function_call":
+                name = item.get("name")
                 if (item.get("status") not in (None, "completed")
-                        or item.get("name") != "project_os_status"):
+                        or name not in (("project_os_status", "homelab_audit")
+                                        if host_audit_enabled else ("project_os_status",))):
                     raise ValueError("denied tool")
                 cid = item.get("call_id")
                 args = item.get("arguments")
                 if not isinstance(cid, str) or not isinstance(args, str) or len(args) > 512:
                     raise ValueError("call format")
                 parsed = json.loads(args, object_pairs_hook=_unique)
-                if not isinstance(parsed, dict) or set(parsed) != {"project_id", "workstream_id"}:
+                if not isinstance(parsed, dict):
                     raise ValueError("call args")
-                if not isinstance(parsed["project_id"], str) or (
-                    parsed["workstream_id"] is not None and
-                    not isinstance(parsed["workstream_id"], str)
-                ):
-                    raise ValueError("call values")
-                calls.append(ModelToolCall(cid, "project_os_status", parsed))
+                if name == "homelab_audit":
+                    if parsed != {}:
+                        raise ValueError("audit arguments")
+                else:
+                    if set(parsed) != {"project_id", "workstream_id"}:
+                        raise ValueError("call args")
+                    if not isinstance(parsed["project_id"], str) or (
+                        parsed["workstream_id"] is not None and
+                        not isinstance(parsed["workstream_id"], str)
+                    ):
+                        raise ValueError("call values")
+                calls.append(ModelToolCall(cid, name, parsed))
                 replay.append({
                     "type": "function_call", "call_id": cid,
-                    "name": "project_os_status", "arguments": args,
+                    "name": name, "arguments": args,
                 })
             elif item.get("type") == "message":
                 contents = item.get("content")
@@ -182,9 +215,11 @@ def _parse_step(raw: bytes) -> tuple[ModelStep, ModelUsage]:
 class OpenAIConversationProvider:
     """Owner-gated, bounded paid calls; one instance for one user turn only."""
 
-    def __init__(self, key_file: Path, *, allow_paid_call: bool = False):
+    def __init__(self, key_file: Path, *, allow_paid_call: bool = False,
+                 host_audit_enabled: bool = False):
         self.key_file = key_file
         self.allow_paid_call = allow_paid_call
+        self.host_audit_enabled = host_audit_enabled
         self.attempts = 0
         self.total_input_tokens = 0
         self.total_output_tokens = 0
@@ -201,11 +236,13 @@ class OpenAIConversationProvider:
         final_only = (
             self.attempts == MAX_PROVIDER_REQUESTS - 1 or completed_tools >= 2
         )
-        raw = _build_request(items, context, final_only=final_only)
+        raw = _build_request(items, context, final_only=final_only,
+                             host_audit_enabled=self.host_audit_enabled)
         # Charge/reservation is unknown after a timeout: no automatic retries.
         self.attempts += 1
         key = read_api_key(self.key_file)
-        step, usage = _parse_step(_post(raw, key))
+        step, usage = _parse_step(_post(raw, key),
+                                  host_audit_enabled=self.host_audit_enabled)
         self.total_input_tokens += usage.input_tokens
         self.total_output_tokens += usage.output_tokens
         return step
