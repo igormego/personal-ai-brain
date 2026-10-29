@@ -257,8 +257,16 @@ def run_conversation(
             final = step.text.strip()
             if len((final + footnote).encode("utf-8")) > MAX_TEXT_BYTES + 600:
                 raise ConversationRejected("reply_too_large")
-            updated = (history + (ChatMessage("user", request.message),
-                                  ChatMessage("assistant", final)))[-MAX_HISTORY_ITEMS:]
+            # Keep bounded short-term history without retaining full prompts.
+            # A valid new user request may be larger than a historical item.
+            bounded_user = request.message.encode("utf-8")[:MAX_ASSISTANT_BYTES].decode(
+                "utf-8", errors="ignore"
+            )
+            updated = history + (ChatMessage("user", bounded_user),
+                                 ChatMessage("assistant", final))
+            updated = updated[-MAX_HISTORY_ITEMS:]
+            while sum(len(m.text.encode("utf-8")) for m in updated) > MAX_HISTORY_BYTES:
+                updated = updated[2:]
             return ConversationReply(request.request_id, request.payload_hash,
                                      request.surface, request.reply_target,
                                      final + footnote, updated, tuple(references),
