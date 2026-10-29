@@ -17,6 +17,7 @@ from personal_ai_brain.assistant_conversation import (
     MAX_TOOL_CALLS, run_conversation,
 )
 from personal_ai_brain.assistant_decision_context import build_decision_context
+from personal_ai_brain.assistant_resource_access import ResourceDenied, resource_catalog, resolve_resource
 from personal_ai_brain.assistant_openai_conversation import (
     MAX_OUTPUT_TOKENS, MAX_PROVIDER_REQUESTS, OpenAIConversationProvider,
     _build_request, _parse_step,
@@ -677,3 +678,189 @@ def test_host_audit_unavailable_explicit_and_duplicate_read_cached():
     assert reads == [True] and reply.tool_calls == 2
     assert "Host audit nedostupný" in reply.text
     assert "host_audit_unavailable" in provider.captured[-1][0][-1]["output"]
+
+
+# Brain v0.7: discover permitted resources, then use ONE read tool for all.
+def resource_call(cid="call_resource", resource_id="project-os/homelab"):
+    return ModelToolCall(cid, "resource_read", {"resource_id": resource_id})
+
+
+def test_trusted_resource_directory_exposes_exact_known_selectors_not_paths():
+    ctx = build_decision_context(snapshot(), today=TODAY)
+    catalog = resource_catalog(ctx)
+    ids = {r["resource_id"] for r in catalog}
+    assert ids == {"project-os/homelab", "project-os/recipe-intelligence"}
+    assert "homelab/host-snapshot" not in ids
+    assert "homelab/host-snapshot" in {
+        r["resource_id"] for r in resource_catalog(ctx, include_host_snapshot=True)
+    }
+    assert resolve_resource("project-os/homelab", ctx) == (
+        "project_os.status", {"project_id": "homelab"},
+    )
+    assert resolve_resource(
+        "homelab/host-snapshot", ctx, include_host_snapshot=True,
+    ) == ("homelab.audit", {})
+    for invalid in ("project-os/../etc", "project-os/invented",
+                    "homelab/host-snapshot", "https://example.org", None, True):
+        with pytest.raises(ResourceDenied, match="resource_denied"):
+            resolve_resource(invalid, ctx)
+
+
+def test_resource_mode_advertises_one_generic_model_tool():
+    ctx = build_decision_context(snapshot(), today=TODAY)
+    msg = ({"role": "user", "content": "Ako je na tom Homelab?"},)
+    req = json.loads(_build_request(msg, ctx, resource_mode=True))
+    assert [x["name"] for x in req["tools"]] == ["resource_read"]
+    advertised = json.loads(req["input"][0]["content"].split("instructions: ", 1)[1])
+    assert [x["resource_id"] for x in advertised] == [
+        "project-os/homelab", "project-os/recipe-intelligence",
+    ]
+    with_host = json.loads(_build_request(
+        msg, ctx, resource_mode=True, host_audit_enabled=True,
+    ))
+    assert len(with_host["tools"]) == 1
+    assert "homelab/host-snapshot" in with_host["input"][0]["content"]
+    assert "homelab/host-snapshot" not in req["input"][0]["content"]
+
+    sample = response(calls=(resource_call(),))
+    with pytest.raises(ModelUnavailable, match="model_response_invalid"):
+        _parse_step(sample)  # Legacy/default never accepts the generic tool.
+    parsed, _ = _parse_step(sample, resource_mode=True)
+    assert parsed.tool_calls[0].arguments == {"resource_id": "project-os/homelab"}
+    with pytest.raises(ModelUnavailable, match="model_response_invalid"):
+        _parse_step(response(calls=(audit_call(),)), resource_mode=True)
+    bad = ModelToolCall("call_bad", "resource_read", {"resource_id": "/etc/passwd", "command": "cat"})
+    with pytest.raises(ModelUnavailable, match="model_response_invalid"):
+        _parse_step(response(calls=(bad,)), resource_mode=True)
+
+
+def test_single_resource_tool_routes_both_project_and_host_and_preserves_provenance():
+    req = request("Aký je stav Homelabu a čo ukazuje posledný host snapshot?")
+    projects, hosts = [], []
+    provider = scripted(
+        toolstep(resource_call("call_project"), resource_call(
+            "call_host", "homelab/host-snapshot")),
+        final("Záznam projektu a snapshot hovoria o odlišných veciach."),
+    )
+    reply = run_conversation(
+        req, registry_with_audit(), build_decision_context(snapshot(), today=TODAY),
+        provider, fake_reader(req, snapshot(), projects),
+        read_host_audit=lambda r: hosts.append(r.request_id) or audit_evidence(r),
+        resource_mode=True,
+    )
+    assert projects == [{"project_id": "homelab"}] and hosts == [req.request_id]
+    assert reply.tool_calls == 2
+    assert "Project OS (záznam, nie live)" in reply.text
+    assert "Host snapshot z " in reply.text
+    outputs = [x for x in provider.captured[1][0] if x.get("type") == "function_call_output"]
+    assert len(outputs) == 2
+    assert json.loads(outputs[0]["output"])["project_id"] == "homelab"
+    host = json.loads(outputs[1]["output"])
+    assert host["docker"]["unhealthy"] == 0 and "image_id" not in str(host)
+
+
+def test_resource_mode_rejects_unadvertised_or_unregistered_resources_without_reads():
+    req = request("Pozri aj na systém.")
+    ctx = build_decision_context(snapshot(), today=TODAY)
+    for candidate in (
+        resource_call("call_unknown", "project-os/unknown"),
+        resource_call("call_path", "project-os/../../etc"),
+        audit_call("call_legacy"),
+        call("call_legacy_project"),
+    ):
+        called = []
+        with pytest.raises(ConversationRejected, match="tool_denied"):
+            run_conversation(
+                req, registry_with_audit(), ctx, scripted(toolstep(candidate)),
+                lambda *_: called.append("project"),
+                read_host_audit=lambda *_: called.append("host"),
+                resource_mode=True,
+            )
+        assert called == []
+    called = []
+    with pytest.raises(ConversationRejected, match="tool_denied"):
+        run_conversation(
+            req, registry([]), ctx,
+            scripted(toolstep(resource_call(
+                "call_missing", "homelab/host-snapshot"))),
+            lambda *_: called.append("project"),
+            read_host_audit=lambda *_: called.append("host"),
+            resource_mode=True,
+        )
+    assert called == []
+
+
+def test_resource_mode_host_needs_opted_in_callback_and_fresh_correlated_result():
+    req = request()
+    ctx = build_decision_context(snapshot(), today=TODAY)
+    called = []
+    with pytest.raises(ConversationRejected, match="tool_denied"):
+        run_conversation(
+            req, registry_with_audit(), ctx,
+            scripted(toolstep(resource_call("call_host", "homelab/host-snapshot"))),
+            lambda *_: called.append(True), resource_mode=True,
+        )
+    assert called == []
+    old = (datetime.now(timezone.utc) - timedelta(minutes=31)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    with pytest.raises(ConversationRejected, match="result_untrusted"):
+        run_conversation(
+            req, registry_with_audit(), ctx,
+            scripted(toolstep(resource_call("call_host", "homelab/host-snapshot"))),
+            lambda *_: pytest.fail("project lookup forbidden"),
+            read_host_audit=lambda r: audit_evidence(r, timestamp=old),
+            resource_mode=True,
+        )
+
+
+def test_resource_mode_keeps_duplicate_read_cache_and_batch_prevalidation():
+    req = request()
+    ctx = build_decision_context(snapshot(), today=TODAY)
+    calls = []
+    provider = scripted(
+        toolstep(resource_call("call_1")),
+        toolstep(resource_call("call_2")),
+        final("Overený projektový stav."),
+    )
+    reply = run_conversation(
+        req, registry([]), ctx, provider, fake_reader(req, snapshot(), calls),
+        resource_mode=True,
+    )
+    assert calls == [{"project_id": "homelab"}]
+    assert reply.tool_calls == 2
+
+    invocations = []
+    with pytest.raises(ConversationRejected, match="tool_denied"):
+        run_conversation(
+            req, registry_with_audit(), ctx,
+            scripted(toolstep(resource_call("call_ok"), resource_call(
+                "call_bad", "some/unapproved-resource"))),
+            lambda *_: invocations.append(True),
+            read_host_audit=lambda *_: invocations.append(True),
+            resource_mode=True,
+        )
+    assert invocations == []
+
+
+def test_resource_model_provider_sets_one_tool_in_network_payload(monkeypatch, tmp_path):
+    import personal_ai_brain.assistant_openai_conversation as module
+    requests = []
+    def fake_post(raw, _secret):
+        packet = json.loads(raw)
+        requests.append(packet)
+        if len(requests) == 1:
+            return response(calls=(resource_call(),))
+        return response(answer="Projektový záznam je platný.")
+    monkeypatch.setattr(module, "_post", fake_post)
+    ctx = build_decision_context(snapshot(), today=TODAY)
+    provider = OpenAIConversationProvider(
+        key_file(tmp_path), allow_paid_call=True,
+        resource_mode=True, host_audit_enabled=False,
+    )
+    items = ({"role": "user", "content": "Ako pokračujeme?"},)
+    first = provider(items, ctx)
+    second = provider((*items, *first.replay_items,
+                       {"type": "function_call_output", "call_id": "call_resource",
+                        "output": "{}"}), ctx)
+    assert second.text == "Projektový záznam je platný."
+    assert all([t["name"] for t in x["tools"]] == ["resource_read"] for x in requests)
+    assert [x["tool_choice"] for x in requests] == ["auto", "auto"]

@@ -19,6 +19,7 @@ from .assistant_project_os import StatusRejected, validate_selector
 from .assistant_result import AssistantResult, MAX_TEXT_BYTES
 from .control import Registry
 from .host_audit import AuditUnavailable, validate_snapshot
+from .assistant_resource_access import ResourceDenied, resolve_resource
 
 MAX_MODEL_STEPS = 3
 MAX_TOOL_CALLS = 2
@@ -158,10 +159,29 @@ def _selector(
 
 def _validated_call(
     call: ModelToolCall, registry: Registry, context: DecisionContext,
-    read_host_audit: ReadHostAudit | None,
+    read_host_audit: ReadHostAudit | None, *, resource_mode: bool = False,
 ) -> tuple[str, dict[str, str]]:
     if not isinstance(call, ModelToolCall):
         raise ConversationRejected("tool_denied")
+    if resource_mode:
+        if (call.name != "resource_read" or type(call.arguments) is not dict
+                or set(call.arguments) != {"resource_id"}):
+            raise ConversationRejected("tool_denied")
+        try:
+            target, args = resolve_resource(
+                call.arguments["resource_id"], context,
+                include_host_snapshot=read_host_audit is not None,
+            )
+        except ResourceDenied:
+            raise ConversationRejected("tool_denied") from None
+        if target == "project_os.status":
+            inner = ModelToolCall(call.call_id, "project_os_status", {
+                "project_id": args["project_id"],
+                "workstream_id": args.get("workstream_id"),
+            })
+            return "project_os.status", _selector(inner, registry, context)
+        # Continue through the existing strict host Registry permission check.
+        call = ModelToolCall(call.call_id, "homelab_audit", {})
     if call.name == "project_os_status":
         return "project_os.status", _selector(call, registry, context)
     if call.name != "homelab_audit" or read_host_audit is None or call.arguments != {}:
@@ -316,6 +336,7 @@ def run_conversation(
     *,
     history: tuple[ChatMessage, ...] = (),
     read_host_audit: ReadHostAudit | None = None,
+    resource_mode: bool = False,
 ) -> ConversationReply:
     """One bounded conversational turn: LLM → permitted reads → LLM reply.
 
@@ -326,7 +347,8 @@ def run_conversation(
     if (not isinstance(request, AssistantRequest) or not isinstance(registry, Registry)
             or not isinstance(context, DecisionContext)
             or not callable(provider) or not callable(read_project_status)
-            or (read_host_audit is not None and not callable(read_host_audit))):
+            or (read_host_audit is not None and not callable(read_host_audit))
+            or type(resource_mode) is not bool):
         raise ConversationRejected("trusted_input_required")
 
     items = _history(history)
@@ -396,7 +418,9 @@ def run_conversation(
                     or call.call_id in all_call_ids):
                 raise ConversationRejected("model_response_invalid")
             seen_ids.add(call.call_id)
-            capability_name, arguments = _validated_call(call, registry, context, read_host_audit)
+            capability_name, arguments = _validated_call(
+                call, registry, context, read_host_audit, resource_mode=resource_mode,
+            )
             planned.append((call, capability_name, arguments))
         for item, (call, _, _) in zip(step.replay_items, planned):
             if (not isinstance(item, dict)
