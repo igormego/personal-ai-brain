@@ -6,45 +6,54 @@ project:
   owner: "Project OS & Agent Architecture chat"
 
 status: "active"
-phase: "remote-codex-v02-trusted-publisher-draft-pr-accepted"
+phase: "brain-v05-api-smoke-accepted-gateway-integration-pending"
 
 current_gate: >
-  Remote Codex v0.2 is LIVE_ACCEPTED for two fixed repositories with isolated
-  offline WSL workers and GitHub Issues transport. Operator-only review/staging
-  PR #47 and owner-authorized trusted publisher PR #48 are implemented.
-  Issue #46 draft-PR end-to-end gate PASSED 2026-10-27: exact owner-approved
-  Homelab and PAB patches were published as two DRAFT PRs (Homelab #34,
-  PAB #50); both open, not merged; required CI green. Operator reports
-  protected Windows approval, matching publication receipts/journals and
-  preserved v0.1/v0.2 workers, ledgers and original WSL packets. No worker
-  credential, remote shell, production operation, auto-merge or deployment
-  was authorized. Future review/merge decisions remain separate gates.
+  Remote Codex v0.2 and the separate trusted draft-PR publisher are accepted.
+  Homelab Project OS control hardening Issue #34 is completed. Brain v0.3 real
+  OpenAI Responses feasibility is accepted through manual paid Slovak one-shot
+  tests, and Brain v0.5.1 source now supports bounded conversational native
+  function calls with verified Project OS results. The normal ChatGPT surface
+  already has a private personal-ai-brain plugin using the connected GitHub app,
+  so ChatGPT-side synthesis should prefer the subscription model rather than a
+  redundant metered API call. Gateway #25 remains open for explicit native
+  user-facing plugin acceptance/delivery semantics and WhatsApp/backend routing.
+  homelab.audit exists SOURCE_ONLY and is disabled live pending Issue #67 host
+  acceptance/deployment. No autonomous merge/deploy or broad host control is live.
 
 current_state: >
-  2026-10-27 independent GitHub verification: Homelab PR #34 draft/open/
-  unmerged, 1 test file +68/-0, base ba84d8e2edd778d93e05632adbc5ac391413b85c,
-  head 9159aa896d13324df3c83e2724064ed0b63d1722, node-tests CI success.
-  PAB PR #50 draft/open/unmerged, 2 files +61/-1, base
-  bdf074618fb74efc248b753759d1613db4540bbe, head
-  4219f3bdb3f3b28bd2864e3b6d23aa4aa59c37d4, test CI success.
-  Owner independently approved exact patches; operator Issue #46 comment
-  #6450359339 records Windows console authorization, exact post-publish
-  checksums, single publication per task, matching protected receipts/journals
-  and unchanged v0.1/v0.2 workers, original patch packets and ledgers.
-  ChatGPT independently checked public PR metadata, changed-file patches,
-  current GitHub state and completed CI, not private local audit stores.
-  Issue #41 v0.2 remote coding acceptance remains completed; publisher
-  and owner review remain separate from the restricted coding worker.
+  Remote Codex v0.2 is LIVE_ACCEPTED for personal-ai-brain and
+  homelab-infrastructure, with sandboxed offline repository development,
+  replay/conflict/restart acceptance and no source publication by the coding
+  worker. A separate owner-authorized trusted publisher can create exact reviewed
+  DRAFT PRs; automatic merge/deploy remains disabled. Project OS status control
+  is live and hardened; Issue #34 is completed. On 2026-10-29 Brain v0.3 made the
+  first real paid OpenAI Responses calls with gpt-6-luna: API connectivity and
+  structured parsing passed on all three reported calls; explicit Slovak project
+  status routing passed, and a repeated natural Homelab next-step query also
+  routed correctly. Reported per-call cost was about $0.00005; this is one-shot
+  feasibility, not production routing accuracy. Brain v0.5/v0.5.1 source now
+  supports bounded stateless conversation with native read-only tool calls and
+  grounded Slovak answers using existing correlated AssistantResult truth.
+  A private personal-ai-brain ChatGPT plugin v0.1.0 was discovered already
+  installed; ordinary ChatGPT successfully submitted private control Issue #81
+  and received one correlated project_os.status result. That proves the
+  foreground ChatGPT->GitHub->control path, not asynchronous server injection
+  into arbitrary chats. Source-only PR #66 adds opt-in homelab.audit via a strict
+  private host snapshot; it is not deployed or enabled yet. North-star Issues
+  #63/#64 record goal-driven delegation: user states a goal, Brain selects among
+  actually registered capabilities, while backend policy remains authority.
 
 exact_next_action: >
-  Issue #46 is COMPLETED and CLOSED after independently verified draft-PR
-  acceptance. Keep both draft PRs OPEN and UNMERGED; separately review
-  Homelab PR #34 and PAB PR #50 and obtain explicit merge authorization
-  if/when the owner wants to integrate these validated code changes.
-  No automatic merge or deployment approval is implied.
-  Select next bounded Remote Codex v0.2 coding milestone within its current
-  allowlisted repos/files. Personal Assistant #25, Homelab control #34 and
-  media #38 require separate explicit permission/deployment milestones.
+  First, explicitly invoke the installed @Personal AI Brain plugin from an
+  ordinary ChatGPT message and verify user-facing routing/answer quality through
+  the already-live read-only project_os.status path. For backend/WhatsApp
+  intelligence, keep Brain v0.5.1 as the approved source and separately deploy a
+  protected, budget-capped API credential only when needed. In parallel, complete
+  Issue #67: operator-owned read-only host audit preflight and staged deployment
+  of homelab.audit; do not route host SSH/Docker requests through Remote Codex
+  v0.2. After these gates, implement the first goal-driven vertical from #64,
+  preferably read-only Sonarr audit (#63) before any mutation.
 
 blockers: []
 
@@ -89,8 +98,13 @@ portfolio:
     deployment, production control or elevated worker permissions.
 
 verification:
-  last_verified: "2026-10-27"
+  last_verified: "2026-10-29"
   sources:
+    - "2026-10-29 Brain v0.3 live API smoke Issue #57 completed: three manually approved gpt-6-luna Responses calls; 3/3 provider/structured parsing success, explicit Slovak project-status routing passed, repeated natural Homelab next-step routing passed once after one earlier clarify; reported latency 1.8-3.1 s and estimated cost about $0.00005/call. Decision-only runner; no Gateway/backend tool execution."
+    - "2026-10-29 Brain source milestones: PR #58 one-shot Responses provider merged with 904 passed/1 skipped; PR #59 grounded Slovak answer compositor merged with 943 passed/1 skipped; PR #61 conversational native function-call loop and PR #62 leaner v0.5.1 follow-up merged, latest reported CI 978 passed/1 skipped. Source integration only; no production Gateway API deployment claimed."
+    - "2026-10-29 ordinary ChatGPT foreground proof: private control Issue #81 project_os.status(homelab) completed with one owner-authored correlated result and closed. Existing private personal-ai-brain plugin v0.1.0 discovered installed using connected GitHub app; no second paid API inference needed for normal ChatGPT synthesis. Explicit @mention routing still requires user-facing acceptance."
+    - "2026-10-29 Operator/goal direction: Issue #64 records goal-driven orchestration across registered capabilities; Issue #63 records Sonarr cleanup as read-only-audit-first vertical. PR #66 merged source-only homelab.audit with CI 1000 passed/1 skipped; capability remains disabled live pending Issue #67 host preflight/staged deployment."
+    - "2026-10-27 Remote Codex v0.2 LIVE_ACCEPTED and trusted draft-PR publisher acceptance remain valid; Issue #34 Homelab control hardening is completed."
     - "2026-10-27 Issue #46 completed draft publishing trial: operator post-publication report #6450359339 verifies Homelab PR #34 and PAB PR #50 exact checksums, protected Windows owner-console authorization, publication journals/receipts, healthy unchanged v0.1/v0.2 workers/ledgers and no merge/deployment; independent ChatGPT GitHub reads verify both PRs draft/open/unmerged with exact base/head and successful node-tests/test CI. Protected local logs not independently accessible."
     - "2026-10-27 independent post-restart ChatGPT external verification: #69 exact replay of PAB task #64 and #70 exact replay of Homelab task #65 both closed without any result comment, original #64/#65 each retained original single correlated comment ID, and #71 new request/same PAB task with changed payload closed with one owner result task_conflict, attempts=0. No new coding turn requested by probes. Issue #41 final acceptance."
     - "2026-10-27 operator post-execution recovery: Issue #41 comment #6446789732 reported v0.2-only worker restart at 15:56 UTC, preserved per-task attempts=1, unchanged thread/turn IDs, retained patch digest, immutable base SHA, byte-identical v0.1/v0.2 ledger and delivery snapshots, no repeated coding or duplicate comments, both worker health polls; no code publication."
