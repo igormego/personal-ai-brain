@@ -85,6 +85,66 @@ Tests inject fake Docker responses, verify the exact fixed queries and validate
 the full existing `pab-control/v0.1` duplicate/replay and fail-closed status.
 No live Docker, SSH, credentials or paid LLM inference is used in tests.
 
+## Optional host refresh timer — source-staged, NOT activated (2026-10-30)
+
+The standalone host-side collector is already supported and the live read-only
+worker has been operator-accepted (#67). To remove manual refresh as a recurring
+availability dependency, the repository now contains **source-only** systemd
+templates:
+
+- [`ops/systemd/pab-host-audit-refresh.service.in`](../ops/systemd/pab-host-audit-refresh.service.in):
+  `Type=oneshot`, the **same exact** `personal_ai_brain.host_audit collect`
+  executable and fixed private snapshot target. It requires operator rendering
+  of `@APPROVED_COLLECTOR_USER@` and an **absolute**
+  `@APPROVED_PYTHON@` interpreter path. The service is not installable as-is,
+  has no `[Install]` section, writes only the pre-existing private snapshot
+  directory, and does not start/restart Docker or PAB control.
+- [`ops/systemd/pab-host-audit-refresh.timer`](../ops/systemd/pab-host-audit-refresh.timer):
+  after host boot +2 minutes, then every 10 minutes after collection finishes;
+  the timer requires a separate, explicit enable/start. It cannot grant any
+  read/write permission, collect its own Docker credentials, or automatically
+  deploy the worker.
+
+**Preflight and required independent approval before ANY live change:** A trusted
+local `local-homelab-admin` operator must inspect actual paths and the **already
+accepted snapshot collector version** (avoid silently executing a newer
+unreviewed checkout); verify the chosen Python executable works under the
+approved collector UID, which must own the existing 0700 snapshot directory and
+publish 0600 files; inspect the current Docker access model as *host-root-equivalent*
+and **never add a new Docker group/socket/credential grant merely to make the
+timer pass**. Confirm `ProtectHome=yes` does not block the selected Python
+installation and `ReadWritePaths` matches the real approved directory; if not,
+stop and request review rather than weakening the sandbox. Inspect systemd
+version/available hardening flags and verify the locally rendered service and
+timer with `systemd-analyze verify`. Validate effective unit diff against
+source; no shell interpolation, arbitrary arguments, secrets or source checkout
+drift. If a host-side permission or service prerequisite is not met, leave the
+timer uninstalled.
+
+**Separate deployment gate:** Once the owner explicitly approves the exact
+rendered unit files, UID, interpreter and rollback, the trusted local operator
+may stage/install **only** those two files, reload systemd and enable/start
+**only the timer**. Do not run `docker compose up`, change the immutable
+control image, mount, source code, ledger, other containers, or ports. After
+activation, verify a fresh timestamped, strictly validated snapshot and
+subsequent scheduled collection. The control container keeps a read-only
+`/host-audit` mount and no Docker socket. The timer alone cannot assert a
+live measurement; every result is still the **time-stamped last collection**.
+
+**Failure and rollback:** failed/late collection must **not** overwrite the
+last valid file or trigger automatic escalations/restarts; the existing
+30-minute reader freshness gate remains authoritative. On any unit failure,
+unexpected permissions, identity/source mismatch, or unsafe output: disable/stop
+**only the timer** and restore the previously approved unit state; preserve
+the private snapshot, control image, ledgers and evidence. Do not suppress
+staleness or silently retry requests to bypass source failure.
+
+Offline checks: `python -m pytest -q tests/test_host_audit_timer.py
+tests/test_host_audit.py`. These verify the source-only configuration and the
+existing fail-closed snapshot reader, **not live unit compatibility or host
+activation**. Nothing in this source milestone enables a scheduler or widens
+model/host permissions.
+
 ## Operator acceptance procedure (historical; accepted and closed)
 
 The rollout, live transport checks and recovery completed on 2026-10-29;
