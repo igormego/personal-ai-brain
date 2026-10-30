@@ -119,10 +119,9 @@ availability dependency, the repository now contains **source-only** systemd
 templates:
 
 - [`ops/systemd/pab-host-audit-refresh.service.in`](../ops/systemd/pab-host-audit-refresh.service.in):
-  `Type=oneshot`, the **same exact** `personal_ai_brain.host_audit collect`
-  executable and fixed private snapshot target. It requires operator rendering
-  of `@APPROVED_COLLECTOR_USER@` and an **absolute**
-  `@APPROVED_PYTHON@` interpreter path. The service is not installable as-is,
+  `Type=oneshot`, invoking the accepted standalone collector file via
+  isolated Python and exactly two private bind targets. Four mandatory
+  placeholders identify trusted UID, Python, source file and snapshot dir. The service is not installable as-is,
   has no `[Install]` section, writes only the pre-existing private snapshot
   directory, and does not start/restart Docker or PAB control.
 - [`ops/systemd/pab-host-audit-refresh.timer`](../ops/systemd/pab-host-audit-refresh.timer):
@@ -138,9 +137,9 @@ unreviewed checkout); verify the chosen Python executable works under the
 approved collector UID, which must own the existing 0700 snapshot directory and
 publish 0600 files; inspect the current Docker access model as *host-root-equivalent*
 and **never add a new Docker group/socket/credential grant merely to make the
-timer pass**. Confirm `ProtectHome=yes` does not block the selected Python
-installation and `ReadWritePaths` matches the real approved directory; if not,
-stop and request review rather than weakening the sandbox. Inspect systemd
+timer pass**. Confirm the private `/run` bind targets work with `ProtectHome=yes` and
+preserve the existing snapshot directory on host; if not, stop without
+weakening the sandbox. Inspect systemd
 version/available hardening flags and verify the locally rendered service and
 timer with `systemd-analyze verify`. Validate effective unit diff against
 source; no shell interpolation, arbitrary arguments, secrets or source checkout
