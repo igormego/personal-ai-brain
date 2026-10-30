@@ -1,0 +1,35 @@
+# SOURCE TEMPLATE ONLY: NOT INSTALLED OR ENABLED.
+# Trusted Homelab operator must inspect the live host and replace both
+# @APPROVED_COLLECTOR_USER@ and @APPROVED_PYTHON@ before installation.
+# Do not grant Docker socket access or credentials to the PAB control container.
+[Unit]
+Description=Personal AI Brain private host snapshot refresh (operator-owned)
+After=local-fs.target
+ConditionPathIsDirectory=/var/lib/personal-ai-brain/host-audit
+
+[Service]
+Type=oneshot
+User=@APPROVED_COLLECTOR_USER@
+ExecStart=@APPROVED_PYTHON@ -m personal_ai_brain.host_audit collect --output /var/lib/personal-ai-brain/host-audit/snapshot.json
+WorkingDirectory=/
+UMask=0077
+TimeoutStartSec=25s
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONNOUSERSITE=1
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/personal-ai-brain/host-audit
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
