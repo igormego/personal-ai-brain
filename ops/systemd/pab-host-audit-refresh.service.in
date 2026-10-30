@@ -14,8 +14,7 @@ ExecStart=@APPROVED_PYTHON@ -m personal_ai_brain.host_audit collect --output /va
 WorkingDirectory=/
 UMask=0077
 TimeoutStartSec=25s
-Environment=PYTHONDONTWRITEBYTECODE=1
-Environment=PYTHONNOUSERSITE=1
+Environment=PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
 NoNewPrivileges=yes
 ProtectSystem=strict
 ReadWritePaths=/var/lib/personal-ai-brain/host-audit
