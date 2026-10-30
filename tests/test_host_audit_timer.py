@@ -18,12 +18,14 @@ def test_collector_template_requires_explicit_host_operator_rendering():
     raw, settings = unit("pab-host-audit-refresh.service.in")
     assert raw.count("@APPROVED_COLLECTOR_USER@") >= 1
     assert raw.count("@APPROVED_PYTHON@") >= 1
+    assert "@PINNED_COLLECTOR_FILE@" in raw
+    assert "@EXISTING_SNAPSHOT_DIR@" in raw
     svc = settings["Service"]
     assert svc["Type"] == "oneshot"
     assert svc["User"] == "@APPROVED_COLLECTOR_USER@"
     assert svc["ExecStart"] == (
-        "@APPROVED_PYTHON@ -m personal_ai_brain.host_audit collect "
-        "--output /var/lib/personal-ai-brain/host-audit/snapshot.json"
+        "@APPROVED_PYTHON@ -I -B /run/pab-host-audit-collector.py collect "
+        "--output /run/pab-host-audit-output/snapshot.json"
     )
     assert set(settings.sections()) == {"Unit", "Service"}
     assert "Install" not in settings  # The service itself cannot be enabled.
@@ -34,8 +36,18 @@ def test_collector_template_requires_explicit_host_operator_rendering():
 def test_collector_is_sandboxed_and_can_write_only_the_snapshot_directory():
     _, settings = unit("pab-host-audit-refresh.service.in")
     svc = settings["Service"]
-    assert svc["ReadWritePaths"] == "/var/lib/personal-ai-brain/host-audit"
-    assert settings["Unit"]["ConditionPathIsDirectory"] == svc["ReadWritePaths"]
+    assert svc["ReadWritePaths"] == "/run/pab-host-audit-output"
+    assert settings["Unit"]["ConditionPathExists"] == "@PINNED_COLLECTOR_FILE@"
+    assert settings["Unit"]["ConditionPathIsDirectory"] == "@EXISTING_SNAPSHOT_DIR@"
+    assert svc["BindReadOnlyPaths"] == (
+        "@PINNED_COLLECTOR_FILE@:/run/pab-host-audit-collector.py"
+    )
+    assert svc["BindPaths"] == (
+        "@EXISTING_SNAPSHOT_DIR@:/run/pab-host-audit-output"
+    )
+    assert svc["ProtectHome"] == "yes"  # no access to the rest of /home
+    assert "PYTHONPATH" not in svc["Environment"]
+    assert "ProtectHome=no" not in (ROOT / "pab-host-audit-refresh.service.in").read_text()
     assert svc["UMask"] == "0077"
     assert svc["TimeoutStartSec"] == "25s"
     for key in (
@@ -53,7 +65,7 @@ def test_collector_is_sandboxed_and_can_write_only_the_snapshot_directory():
     assert not any(
         key in svc for key in (
             "SupplementaryGroups", "Group", "EnvironmentFile", "RootDirectory",
-            "ExecReload", "Sockets", "BindPaths", "BindReadOnlyPaths",
+            "ExecReload", "Sockets", "RootImage",
         )
     )
 
