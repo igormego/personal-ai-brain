@@ -149,13 +149,19 @@ recorded `project_os.status` and an operator-collected `homelab.audit` snapshot.
 Only bounded private control transport issue creation is permitted; GitHub app
 binding/permissions did not change. The live worker's audit transport was
 independently proven previously through private Issues #84 and #88. **A newly
-installed skill release is not a fresh native @mention execution proof**:
-explicit user-facing `@Personal AI Brain` invocation is still required for
-plugin routing acceptance. Host snapshots expire after **30 minutes** and no
-automatic refresh/scheduler is enabled; a stale snapshot must fail closed.
-Operator host closeout [#67](https://github.com/igormego/personal-ai-brain/issues/67)
-also remains open. No backend Brain v0.7 deployment or persistent cross-surface
-chat delivery occurred as a result of the plugin update.
+installed skill release alone was not native @mention execution proof**.
+Subsequently, on 2026-10-29, Igor invoked **@Personal AI Brain** in an ordinary
+ChatGPT conversation; private [control Issue #90](https://github.com/igormego/personal-project-brain/issues/90)
+returned one verified, correlated `project_os.status(homelab)` result to that
+originating conversation. This **accepts the foreground ChatGPT status slice**,
+not asynchronous delivery into arbitrary chats or a backend Brain v0.7 deployment.
+Host snapshots expire after **30 minutes**, with no automatic refresh scheduler;
+stale snapshots fail closed. Operator host closeout
+[#67](https://github.com/igormego/personal-ai-brain/issues/67)
+was independently verified and **closed on 2026-10-30** with running-image,
+runtime, 91 unchanged recovery ledger files, seven later correlated records and
+15 unaffected-container checks. No cross-surface persistent conversation delivery
+or WhatsApp runtime has been activated.
 
 ## MVP capability scope
 
