@@ -1,0 +1,14 @@
+# SOURCE ONLY. Enable only after separate approval and verified host acceptance.
+# A skipped or failed collection leaves the previous snapshot, which the
+# existing reader rejects once it is older than 30 minutes.
+[Unit]
+Description=Refresh Personal AI Brain private host snapshot every 10 minutes
+
+[Timer]
+Unit=pab-host-audit-refresh.service
+OnBootSec=2min
+OnUnitInactiveSec=10min
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target
