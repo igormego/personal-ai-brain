@@ -1,24 +1,31 @@
 # SOURCE TEMPLATE ONLY: NOT INSTALLED OR ENABLED.
-# Trusted Homelab operator must inspect the live host and replace both
-# @APPROVED_COLLECTOR_USER@ and @APPROVED_PYTHON@ before installation.
-# Do not grant Docker socket access or credentials to the PAB control container.
+# Local operator must confirm and substitute ALL four placeholders after
+# checking the pinned collector SHA, trusted UID, Python path and snapshot mount.
+# The two existing home-backed resources are mapped into /run for this service;
+# ProtectHome=yes continues hiding every other home path.
+# No new Docker socket permissions, credentials, image or Compose changes.
 [Unit]
 Description=Personal AI Brain private host snapshot refresh (operator-owned)
 After=local-fs.target
-ConditionPathIsDirectory=/var/lib/personal-ai-brain/host-audit
+ConditionPathExists=@PINNED_COLLECTOR_FILE@
+ConditionPathIsDirectory=@EXISTING_SNAPSHOT_DIR@
 
 [Service]
 Type=oneshot
 User=@APPROVED_COLLECTOR_USER@
-ExecStart=@APPROVED_PYTHON@ -m personal_ai_brain.host_audit collect --output /var/lib/personal-ai-brain/host-audit/snapshot.json
+ExecStart=@APPROVED_PYTHON@ -I -B /run/pab-host-audit-collector.py collect --output /run/pab-host-audit-output/snapshot.json
 WorkingDirectory=/
 UMask=0077
 TimeoutStartSec=25s
 Environment=PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
 NoNewPrivileges=yes
 ProtectSystem=strict
-ReadWritePaths=/var/lib/personal-ai-brain/host-audit
 ProtectHome=yes
+# systemd manager resolves the sources on the host. Destinations stay outside
+# /home; never use ProtectHome=no or open the entire home tree.
+BindReadOnlyPaths=@PINNED_COLLECTOR_FILE@:/run/pab-host-audit-collector.py
+BindPaths=@EXISTING_SNAPSHOT_DIR@:/run/pab-host-audit-output
+ReadWritePaths=/run/pab-host-audit-output
 PrivateTmp=yes
 PrivateDevices=yes
 ProtectKernelTunables=yes
