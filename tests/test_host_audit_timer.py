@@ -49,7 +49,7 @@ def test_collector_is_sandboxed_and_can_write_only_the_snapshot_directory():
     assert svc["RestrictAddressFamilies"] == "AF_UNIX"
     assert svc["CapabilityBoundingSet"] == ""
     assert svc["AmbientCapabilities"] == ""
-    assert svc["Environment"] == "PYTHONNOUSERSITE=1"
+    assert svc["Environment"] == "PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1"
     assert not any(
         key in svc for key in (
             "SupplementaryGroups", "Group", "EnvironmentFile", "RootDirectory",
