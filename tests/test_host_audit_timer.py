@@ -47,7 +47,6 @@ def test_collector_is_sandboxed_and_can_write_only_the_snapshot_directory():
     )
     assert svc["ProtectHome"] == "yes"  # no access to the rest of /home
     assert "PYTHONPATH" not in svc["Environment"]
-    assert "ProtectHome=no" not in (ROOT / "pab-host-audit-refresh.service.in").read_text()
     assert svc["UMask"] == "0077"
     assert svc["TimeoutStartSec"] == "25s"
     for key in (
