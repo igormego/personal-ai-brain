@@ -85,6 +85,32 @@ Tests inject fake Docker responses, verify the exact fixed queries and validate
 the full existing `pab-control/v0.1` duplicate/replay and fail-closed status.
 No live Docker, SSH, credentials or paid LLM inference is used in tests.
 
+## Revised timer design after operator preflight (2026-10-30)
+
+[Issue #71](https://github.com/igormego/personal-ai-brain/issues/71#issuecomment-6522853626)
+found that the original PR #70 service unit was **BLOCKED**: its proposed
+output directory does not exist, the accepted collector and snapshot live under
+the operator home, and the system Python does not import the PAB module.
+
+**Use the revised template below, not the original PR #70 unit.** It preserves
+`ProtectHome=yes` while binding only the **approved, pinned collector file**
+read-only and the **already mounted snapshot directory** read-write to
+service-private destinations under `/run`. Python runs the pinned standalone
+file with `-I -B`, without any new package install or import path. All four
+placeholders (approved user, Python executable, collector file, existing
+snapshot directory) require trusted host-side verification and rendering.
+The same underlying snapshot remains visible to the unchanged read-only worker;
+no host file, package, permissions, or mount is changed by this source update.
+
+**Next gate: operator read-only review, NOT activation.** Validate the accepted
+collector checksum, script entrypoint, exact existing path identities, unit
+namespace mapping, interpreter and security settings on the real host with
+systemd 259. Run `systemd-analyze verify` on the exact rendered units in
+an offline staging location. If a bind mapping or standalone Python execution
+cannot be proven safe, report BLOCKED rather than relaxing sandbox settings.
+The two units remain not installed; activation requires a separate owner
+approval after a READY report. Do not repeat completed #67 transport tests.
+
 ## Optional host refresh timer — source-staged, NOT activated (2026-10-30)
 
 The standalone host-side collector is already supported and the live read-only
