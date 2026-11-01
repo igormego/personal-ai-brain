@@ -64,6 +64,32 @@ Existing Media Automation policy remains authoritative: 2160p-first/1080p fallba
 where configured, no mass upgrades/reacquisition, automated Usenet/manual CZ/SK
 torrents. The adapter does not alter monitoring, profiles, files or queue entries.
 
+## Source-only private snapshot consumer (2026-11-01)
+
+The read-side control bridge is now staged in source, not deployed:
+`media_snapshot.read_media_snapshot` consumes only a fixed operator-mounted
+`/media-audit/snapshot.json` path. It requires a small (<=4096-byte),
+single-linked regular file, private 0600 permissions, an expected owner UID
+(root or the container process UID), strict unique-key JSON and a complete,
+fresh (<=30-minute) `sonarr/overview` schema. The existing Registry
+`media.resource_read` then returns only typed, bounded sanitized facts.
+Missing, partial, stale, malformed, symlink or exposed files fail closed.
+
+`control_worker.serve` opts in **only** if trusted deployment configuration
+sets `PAB_MEDIA_RESOURCE_ENABLED=1`; no end-user arguments or paths can
+enable the capability. The default production startup is unchanged. Only
+the normalized snapshot may enter control; never mount the Sonarr API key,
+collector environment or configuration into the worker.
+
+**Operator prerequisite (not implemented in this source change):** create
+a pinned, host-only collection runner with existing-key access, a hard external
+deadline, private atomic snapshot publication, and a reviewed fixed read-only
+container mount. Validate file ownership compatibility with the control UID,
+existing control rollback image, complete failure/staleness behavior, and
+read-only bind semantics. Prepare the exact immutable image/Compose diff before
+asking for separate owner approval to deploy. No API key, network reachability
+to Sonarr, or elevated Docker access should be added to control.
+
 ## Next gate and rollback
 
 After source review/CI, separately approve a host-only pinned collector runner,

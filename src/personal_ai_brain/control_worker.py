@@ -212,8 +212,20 @@ def serve(state=STATE, heartbeat=BEAT):
     # Ignore every other environment value; do not accept a caller path.
     audit_file = (Path("/host-audit/snapshot.json")
                   if os.environ.get("PAB_HOST_AUDIT_ENABLED") == "1" else None)
-    registry = build_registry(Path("/core-state"), lambda: RunReader(core_token),
-                              redactor, Client(), host_audit_snapshot=audit_file)
+    # Explicitly opted-in, fixed, read-only mount. Sonarr key and host collector
+    # never enter the control container. No caller-provided path/endpoint.
+    media_provider = None
+    if os.environ.get("PAB_MEDIA_RESOURCE_ENABLED") == "1":
+        from .media_snapshot import MOUNTED_SNAPSHOT_PATH, read_media_snapshot
+
+        def media_provider(resource_id):
+            return read_media_snapshot(MOUNTED_SNAPSHOT_PATH, resource_id)
+
+    registry = build_registry(
+        Path("/core-state"), lambda: RunReader(core_token),
+        redactor, Client(), host_audit_snapshot=audit_file,
+        media_resource_provider=media_provider,
+    )
     def pulse():
         atomic_json(heartbeat, {"time": time.time()})
     worker = Worker(state, GitHubIssues(control_token), registry, redactor, pulse, stop.is_set)
