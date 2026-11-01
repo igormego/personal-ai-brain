@@ -1,0 +1,42 @@
+# SOURCE ONLY: no installation, enablement or scheduler in this milestone.
+# Render from separately approved paths; preserve existing UID/permissions.
+[Unit]
+Description=Private operator-owned Sonarr overview snapshot
+After=local-fs.target
+ConditionPathExists=@EXISTING_CONFIG_FILE@
+ConditionPathIsDirectory=@PRIVATE_SNAPSHOT_DIRECTORY@
+
+[Service]
+Type=oneshot
+User=1000
+Group=1000
+WorkingDirectory=/
+ExecStart=/usr/bin/python3 -I -B /run/pab-sonarr63-code/run.py --config /run/pab-sonarr63-config/config.xml --directory /run/pab-sonarr63-output
+UMask=0077
+TimeoutStartSec=160s
+TimeoutStopSec=2s
+KillMode=control-group
+SendSIGKILL=yes
+LimitCORE=0
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+BindReadOnlyPaths=@PINNED_RUNNER_DIRECTORY@:/run/pab-sonarr63-code
+BindReadOnlyPaths=@EXISTING_CONFIG_FILE@:/run/pab-sonarr63-config/config.xml
+BindPaths=@PRIVATE_SNAPSHOT_DIRECTORY@:/run/pab-sonarr63-output
+ReadWritePaths=/run/pab-sonarr63-output
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_INET AF_UNIX
+IPAddressDeny=any
+IPAddressAllow=localhost
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
