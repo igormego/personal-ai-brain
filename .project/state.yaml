@@ -60,6 +60,10 @@ current_state: >
   12:07:44Z preserved private ownership/modes and the unchanged healthy control.
   Foreground private transport #91 independently returned the 12:07:44Z snapshot
   with verified author/request correlation and current freshness.
+  Issue #63 source-only Sonarr overview adapter now follows PR #73: verified Sonarr
+  4.0.17.2952 GET endpoints normalize into the existing media.resource_read contract.
+  No Sonarr credential, provider or new adapter is deployed in control; private
+  snapshot publication/provider integration requires separate operator approval.
   North-star Issues #63/#64 record goal-driven delegation: user states a goal,
   Brain selects among registered capabilities, and backend policy is authority.
 
