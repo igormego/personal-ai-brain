@@ -60,7 +60,8 @@ def read_media_snapshot(path: Path, resource_id: str, *, now=None) -> dict:
         )
         # The authoritative strict schema and 30-minute freshness gate are
         # enforced on EVERY read, never cached as a forever-current result.
-        return sanitize_media_resource(resource_id, data, now=now)
+        sanitize_media_resource(resource_id, data, now=now)
+        return data  # Registry independently normalizes into a filtered result.
     except (OSError, UnicodeError, ValueError, TypeError, RecursionError):
         raise MediaResourceUnavailable("media_resource_unavailable") from None
     finally:
