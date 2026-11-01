@@ -65,8 +65,11 @@ current_state: >
   PR #75 merged an opt-in credential-free, fixed-path private Sonarr snapshot
   reader plus control startup integration, offline tested (1105 passed / 1 skipped).
   Default production control has this capability OFF. The host-only key-handling
-  runner, atomic publication, read-only mount, image/Compose review and live
-  deployment require separate operator plan and explicit approval. No new
+  runner, hard timeout, atomic publisher and minimal accepted-base candidate
+  builder are now source-tested. Activation is BLOCKED: existing config/parent
+  are group-writable and no candidate image or isolated namespace acceptance
+  exists under the read-only-host scope. Permission remediation, isolated staging
+  and deployment need separate explicit approvals. No new
   Sonarr credential, provider or adapter is deployed in control yet.
   North-star Issues #63/#64 record goal-driven delegation: user states a goal,
   Brain selects among registered capabilities, and backend policy is authority.

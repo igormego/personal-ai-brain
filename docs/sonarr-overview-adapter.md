@@ -2,8 +2,8 @@
 
 Status: **source-only / not deployed**, PAB Issue [#63](https://github.com/igormego/personal-ai-brain/issues/63).
 This implements the operator side of PR #73's existing `media.resource_read`
-contract. No new capability, production Registry wiring, CLI, scheduler, credential
-store, or Sonarr write operation is added.
+contract. The host-only runner below is source-only. No new capability, production
+activation, scheduler, credential store or Sonarr write operation is added.
 
 ## Verified inventory — 2026-11-01
 
@@ -81,14 +81,8 @@ enable the capability. The default production startup is unchanged. Only
 the normalized snapshot may enter control; never mount the Sonarr API key,
 collector environment or configuration into the worker.
 
-**Operator prerequisite (not implemented in this source change):** create
-a pinned, host-only collection runner with existing-key access, a hard external
-deadline, private atomic snapshot publication, and a reviewed fixed read-only
-container mount. Validate file ownership compatibility with the control UID,
-existing control rollback image, complete failure/staleness behavior, and
-read-only bind semantics. Prepare the exact immutable image/Compose diff before
-asking for separate owner approval to deploy. No API key, network reachability
-to Sonarr, or elevated Docker access should be added to control.
+The source runner and candidate preparation below implement the next source
+pieces. They remain uninstalled and have not executed against production.
 
 ## Next gate and rollback
 
@@ -103,3 +97,123 @@ unnecessary because nothing was deployed. Keep #63 open for real user-facing
 read acceptance and separately scoped future mutations.
 
 Offline validation: `python -m pytest -q tests/test_sonarr_overview.py tests/test_assistant_media_resources.py`.
+
+## Runner and deployment preflight — 2026-11-01
+
+**Verdict: BLOCKED for production activation; source/offline preparation ready.**
+
+Read-only host observations:
+
+- Existing control image/rollback is
+  `sha256:1ca7a20c4de75abe60c2d75037d943a960b438cf2a1c0829f6d501370541f538`,
+  healthy, unchanged start time 2026-10-30T12:04:18Z, user 1000:1000.
+- The accepted control.py/control_worker.py/host_audit.py bytes were read from
+  the running container without execution and match retained acceptance evidence.
+- Existing private state parent is UID1000/0700. Planned Sonarr directory does
+  not exist. A future UID1000 directory0700/file0600 is compatible with PR #75's
+  strict eUID ownership check without ACLs/group grants or control UID changes.
+- Existing Sonarr credential source **and its immediate directory are 0775**,
+  UID/GID1000. The runner rejects group/world-writable credential sources. No
+  chmod, key extraction/copy, configuration change or privileged bypass occurred.
+  This is a real prerequisite, not a reason to weaken the loader. Before staging,
+  the owner must approve an exact existing-source permission remediation after
+  verifying Sonarr access; no recursive permissions change or new credential.
+- Docker 29.7.2, Compose 5.5.0, systemd 259.5, host Python 3.14.4. Existing host
+  audit timer remains active. No new Sonarr service/timer or snapshot exists.
+- Read-only `compose config` with the existing protected deploy.env and both
+  accepted files plus an in-memory hypothetical override preserved all original
+  mounts/security/other services. Only the media enable flag and read-only mount
+  were added; the current image was used solely for this structural check.
+  This is **not** a rendered activation override or a tested candidate image.
+
+### Host-only execution boundary
+
+`sonarr_snapshot_runner` accepts operator-owned config/directory paths, never
+request arguments. It reads no key in the parent. A forked child validates the
+bounded existing XML config, rejects symlinks/hardlinks, wrong owners, writable
+source/parent, duplicate keys, DTD/entities, wrong port/base, then calls the
+existing collector. Key stays in child memory; no key argv/env/copy, Python/FD
+diagnostic output, or core dump. Parent receives at most 4096 sanitized bytes.
+
+The parent kills a noncooperative collector with SIGKILL after **150 seconds**,
+waits/reaps it and never publishes timeout/partial output. The optional source-only
+oneshot unit adds a 160-second whole-service timeout, 2-second stop timeout and
+control-group kill as a second boundary. No timer is supplied or enabled.
+The unit permits only loopback networking, preserves ProtectHome/ProtectSystem,
+and maps only the pinned code, existing config and private output directory.
+Actual namespace/BPF enforcement remains an isolated staging acceptance check.
+
+Output directory must preexist, owned by runner UID, exactly0700. Descriptor-relative
+publication pins it; a nonblocking private lock rejects overlaps. Existing target
+must be regular, single-linked, same owner and0600. New temporary file is0600,
+fsynced, atomically renamed to snapshot.json and the directory fsynced. Collection
+failure leaves old bytes/timestamp untouched; expiry still fails closed after30m.
+A post-rename directory-fsync error is **uncertain durability**: a complete new
+packet may exist. Inspect it; never silently retry or restore. Crash leftovers
+are private evidence, not automatically pruned.
+
+`scripts/prepare_sonarr63_candidate.py` creates separate local review artifacts:
+
+1. Minimal control image context: exact accepted base module hashes are mandatory;
+   only control.py, control_worker.py, assistant_media_resources.py and
+   media_snapshot.py are added/replaced. It deliberately excludes main's unrelated
+   media.plan_movie branch, host collector and credential loader. Dockerfile inherits
+   the current immutable base and changes no user/command/dependencies/other files.
+2. Optional `--runner-output` builds a six-file host bundle with SHA-256 manifest,
+   including isolated `python3 -I -B run.py` bootstrap. It has no control code or
+   secrets and does not depend on the production checkout or host package install.
+
+**No image has been built.** Manifest `candidate_image: null` is intentional.
+The local environment has no Docker executable; building/tagging/exporting on the
+Homelab would violate this milestone's read-only-host limit. The generated pinned
+base build recipe must be tested against the approved builder in isolated staging;
+record its actual resulting image ID before rendering the Compose template.
+
+### Exact activation gates and rollback
+
+1. Separate owner approval of the exact credential-source/parent permission fix
+   and isolated staging (not production). Recheck current hashes/UID/health first.
+   Do not copy the key or relax loader checks. Verify native and unit-private source
+   paths; a safe /run alias does not prove the original source directory is safe.
+2. Stage the hash-pinned host bundle in a new private Sonarr-only directory under
+   the existing PAB state parent and create its separate snapshot subdirectory0700.
+   Do not reuse/modify the host-audit directory/timer. Render and verify the optional
+   oneshot with actual paths before any unit installation. No scheduler implied.
+3. Build the minimal control context offline from the verified local base; no pull,
+   checkout update or dependency installation. Record image ID, inspect effective
+   user/entrypoint/modules/security and test the existing capabilities plus media
+   reader against synthetic fresh/stale/invalid snapshots in isolated containers
+   without credentials, production ledgers or network. Stop on any baseline drift.
+4. Separately approve first host collection and a second bounded invocation at
+   least one minute later. Require valid advancing timestamps, preserved0700/0600,
+   correct UID and byte-stable old snapshot on injected **offline** failures. Test
+   stale rejection with synthetic time/data; do not corrupt production snapshots.
+   No live GitHub request is authorized by this preparation milestone.
+5. Render `ops/sonarr63/compose.override.yaml.in` using the **built** immutable ID
+   and new directory, layered after both current accepted Compose files with the
+   existing deploy.env. Require effective diff: image, PAB_MEDIA_RESOURCE_ENABLED=1,
+   and one /media-audit:ro directory bind with create_host_path=false, nothing else.
+   Capture current image, Compose/env hashes and ledger/container evidence privately.
+6. Present exact rendered hashes, immutable ID, isolated tests, snapshot and rollback
+   evidence for **separate production activation approval**. Only then recreate
+   control using --no-deps --no-build --pull never; no other service. Verify health,
+   read-only source access, original capabilities/ledgers/mounts and existing audit
+   timer. A single correlated media.resource_read transport probe and plugin
+   exposure each remain separately scoped; do not repeat #67's acceptance suite.
+
+Rollback: stop only any newly introduced Sonarr runner (no scheduler is currently
+proposed), let/force its bounded child terminate, and recreate **control only** with
+the original two Compose files and unchanged deploy.env, omitting the Sonarr
+override. Their existing image pin is the rollback ID above, retained locally.
+Preserve all ledgers, new snapshots, source manifests and old images; no down/prune,
+volume removal, key rotation, host-audit timer operation or Sonarr mutation.
+Remove only newly installed Sonarr unit after stopping it if that unit was part of
+the approved rollout, then daemon-reload; no cleanup of unrelated units.
+
+Rollback Compose file hashes observed read-only:
+
+- compose.base.yaml: `dfdb6558d7423b8166137deac2928a2f89950b9f4422d3be0442700de9a5afe6`
+- accepted host-audit override: `1d642898fc332241ee48f0190129b9ea78a282f9d675fd9589efecd9343fbc5e`
+
+No production rollout can be called READY until credential permissions, actual
+candidate image and isolated unit/mount execution are verified. Keep Issue #63 open.

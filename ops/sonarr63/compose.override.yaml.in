@@ -1,0 +1,15 @@
+# SOURCE TEMPLATE ONLY. Layer after BOTH existing accepted Compose files.
+# Render only after an isolated candidate build reports the exact image ID.
+services:
+  control:
+    image: "@VERIFIED_CANDIDATE_IMAGE_ID@"
+    pull_policy: never
+    environment:
+      PAB_MEDIA_RESOURCE_ENABLED: "1"
+    volumes:
+      - type: bind
+        source: "@PRIVATE_SONARR_SNAPSHOT_DIRECTORY@"
+        target: /media-audit
+        read_only: true
+        bind:
+          create_host_path: false
