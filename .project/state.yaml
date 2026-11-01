@@ -20,10 +20,12 @@ current_gate: >
   user-facing plugin acceptance/delivery semantics and WhatsApp/backend routing.
   homelab.audit is now LIVE for authenticated read-only snapshot requests,
   with private GitHub Issues #84/#88 completed, invalid-argument/conflict
-  denials #85/#86, and post-restart duplicate #87. Its snapshot requires manual
-  refresh and expires after 30 minutes; #67 still needs final operator
-  post-replay ledger/container attestation. No autonomous deploy or
-  broad host control is live.
+  denials #85/#86, and post-restart duplicate #87. Issue #67 operator acceptance
+  is complete. Issue #71 timer acceptance is complete on 2026-11-01: approved
+  PR #72 units refresh the private snapshot approximately every 10 minutes;
+  private transport #91 returned a fresh correlated homelab.audit result.
+  Snapshots still expire after 30 minutes. No autonomous deploy or broad host
+  control is live.
 
 current_state: >
   Remote Codex v0.2 is LIVE_ACCEPTED for personal-ai-brain and
@@ -52,8 +54,12 @@ current_state: >
   cached post-restart duplicate #87, plus a new ChatGPT-originated live audit
   #88 with fresh owner-authored result and correct correlation. The host
   snapshot was taken at 19:02:22Z *before* activation; its image ID describes
-  the previous container, not current Docker state. No automatic refresh.
-  Final post-replay host evidence is still operator-pending under #67.
+  the previous container, not current Docker state. Issue #67 subsequently closed
+  after final operator attestation on 2026-10-30. On 2026-11-01 the owner installed
+  the exact PR #72 units; successful scheduled collections at 11:57:26Z and
+  12:07:44Z preserved private ownership/modes and the unchanged healthy control.
+  Foreground private transport #91 independently returned the 12:07:44Z snapshot
+  with verified author/request correlation and current freshness.
   North-star Issues #63/#64 record goal-driven delegation: user states a goal,
   Brain selects among registered capabilities, and backend policy is authority.
 
@@ -62,14 +68,12 @@ exact_next_action: >
   ordinary ChatGPT message and verify user-facing routing/answer quality through
   the already-live read-only project_os.status path. For backend/WhatsApp
   intelligence, keep Brain v0.5.1 as the approved source and separately deploy a
-  protected, budget-capped API credential only when needed. For Issue #67,
-  collect only the final Codex Local operator closeout after usage resets:
-  current candidate pin, all original ledger hashes and unrelated-container
-  invariants after replay #87 and ChatGPT audit #88; no repeat deploy or
-  acceptance traffic. Separately scope a narrow scheduled snapshot refresh
-  (otherwise 30-minute snapshot expires) and then reviewed ChatGPT tool
-  exposure. Never route host SSH/Docker requests through remote coding bridge.
-  Next, advance goal-driven vertical #64 beginning read-only.
+  protected, budget-capped API credential only when needed. Issues #67 and #71
+  are accepted; preserve the timer-only rollback and fail-closed 30-minute
+  freshness boundary. Long-duration reliability and reboot acceptance were not
+  exercised by this timer milestone. Never route host SSH/Docker requests
+  through remote coding bridge. Next, advance goal-driven vertical #64
+  beginning read-only.
 
 blockers: []
 
@@ -114,8 +118,9 @@ portfolio:
     deployment, production control or elevated worker permissions.
 
 verification:
-  last_verified: "2026-10-29"
+  last_verified: "2026-11-01"
   sources:
+    - "2026-11-01 Issue #71 accepted: exact PR #72 rendered units installed by owner; two scheduled collections 11:57:26Z/12:07:44Z, strict snapshot validation, original private ownership/modes and unchanged healthy control independently verified. Private foreground transport #91 completed and closed with one authoritative correlated homelab.audit result for source 12:07:44Z. Timer-only rollback retained; no reboot/failure injection or repeated #67 tests."
     - "2026-10-29 independently verified first homelab.audit live transport milestone: private Project OS Issues #82/83 status/health completed, #84 homelab.audit completed from a preactivation snapshot, #85 invalid input and #86 conflict rejected, #87 post-restart duplicate completed without a new handler execution, and new authenticated ChatGPT-originated #88 homelab.audit completed with author/request/result correlation. Codex Local reported candidate immutable pin, successful graceful control-only recovery and 91 preserved prior ledger records. Final host ledger/container attestation still pending under PAB Issue #67; no scheduled collector, broad Docker control or independent operator runtime." 
     - "2026-10-29 Brain v0.3 live API smoke Issue #57 completed: three manually approved gpt-6-luna Responses calls; 3/3 provider/structured parsing success, explicit Slovak project-status routing passed, repeated natural Homelab next-step routing passed once after one earlier clarify; reported latency 1.8-3.1 s and estimated cost about $0.00005/call. Decision-only runner; no Gateway/backend tool execution."
     - "2026-10-29 Brain source milestones: PR #58 one-shot Responses provider merged with 904 passed/1 skipped; PR #59 grounded Slovak answer compositor merged with 943 passed/1 skipped; PR #61 conversational native function-call loop and PR #62 leaner v0.5.1 follow-up merged, latest reported CI 978 passed/1 skipped. Source integration only; no production Gateway API deployment claimed."
