@@ -1,6 +1,6 @@
 # homelab.audit v0.1 — host snapshot, not an admin API
 
-**Status (2026-10-30): LIVE read-only control capability, operator acceptance CLOSED; snapshot refresh remains manual.**
+**Status (2026-11-01): LIVE read-only control capability and operator-approved automatic snapshot refresh; Issues #67/#71 accepted.**
 Source milestone [#65](https://github.com/igormego/personal-ai-brain/issues/65)
 was followed by an explicitly authorized control-only operator rollout. Independent
 private GitHub verification confirmed authenticated `homelab.audit` results
@@ -12,9 +12,13 @@ and conflict denials #85/#86, and post-restart duplicate #87 without reexecution
 the actual approved running image, healthy runtime/transport, unchanged 91 recovery
 ledger files, seven correlated subsequent records (#87–#90) and preservation of
 15 other containers. [Final operator attestation](https://github.com/igormego/personal-ai-brain/issues/67#issuecomment-6522448073)
-documents the host read-only evidence. The stored snapshot collected at
-2026-10-29T19:02:22Z is **expired and correctly rejected**; no automatic refresh
-exists. A stored preactivation `control.image_id` is **not** proof of the
+documents the host read-only evidence. The historical 2026-10-29 snapshot expired and was correctly rejected before
+refresh activation. On 2026-11-01 the owner installed the exact reviewed PR #72
+units and enabled only the timer. Successful scheduled collections at 11:57:26Z
+and 12:07:44Z preserved private ownership/modes and unchanged healthy control.
+[Private transport #91](https://github.com/igormego/personal-project-brain/issues/91)
+returned the 12:07:44Z snapshot with verified correlation and current freshness.
+This is a collected snapshot, not live telemetry; the 30-minute expiry remains. A stored preactivation `control.image_id` is **not** proof of the
 currently running image. Private ChatGPT plugin **v0.2.0** supports foreground
 read-only `project_os.status` and `homelab.audit` via the existing GitHub
 control transport; it does not grant host administration or Docker access.
@@ -102,21 +106,22 @@ snapshot directory) require trusted host-side verification and rendering.
 The same underlying snapshot remains visible to the unchanged read-only worker;
 no host file, package, permissions, or mount is changed by this source update.
 
-**Next gate: operator read-only review, NOT activation.** Validate the accepted
+**Historical preactivation gate (completed under Issue #71 on 2026-11-01):** Validate the accepted
 collector checksum, script entrypoint, exact existing path identities, unit
 namespace mapping, interpreter and security settings on the real host with
 systemd 259. Run `systemd-analyze verify` on the exact rendered units in
 an offline staging location. If a bind mapping or standalone Python execution
 cannot be proven safe, report BLOCKED rather than relaxing sandbox settings.
-The two units remain not installed; activation requires a separate owner
-approval after a READY report. Do not repeat completed #67 transport tests.
+At that preactivation checkpoint the units were not installed and required separate
+owner approval. The owner subsequently approved and performed the exact installation;
+see the current acceptance status above. Do not repeat completed #67 transport tests.
 
-## Optional host refresh timer — source-staged, NOT activated (2026-10-30)
+## Host refresh timer — activated and accepted (2026-11-01)
 
 The standalone host-side collector is already supported and the live read-only
 worker has been operator-accepted (#67). To remove manual refresh as a recurring
 availability dependency, the repository now contains **source-only** systemd
-templates:
+templates (rendered and installed through the separately approved operator flow):
 
 - [`ops/systemd/pab-host-audit-refresh.service.in`](../ops/systemd/pab-host-audit-refresh.service.in):
   `Type=oneshot`, invoking the accepted standalone collector file via
