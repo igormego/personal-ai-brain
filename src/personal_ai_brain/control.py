@@ -128,7 +128,8 @@ class Registry:
 
 
 def build_registry(core_state: Path, reader_factory, redactor, work_client=None,
-                   media_plan_provider=None, host_audit_snapshot: Path | None = None):
+                   media_plan_provider=None, host_audit_snapshot: Path | None = None,
+                   *, media_resource_provider=None):
     def runtime_health(_):
         health, code = runtime.health(core_state, core_state / "heartbeat.json")
         last = health.get("last_run", {})
@@ -216,6 +217,35 @@ def build_registry(core_state: Path, reader_factory, redactor, work_client=None,
         caps.append(Capability(
             "homelab.audit", "Read recent sanitized Ubuntu inventory snapshot",
             "read_only", empty_schema, no_arguments, homelab_audit,
+        ))
+    # Source-only opt-in: an explicitly trusted Media operator must supply the
+    # sanitized, complete, timestamped read provider. Production does not wire it.
+    if media_resource_provider is not None:
+        from .assistant_media_resources import (
+            MediaResourceUnavailable, read_media_resource, validate_media_selector,
+        )
+
+        def media_selector(value):
+            try:
+                return validate_media_selector(value)
+            except MediaResourceUnavailable:
+                raise Rejected("invalid_media_resource") from None
+
+        def media_read(arguments):
+            try:
+                return read_media_resource(arguments, media_resource_provider)
+            except MediaResourceUnavailable:
+                raise CapabilityFailed("media_resource_unavailable") from None
+
+        caps.append(Capability(
+            "media.resource_read",
+            "Read one approved, sanitized Media snapshot resource (source-only)",
+            "read_only",
+            {"type": "object", "additionalProperties": False,
+             "required": ["resource_id"],
+             "properties": {"resource_id": {"type": "string",
+                                            "enum": ["sonarr/overview"]}}},
+            media_selector, media_read,
         ))
     if media_plan_provider is not None:
         # An operator must provide a trusted plan-only adapter; the existing
