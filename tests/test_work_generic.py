@@ -156,6 +156,7 @@ def test_executes_trusted_ci_fixture_with_input_and_produces_artifact(tmp_path, 
     assert (status, code) == ("succeeded", "generic_sandbox_completed")
     assert (workspace / "outputs/total.txt").read_text() == "21"
     assert len(manifest) == 1 and manifest[0]["sha256"] == hashlib.sha256(b"21").hexdigest()
+    assert manifest[0]["preview_text"] == "21"
     report = json.loads((artifacts / "test-result.json").read_text())
     assert report["goal_semantics_verified"] is False
     provenance = json.loads((artifacts / "generic-artifacts.json").read_text())
