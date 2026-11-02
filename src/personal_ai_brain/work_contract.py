@@ -1,5 +1,7 @@
 """Strict Work Contract v0.1. Text fields describe the one fixed fixture only."""
 from datetime import datetime, timezone, timedelta
+import base64
+import binascii
 import hashlib
 import json
 import re
@@ -8,6 +10,8 @@ from . import coding_policy
 
 REPOSITORY = 'Az1mutt/personal-ai-brain'
 TASK_TYPE = 'fixture.patch-test.v1'
+GENERIC_TYPE = 'workspace.python.v1'
+GENERIC_FIELDS = {'script', 'inputs'}
 GOAL = 'Create the deterministic Work Runner fixture artifact.'
 CRITERIA = ['fixture content matches', 'isolation checks pass']
 FIELDS = {'schema_version', 'task_id', 'task_type', 'repository', 'base_ref',
@@ -46,11 +50,14 @@ def parse(raw):
     try:
         value = json.loads(raw, object_pairs_hook=unique_object,
                            parse_constant=lambda _: (_ for _ in ()).throw(Rejected('nonfinite_json')))
-        if not isinstance(value, dict) or set(value) != FIELDS:
+        if not isinstance(value, dict):
+            raise Rejected('invalid_fields')
+        generic = value.get('task_type') == GENERIC_TYPE
+        if set(value) != (FIELDS | GENERIC_FIELDS if generic else FIELDS):
             raise Rejected('invalid_fields')
         task_id(value['task_id'])
         coding = value['task_type'] == coding_policy.TYPE
-        if (value['schema_version'] != '0.1' or value['task_type'] not in (TASK_TYPE, coding_policy.TYPE)
+        if (value['schema_version'] != '0.1' or value['task_type'] not in (TASK_TYPE, coding_policy.TYPE, GENERIC_TYPE)
                 or value['repository'] != REPOSITORY):
             raise Rejected('unsupported_contract')
         if coding:
@@ -68,11 +75,49 @@ def parse(raw):
             # caller goals passed merely because this profile's tests passed.
             if value['goal'] != coding_policy.GOAL or texts != coding_policy.CRITERIA:
                 raise Rejected('unsupported_coding_profile')
+        elif generic:
+            # The sandbox can run novel task-local scripts; its exit status and
+            # artifact manifest do NOT prove the user's semantic goal succeeded.
+            if (not isinstance(value['goal'], str) or not 1 <= len(value['goal']) <= 2000
+                    or any(ord(ch) < 32 and ch not in '\n\t' for ch in value['goal'])):
+                raise Rejected('invalid_generic_goal')
+            criteria = value['acceptance_criteria']
+            if (not isinstance(criteria, list) or not 1 <= len(criteria) <= 5
+                    or any(type(t) is not str or not 1 <= len(t) <= 300 for t in criteria)):
+                raise Rejected('invalid_generic_criteria')
+            script = value['script']
+            if (type(script) is not str or not 1 <= len(script.encode('utf-8')) <= 4096
+                    or any(ord(ch) == 0 for ch in script)):
+                raise Rejected('invalid_generic_script')
+            inputs = value['inputs']
+            if type(inputs) is not list or len(inputs) > 8:
+                raise Rejected('invalid_generic_inputs')
+            from .workspace_artifacts import InputGrant, _safe_path, _safe_resource
+            seen = set()
+            total = 0
+            for item in inputs:
+                if (type(item) is not dict or set(item) != {'resource_id', 'path', 'content_b64'}
+                        or not _safe_resource(item['resource_id'])
+                        or type(item['content_b64']) is not str):
+                    raise Rejected('invalid_generic_inputs')
+                _safe_path(item['path'])
+                if item['path'] in seen:
+                    raise Rejected('invalid_generic_inputs')
+                seen.add(item['path'])
+                try:
+                    raw = base64.b64decode(item['content_b64'], validate=True)
+                except (binascii.Error, ValueError):
+                    raise Rejected('invalid_generic_inputs') from None
+                if base64.b64encode(raw).decode('ascii') != item['content_b64']:
+                    raise Rejected('invalid_generic_inputs')
+                total += len(raw)
+                if total > 4096:
+                    raise Rejected('invalid_generic_inputs')
         elif value['goal'] != GOAL or value['acceptance_criteria'] != CRITERIA:
             raise Rejected('unsupported_contract')
         if not isinstance(value['base_ref'], str) or not re.fullmatch('[0-9a-f]{40}', value['base_ref']):
             raise Rejected('immutable_base_required')
-        if type(value['deadline_seconds']) is not int or not 1 <= value['deadline_seconds'] <= (180 if coding else 60):
+        if type(value['deadline_seconds']) is not int or not 1 <= value['deadline_seconds'] <= (180 if coding or generic else 60):
             raise Rejected('invalid_deadline')
         requested = datetime.fromisoformat(value['requested_at'].replace('Z', '+00:00'))
         if requested.tzinfo is None:
