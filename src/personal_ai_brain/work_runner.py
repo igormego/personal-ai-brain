@@ -20,8 +20,9 @@ PROFILE = Path('/etc/personal-ai-brain/builder/profile.json')
 
 def profile(path=PROFILE):
     value = json.loads(path.read_bytes())
-    if (set(value) - {'coding_enabled'} != {'schema_version', 'repository', 'base_ref', 'seed', 'min_free_bytes'}
+    if (set(value) - {'coding_enabled', 'generic_enabled'} != {'schema_version', 'repository', 'base_ref', 'seed', 'min_free_bytes'}
             or type(value.get('coding_enabled', False)) is not bool
+            or type(value.get('generic_enabled', False)) is not bool
             or value['schema_version'] != '0.1' or value['repository'] != REPOSITORY
             or not re.fullmatch('[0-9a-f]{40}', value['base_ref'])
             or value['seed'] != '/opt/personal-ai-brain/builder/repository.git'
@@ -74,6 +75,10 @@ class Runner:
         identifier = record['task_id']
         parent = self.store.workspaces / identifier
         parent.mkdir(mode=0o700)
+        if record['request']['task_type'] == 'workspace.python.v1':
+            scratch = parent / 'scratch'
+            scratch.mkdir(mode=0o700)
+            return scratch
         workspace = parent / 'repo'
         seed = ('/opt/personal-ai-brain/builder/coding-repository.git'
                 if record['request']['task_type'] == 'coding.patch-test.v1' else self.policy['seed'])
@@ -98,14 +103,20 @@ class Runner:
         artifacts = self.store.audit / identifier
         deadline = time.monotonic() + record['request']['deadline_seconds']
         try:
+            generic = record['request']['task_type'] == 'workspace.python.v1'
+            reserved = {'attempts': 1, 'base_sha': record['request']['base_ref']}
+            if not generic:
+                reserved['branch'] = 'builder/' + identifier
             record = self.store.transition(identifier, 'reserved', 'worker_reserved',
-                                           attempts=1, base_sha=record['request']['base_ref'],
-                                           branch='builder/' + identifier)
+                                           **reserved)
             if record['status'] in TERMINAL:
                 return True
             coding = record['request']['task_type'] == 'coding.patch-test.v1'
             if coding and not self.policy.get('coding_enabled', False):
                 self.store.transition(identifier, 'blocked', 'coding_not_enabled')
+                return True
+            if generic and not self.policy.get('generic_enabled', False):
+                self.store.transition(identifier, 'blocked', 'generic_not_enabled')
                 return True
             if shutil.disk_usage(self.store.root).free < self.policy['min_free_bytes']:
                 self.store.transition(identifier, 'blocked', 'insufficient_storage')
@@ -115,7 +126,13 @@ class Runner:
             record = self.store.transition(identifier, 'running', 'sandbox_starting', started_at=timestamp())
             if record['status'] in TERMINAL:
                 return True
-            if coding:
+            output_artifacts = ()
+            if generic:
+                from .work_generic import execute as generic_execute
+                status, code, output_artifacts = generic_execute(
+                    record['request'], workspace, artifacts,
+                    lambda: self.guard(identifier, deadline))
+            elif coding:
                 from .coding_execute import execute as coding_execute
                 status, code = coding_execute(record['request'], workspace, artifacts,
                                                lambda: self.guard(identifier, deadline))
@@ -125,7 +142,11 @@ class Runner:
                                          self.stopping, Path(__file__).with_name('work_fixture.py'))
             if self.stopping():
                 status, code = 'interrupted', 'service_stopping'
-            self.store.transition(identifier, status, code)
+            if generic and status == 'succeeded':
+                self.store.transition(identifier, status, code, output_artifacts=list(output_artifacts),
+                                      goal_semantics_verified=False)
+            else:
+                self.store.transition(identifier, status, code)
         except Abort as error:
             atomic_json(artifacts / 'test-result.json', {'status': 'not_completed', 'code': error.code})
             self.store.transition(identifier, error.status, error.code)
