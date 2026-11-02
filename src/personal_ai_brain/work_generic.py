@@ -39,7 +39,7 @@ def execute(request: dict, workspace: Path, artifacts: Path, guard):
     and after checking generic_enabled. No repo checkout is required.
     """
     inputs = tuple(
-        InputGrant(item["resource_id"], item["path"],
+        InputGrant("user-inline", item["path"],
                    base64.b64decode(item["content_b64"], validate=True))
         for item in request["inputs"]
     )
