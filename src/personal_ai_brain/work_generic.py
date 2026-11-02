@@ -124,8 +124,26 @@ def execute(request: dict, workspace: Path, artifacts: Path, guard):
         if [(a.path, a.size, a.sha256) for a in staged_outputs] != [
                 (a.path, a.size, a.sha256) for a in verified]:
             raise WorkspaceArtifactDenied("output_integrity_failed")
-        manifest = tuple({"path": a.path, "size": a.size, "sha256": a.sha256}
-                         for a in verified)
+        # Only small, safe UTF-8 text outputs are returned inline. Full file
+        # contents otherwise remain in the private worker artifact store.
+        # The control service still independently redacts outgoing fields.
+        preview_budget = 1024
+        items = []
+        content_by_path = {a.path: a.content for a in grants}
+        for artifact in verified:
+            entry = {"path": artifact.path, "size": artifact.size,
+                     "sha256": artifact.sha256}
+            if (artifact.path.lower().endswith((".txt", ".md", ".json", ".py"))
+                    and artifact.size <= 512 and preview_budget >= artifact.size):
+                try:
+                    preview = content_by_path[artifact.path].decode("utf-8")
+                    if all(ch in "\n\t" or ord(ch) >= 32 for ch in preview):
+                        entry["preview_text"] = preview
+                        preview_budget -= artifact.size
+                except UnicodeError:
+                    pass
+            items.append(entry)
+        manifest = tuple(items)
         atomic_json(artifacts / "generic-artifacts.json", {
             "schema_version": "0.1",
             "script_sha256": hashlib.sha256(request["script"].encode("utf-8")).hexdigest(),
