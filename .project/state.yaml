@@ -75,19 +75,18 @@ current_state: >
   Brain selects among registered capabilities, and backend policy is authority.
 
 exact_next_action: >
-  Advance approved goal-driven Agent Workspace #77 without per-question
-  capability proliferation: implement/test one opt-in generic task executor
-  inside the already trusted isolated Work Runner/sandbox boundary, with
-  reusable task-local granted inputs and independently validated artifacts
-  from merged source PR #78, preserving durable ledger/replay. Add one
-  authenticated task.submit/status/result path through the existing outbound
-  transport rather than a parallel queue. Then obtain one operator-approved
-  installation and host isolation acceptance for this whole task class,
-  followed by a real multi-domain natural-goal ChatGPT acceptance. Current
-  pab-codex/v0.2 file allowlists cannot modify privileged runner/transport
-  files; do not send unattainable host tasks to that lane. Existing Assistant
-  @plugin read-only status and Homelab audit (#67/#71) are accepted; preserve
-  them. No arbitrary host shell, SSH, Docker or production write is approved.
+  Issue #77 reusable task execution profile is now SOURCE_READY (PR #79
+  merged, required CI green) but DEFAULT DISABLED and NOT LIVE. The exact next
+  action is ONE trusted Codex Local local-homelab-admin operator bootstrap
+  per docs/general-agent-workspace-v01.md: read current installed worker and
+  container pins, preserve existing ledgers, run real pab-builder Bubblewrap
+  isolation/stress/recovery tests with no host-writable workspace, stage the
+  verified code, then obtain scoped owner authorization before enabling only
+  this generic profile and necessary control image. Finish with external
+  ChatGPT user-origin work.submit/status/replay/conflict and three disparate
+  natural-goal tasks with no per-goal new handlers. Never send an unauthorized
+  host-admin request through pab-codex/v0.2 or silently broaden the @plugin.
+  Existing Project OS and homelab.audit read-only capabilities stay live.
 
 blockers: []
 
@@ -98,6 +97,7 @@ dependencies:
     dependency: "Hosts Core and control containers, separate credentials and durable private audit."
 
 important_open_loops:
+  - "GENERAL AGENT WORKSPACE #77 updated 2026-11-02: PR #79 merged as dfe8ba05dc481d85d7855960aee2dc4e06314c50; existing Work Runner/transport now has source-only opt-in workspace.python.v1 code, rootless Bubblewrap generic mode with bounded anonymous tmpfs (no writable host bind), strict task-local inline inputs, stdout JSON artifacts with bounded previews and existing durable ledger. Generic profile defaults disabled and has NOT been host-accepted or deployed. GitHub tests workflow 41422252087 green. Exact next: one trusted local operator run of docs/general-agent-workspace-v01.md, preserving existing services/ledgers, stage/verify isolation and only then authorize enablement; followed by external ChatGPT acceptance. Source completion is not a live general-agent milestone."
   - "GENERAL AGENT WORKSPACE #77 (2026-11-02): approved reusable sandbox/resource-broker direction; PR #78 merged as 57a8ac9587846ae6819e83a1b30c6da1bdcd25c9 with green GitHub CI. Task-local trusted input grants and post-execution artifact inspection are source-ready and generic across formats; they do NOT execute model code, expose host resources, create a task route or modify live workers. Blocker remains an independently reviewed opt-in sandbox runner + authenticated task.submit/status/result backed by existing durable truth, then one-time operator installation/host isolation acceptance. No per-user-goal new handler should be required."
   - "COMPLETED: Credentialless Coding Agent Broker v0.1 foundation; Local Bridge durable core, request/task idempotency, dispatcher, approval_required, bounded lifecycle/recovery, WSL2 backend, managed ChatGPT auth, Linux workspace isolation and internal real coding acceptance. See docs/codex-bridge-checkpoint.md."
   - "COMPLETED: Remote Transport v0.1 is live-accepted. PR #23 implemented the outbound Windows Issues mailbox; PR #31 repaired restricted completion validation; external ChatGPT Issues #44-#48 proved execution, replay/conflict safety and Homelab coexistence."
@@ -135,6 +135,7 @@ portfolio:
 verification:
   last_verified: "2026-11-02"
   sources:
+    - "2026-11-02 source-only General Agent Workspace profile: PR #79 squash-merged as dfe8ba05dc481d85d7855960aee2dc4e06314c50 after GitHub CI workflow 41422252087 succeeded. Fixed opt-in workspace.python.v1 task type reuses Work Runner's durable ledger/work.submit, rootless Bubblewrap task-local tmpfs, no writable host binds, bounded stdout/artifact path/hash/preview validation. Actual host isolation and installer acceptance pending; no service/profile/container/credential changed."
     - "2026-11-02 reusable General Agent Workspace #77 source milestone: PR #78 merged as 57a8ac9587846ae6819e83a1b30c6da1bdcd25c9 after tests workflow 41419464259 success. Exactly two additive files workspace_artifacts.py and test_workspace_artifacts.py; no live execution/credential/permission change. Issue #77 records actual cross-project blocker and future opt-in runner gate."
     - "2026-11-01 Issue #71 accepted: exact PR #72 rendered units installed by owner; two scheduled collections 11:57:26Z/12:07:44Z, strict snapshot validation, original private ownership/modes and unchanged healthy control independently verified. Private foreground transport #91 completed and closed with one authoritative correlated homelab.audit result for source 12:07:44Z. Timer-only rollback retained; no reboot/failure injection or repeated #67 tests."
     - "2026-10-29 independently verified first homelab.audit live transport milestone: private Project OS Issues #82/83 status/health completed, #84 homelab.audit completed from a preactivation snapshot, #85 invalid input and #86 conflict rejected, #87 post-restart duplicate completed without a new handler execution, and new authenticated ChatGPT-originated #88 homelab.audit completed with author/request/result correlation. Codex Local reported candidate immutable pin, successful graceful control-only recovery and 91 preserved prior ledger records. Final host ledger/container attestation still pending under PAB Issue #67; no scheduled collector, broad Docker control or independent operator runtime." 
