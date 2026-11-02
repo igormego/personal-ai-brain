@@ -127,9 +127,15 @@ def summary(record):
         # crosses the existing control transport. Never claim semantic success.
         artifacts = record.get('output_artifacts')
         if (type(artifacts) is not list or not 1 <= len(artifacts) <= 32
-                or any(type(a) is not dict or set(a) != {'path', 'size', 'sha256'}
+                or any(type(a) is not dict or set(a) not in (
+                           {'path', 'size', 'sha256'},
+                           {'path', 'size', 'sha256', 'preview_text'})
                        or type(a['path']) is not str or type(a['size']) is not int
-                       or type(a['sha256']) is not str for a in artifacts)):
+                       or type(a['sha256']) is not str
+                       or ('preview_text' in a and
+                           (type(a['preview_text']) is not str
+                            or len(a['preview_text'].encode('utf-8')) > 512))
+                       for a in artifacts)):
             raise ValueError('invalid_generic_result')
         result.update(artifact_manifest=artifacts, goal_semantics_verified=False)
     return {'task_id': contract.task_id(record['task_id']), 'status': status,
