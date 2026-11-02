@@ -38,15 +38,17 @@ def command(workspace, fixture, *, generic=False):
             '--proc', '/proc', '--remount-ro', '/proc', '--dev', '/dev',
             '--size', '16777216', '--tmpfs', '/tmp', '--size', '4194304', '--tmpfs', '/home',
             '--dir', '/home/worker', '--setenv', 'HOME', '/home/worker',
-            '--setenv', 'PATH', '/usr/bin', '--setenv', 'LC_ALL', 'C',
-            '--bind', str(workspace), '/workspace',
-            ]
+            '--setenv', 'PATH', '/usr/bin', '--setenv', 'LC_ALL', 'C']
     if generic:
-        # The input tree is overmounted read-only inside the sandbox, while
-        # output files can only be created in its isolated task workspace.
-        args.extend(['--ro-bind', str(workspace / 'inputs'), '/workspace/inputs'])
+        # Never expose a writable host directory to untrusted task code:
+        # only a size-capped anonymous tmpfs and RO staged input mount.
+        args.extend(['--size', '16777216', '--tmpfs', '/workspace',
+                     '--dir', '/workspace/inputs',
+                     '--ro-bind', str(workspace / 'inputs'), '/workspace/inputs',
+                     '--dir', '/workspace/outputs'])
     else:
-        args.extend(['--ro-bind', str(workspace / '.git'), '/workspace/.git'])
+        args.extend(['--bind', str(workspace), '/workspace',
+                     '--ro-bind', str(workspace / '.git'), '/workspace/.git'])
     args.extend(['--ro-bind', str(fixture), '/fixture.py', '--chdir', '/workspace',
                  '/usr/bin/python3', '-I', '-B', '/fixture.py'])
     return args
