@@ -75,18 +75,21 @@ current_state: >
   Brain selects among registered capabilities, and backend policy is authority.
 
 exact_next_action: >
-  Issue #77 reusable task execution profile is now SOURCE_READY (PR #79
-  merged, required CI green) but DEFAULT DISABLED and NOT LIVE. The exact next
-  action is ONE trusted Codex Local local-homelab-admin operator bootstrap
-  per docs/general-agent-workspace-v01.md: read current installed worker and
-  container pins, preserve existing ledgers, run real pab-builder Bubblewrap
-  isolation/stress/recovery tests with no host-writable workspace, stage the
-  verified code, then obtain scoped owner authorization before enabling only
-  this generic profile and necessary control image. Finish with external
-  ChatGPT user-origin work.submit/status/replay/conflict and three disparate
-  natural-goal tasks with no per-goal new handlers. Never send an unauthorized
-  host-admin request through pab-codex/v0.2 or silently broaden the @plugin.
-  Existing Project OS and homelab.audit read-only capabilities stay live.
+  General Agent Workspace #77 is SOURCE_READY / LOCAL PREFLIGHT BLOCKED,
+  not live. Operator-reported 2026-11-02: existing SSH, builder/broker and
+  Core/control services work, but new workspace modules are not installed.
+  Noninteractive sudo prevented private-ledger inspection and real pab-builder
+  Bubblewrap identity tests; no service/config/ledger was modified. Exact next:
+  establish ONE trusted interactive operator SSH/TTY sudo session locally
+  (password stays in the trusted terminal, not ChatGPT/Codex/GitHub);
+  finish read-only host identity/isolation and ledger/pin checks in that SAME
+  session, prepare private backup/rollback and exact installation diff.
+  Record PASS/BLOCKED evidence in Issue #77 without publishing host secrets.
+  Separate explicit operator authorization remains required before any
+  control/builder deployment or generic_enabled activation. Then independently
+  accept real ChatGPT work.submit/status/replay/conflict and varied generic
+  tasks. No broad sudoers permission, host shell via Codex v0.2 or new
+  one-off domain capability.
 
 blockers: []
 
@@ -97,6 +100,7 @@ dependencies:
     dependency: "Hosts Core and control containers, separate credentials and durable private audit."
 
 important_open_loops:
+  - "2026-11-02 #77 PRIVATE OPERATOR PREFLIGHT BLOCKED: local Codex reported SSH works and current builder/broker plus Core/control healthy; new generic modules absent; no changes performed. Interactive sudo unavailable in noninteractive Codex SSH context, so private ledger and pab-builder Bubblewrap isolation tests not run, backup/rollback not yet verified, activation NOT APPROVED. Private report remains only on local Windows under .operator-bootstrap-private; do not claim remote inspection. Next gate is one trusted interactive SSH/TTY sudo session for READ-ONLY checks, then separately reviewed bounded activation; see #77 issuecomment-6574052813."
   - "GENERAL AGENT WORKSPACE #77 updated 2026-11-02: PR #79 merged as dfe8ba05dc481d85d7855960aee2dc4e06314c50; existing Work Runner/transport now has source-only opt-in workspace.python.v1 code, rootless Bubblewrap generic mode with bounded anonymous tmpfs (no writable host bind), strict task-local inline inputs, stdout JSON artifacts with bounded previews and existing durable ledger. Generic profile defaults disabled and has NOT been host-accepted or deployed. GitHub tests workflow 41422252087 green. Exact next: one trusted local operator run of docs/general-agent-workspace-v01.md, preserving existing services/ledgers, stage/verify isolation and only then authorize enablement; followed by external ChatGPT acceptance. Source completion is not a live general-agent milestone."
   - "GENERAL AGENT WORKSPACE #77 (2026-11-02): approved reusable sandbox/resource-broker direction; PR #78 merged as 57a8ac9587846ae6819e83a1b30c6da1bdcd25c9 with green GitHub CI. Task-local trusted input grants and post-execution artifact inspection are source-ready and generic across formats; they do NOT execute model code, expose host resources, create a task route or modify live workers. Blocker remains an independently reviewed opt-in sandbox runner + authenticated task.submit/status/result backed by existing durable truth, then one-time operator installation/host isolation acceptance. No per-user-goal new handler should be required."
   - "COMPLETED: Credentialless Coding Agent Broker v0.1 foundation; Local Bridge durable core, request/task idempotency, dispatcher, approval_required, bounded lifecycle/recovery, WSL2 backend, managed ChatGPT auth, Linux workspace isolation and internal real coding acceptance. See docs/codex-bridge-checkpoint.md."
@@ -135,6 +139,7 @@ portfolio:
 verification:
   last_verified: "2026-11-02"
   sources:
+    - "2026-11-02 Codex Local operator-reported read-only preflight for Issue #77 (user-relayed, private local report not accessible): SSH and services running, generic worker modules absent; noninteractive sudo blocks private ledger + pab-builder identity tests. No deployment/changes; approval not ready. Tracked in Issue #77 comment 6574052813."
     - "2026-11-02 source-only General Agent Workspace profile: PR #79 squash-merged as dfe8ba05dc481d85d7855960aee2dc4e06314c50 after GitHub CI workflow 41422252087 succeeded. Fixed opt-in workspace.python.v1 task type reuses Work Runner's durable ledger/work.submit, rootless Bubblewrap task-local tmpfs, no writable host binds, bounded stdout/artifact path/hash/preview validation. Actual host isolation and installer acceptance pending; no service/profile/container/credential changed."
     - "2026-11-02 reusable General Agent Workspace #77 source milestone: PR #78 merged as 57a8ac9587846ae6819e83a1b30c6da1bdcd25c9 after tests workflow 41419464259 success. Exactly two additive files workspace_artifacts.py and test_workspace_artifacts.py; no live execution/credential/permission change. Issue #77 records actual cross-project blocker and future opt-in runner gate."
     - "2026-11-01 Issue #71 accepted: exact PR #72 rendered units installed by owner; two scheduled collections 11:57:26Z/12:07:44Z, strict snapshot validation, original private ownership/modes and unchanged healthy control independently verified. Private foreground transport #91 completed and closed with one authoritative correlated homelab.audit result for source 12:07:44Z. Timer-only rollback retained; no reboot/failure injection or repeated #67 tests."
