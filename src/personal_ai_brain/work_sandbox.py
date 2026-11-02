@@ -25,9 +25,9 @@ def limits():
     resource.setrlimit(resource.RLIMIT_FSIZE, (1048576, 1048576))
     resource.setrlimit(resource.RLIMIT_NOFILE, (64, 64))
 
-def command(workspace, fixture):
+def command(workspace, fixture, *, generic=False):
     version = f'python{sys.version_info.major}.{sys.version_info.minor}'
-    return ['/usr/bin/bwrap', '--unshare-all', '--unshare-user', '--die-with-parent', '--new-session',
+    args = ['/usr/bin/bwrap', '--unshare-all', '--unshare-user', '--die-with-parent', '--new-session',
             '--disable-userns', '--assert-userns-disabled', '--uid', '65534', '--gid', '65534',
             '--cap-drop', 'ALL', '--clearenv',
             '--ro-bind', '/usr/bin/python3', '/usr/bin/python3',
@@ -40,9 +40,16 @@ def command(workspace, fixture):
             '--dir', '/home/worker', '--setenv', 'HOME', '/home/worker',
             '--setenv', 'PATH', '/usr/bin', '--setenv', 'LC_ALL', 'C',
             '--bind', str(workspace), '/workspace',
-            '--ro-bind', str(workspace / '.git'), '/workspace/.git',
-            '--ro-bind', str(fixture), '/fixture.py', '--chdir', '/workspace',
-            '/usr/bin/python3', '-I', '-B', '/fixture.py']
+            ]
+    if generic:
+        # The input tree is overmounted read-only inside the sandbox, while
+        # output files can only be created in its isolated task workspace.
+        args.extend(['--ro-bind', str(workspace / 'inputs'), '/workspace/inputs'])
+    else:
+        args.extend(['--ro-bind', str(workspace / '.git'), '/workspace/.git'])
+    args.extend(['--ro-bind', str(fixture), '/fixture.py', '--chdir', '/workspace',
+                 '/usr/bin/python3', '-I', '-B', '/fixture.py'])
+    return args
 
 def kill_tree(process):
     # Killing the namespace parent destroys even children that called setsid().
