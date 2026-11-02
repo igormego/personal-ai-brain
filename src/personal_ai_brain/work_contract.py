@@ -92,12 +92,11 @@ def parse(raw):
             inputs = value['inputs']
             if type(inputs) is not list or len(inputs) > 8:
                 raise Rejected('invalid_generic_inputs')
-            from .workspace_artifacts import InputGrant, _safe_path, _safe_resource
+            from .workspace_artifacts import _safe_path
             seen = set()
             total = 0
             for item in inputs:
-                if (type(item) is not dict or set(item) != {'resource_id', 'path', 'content_b64'}
-                        or not _safe_resource(item['resource_id'])
+                if (type(item) is not dict or set(item) != {'path', 'content_b64'}
                         or type(item['content_b64']) is not str):
                     raise Rejected('invalid_generic_inputs')
                 _safe_path(item['path'])
