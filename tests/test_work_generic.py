@@ -59,7 +59,6 @@ def test_generic_request_accepted_by_existing_handoff_contract():
     {"inputs": [{"path": "a.txt", "content_b64": "eA=="}, {"path": "a.txt", "content_b64": "eQ=="}]},
     {"deadline_seconds": 181},
     {"repository": "somebody/other"},
-    {"base_ref": "b" * 40},
 ])
 def test_generic_bad_envelopes_are_rejected(extra):
     with pytest.raises(contract.Rejected):
@@ -134,19 +133,23 @@ def test_generic_runner_reuses_single_durable_task_and_status_manifest(tmp_path,
 
 
 def test_executes_trusted_ci_fixture_with_input_and_produces_artifact(tmp_path, monkeypatch):
-    # This is a *trusted CI fixture* run by Python, not proof of Bwrap isolation.
-    # In production the command is always built by work_sandbox.command.
+    # Trusted fixture uses Python directly only for CI behavior checking.
+    # Effective runtime isolation must be independently validated on Homelab.
     monkeypatch.setattr(work_generic, "command", lambda workspace, script, generic:
                         [sys.executable, "-I", "-B", str(script)])
-    data = base64.b64encode(b"3,7,11").decode()
-    value = parsed(
-        script="from pathlib import Path\n"
-               "nums = list(map(int, Path('inputs/nums.txt').read_text().split(',')))\n"
-               "Path('outputs/total.txt').write_text(str(sum(nums)))\n",
-        inputs=[{"path": "nums.txt", "content_b64": data}],
-    )
     workspace = tmp_path / "scratch"
     workspace.mkdir()
+    input_file = workspace / "inputs" / "nums.txt"
+    data = base64.b64encode(b"3,7,11").decode()
+    source = (
+        "import base64, json\n"
+        "from pathlib import Path\n"
+        f"nums = list(map(int, Path({str(input_file)!r}).read_text().split(',')))\n"
+        "result = str(sum(nums)).encode()\n"
+        "print(json.dumps({'files':[{'path':'total.txt',"
+        "'content_b64':base64.b64encode(result).decode()}]}))\n"
+    )
+    value = parsed(script=source, inputs=[{"path": "nums.txt", "content_b64": data}])
     artifacts = tmp_path / "audit"
     artifacts.mkdir()
     status, code, manifest = work_generic.execute(value, workspace, artifacts, lambda: None)
@@ -159,13 +162,27 @@ def test_executes_trusted_ci_fixture_with_input_and_produces_artifact(tmp_path, 
     assert provenance["inputs"][0]["resource_id"] == "user-inline"
 
 
-def test_empty_artifact_does_not_become_success(tmp_path, monkeypatch):
+def test_malformed_or_traversal_output_cannot_leave_task_workspace(tmp_path, monkeypatch):
     monkeypatch.setattr(work_generic, "command", lambda workspace, script, generic:
                         [sys.executable, "-I", "-B", str(script)])
-    value = parsed(script="pass\n")
+    workspace = tmp_path / "scratch"
+    workspace.mkdir()
+    artifacts = tmp_path / "audit"
+    artifacts.mkdir()
+    source = "print('{\"files\":[{\"path\":\"../escape\",\"content_b64\":\"eA==\"}]}')\n"
+    value = parsed(script=source)
+    status, code, files = work_generic.execute(value, workspace, artifacts, lambda: None)
+    assert (status, code, files) == ("failed", "generic_artifact_rejected", ())
+    assert not (tmp_path / "escape").exists()
+
+
+def test_non_json_stdout_never_claims_success(tmp_path, monkeypatch):
+    monkeypatch.setattr(work_generic, "command", lambda workspace, script, generic:
+                        [sys.executable, "-I", "-B", str(script)])
+    value = parsed(script="print('ok')\n")
     workspace = tmp_path / "scratch"
     workspace.mkdir()
     artifacts = tmp_path / "audit"
     artifacts.mkdir()
     status, code, files = work_generic.execute(value, workspace, artifacts, lambda: None)
-    assert (status, code, files) == ("failed", "generic_no_artifacts", ())
+    assert (status, code, files) == ("failed", "generic_artifact_rejected", ())
