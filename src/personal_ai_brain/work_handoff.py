@@ -121,13 +121,23 @@ def summary(record):
         if date is not None and (not isinstance(date, str) or not re.fullmatch(
                 r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})', date)):
             raise ValueError('invalid_state_timestamp')
+    result = {'status': status, 'artifacts_retained': True} if status in TERMINAL else None
+    if status == 'succeeded' and record['request']['task_type'] == contract.GENERIC_TYPE:
+        # Metadata only: no script/input/output body or private filesystem path
+        # crosses the existing control transport. Never claim semantic success.
+        artifacts = record.get('output_artifacts')
+        if (type(artifacts) is not list or not 1 <= len(artifacts) <= 32
+                or any(type(a) is not dict or set(a) != {'path', 'size', 'sha256'}
+                       or type(a['path']) is not str or type(a['size']) is not int
+                       or type(a['sha256']) is not str for a in artifacts)):
+            raise ValueError('invalid_generic_result')
+        result.update(artifact_manifest=artifacts, goal_semantics_verified=False)
     return {'task_id': contract.task_id(record['task_id']), 'status': status,
             'payload_hash': record['payload_hash'], 'attempts': record['attempts'],
             'cancel_requested': record['cancel_requested'],
             'submitted_at': record['history'][0]['at'],
             'started_at': record.get('started_at'), 'finished_at': record.get('finished_at'),
-            'terminal': status in TERMINAL,
-            'result': {'status': status, 'artifacts_retained': True} if status in TERMINAL else None}
+            'terminal': status in TERMINAL, 'result': result}
 
 class Server:
     def __init__(self, store, base, surface=SURFACE):
