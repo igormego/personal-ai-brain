@@ -238,3 +238,60 @@ Run offline script tests with:
 
 Tests create only synthetic fixtures, mock external commands, and retain fixtures
 at the specified path for review. They never run a live SSH or GitHub probe.
+
+
+## Laptop-off / travel development lane (2026-11-03)
+
+**Purpose:** work on repository tasks from ChatGPT web/mobile or Codex Cloud
+without the Windows notebook, Windows Remote Codex v0.2 worker, or local SSH.
+This is a routing convention over existing tools, not another agent, task queue
+or grant of runtime permissions. The November 6–11 travel scenario is the
+initial consumer; the procedure is reusable.
+
+| Need | Existing route while Windows is OFF | Evidence / limitation |
+| --- | --- | --- |
+| Discuss, inspect, plan or make a small bounded repository change | Ordinary ChatGPT + its already connected write-enabled GitHub tool surface; read current repository `AGENTS.md`, edit only an approved branch, open PR, check GitHub CI | This path is **independent of the Windows bridge**; GitHub CI, not the chat, executes repository tests. Never assert tests were run locally. |
+| Substantial repository coding, runnable tests, iterative implementation | **Codex Cloud** with the existing published `pab-homelab-dev` / `cloud-github-dev` environment, if still available to the account; select the appropriate repository and keep the same task for follow-ups | Prior cloud environment check was **VERIFIED_WITH_WARNING on 2026-10-12**, not a new November acceptance. Only the Codex Cloud surface can launch its tasks; this ordinary ChatGPT plugin cannot claim to launch a cloud task. |
+| Project OS status or authorized read-only Homelab inspection | Existing authenticated ChatGPT plugin + private GitHub control ledger on the always-on Homelab, subject to real backend uptime and freshness | Do not confuse the read-only Homelab control with unrestricted administration. |
+| Live SSH, host changes, deployment, secrets, local-only files | **Not enabled by this travel lane.** Defer or use a separately approved existing authenticated operator path | Neither GitHub merge nor cloud CI implies live Homelab acceptance; no copied admin SSH keys, broad sudo or exposed Docker socket. |
+
+**Before relying on Codex Cloud from mobile:** on web/desktop ensure the
+existing environment is still **published**, visible to the intended account,
+and includes the currently accessible repositories. On the phone, select
+**Codex → published environment**; start one bounded repository task and
+confirm that it can inspect files and run its expected tests without the
+notebook. If that acceptance fails, use the working ChatGPT→GitHub branch/PR
+route for smaller tasks; do not create a second unreviewed agent/runtime.
+
+**ChatGPT-native GitHub task flow:** identify the correct repository and
+read its live `AGENTS.md`; check source and current state; create a narrow
+branch; implement a scoped change with GitHub file operations; open a reviewable
+PR; read the actual diff and required CI checks; only merge when project
+instructions, tests and task authorization permit it. The user should receive
+the **real PR/task URL and completed vs blocked truth**, not hand-copy
+prompts, commits, log excerpts or task IDs. For a task too large to edit and
+validate reliably through the GitHub tool surface, choose Codex Cloud rather
+than generating dozens of API mutations or pretending a remote Codex session
+was launched.
+
+**Codex Cloud task flow:** use a currently published environment on the
+web/mobile, continue the same task for the same feature, review its diff and
+test results, and commit/publish important work to GitHub. A new task is a
+new isolated workspace; saved Cloud VM state is normally recoverable for up
+to seven days after a task resume and is not durable project state. GitHub
+commits/PRs remain authoritative; update the specialist Project State on a
+verified meaningful milestone. Laptop-off work must not depend on locally
+retained, unpublished Windows WSL patches (including accepted coding Issue
+#106) until an authorized publisher makes those changes durable in GitHub.
+
+**Explicit selection rule:** when Igor says the notebook is off, unavailable,
+or he is travelling, **do not issue `pab-codex/v0.2` requests expecting a
+Windows worker to run**. Prefer GitHub-native work here, or a real Codex Cloud
+task initiated on its own surface. Existing queued tasks keep their original
+durable identity and are never silently re-submitted to a different executor.
+
+Source: [Codex Cloud help](https://help.openai.com/en/articles/20001545-using-codex-cloud)
+and [cloud environment guide](https://learn.chatgpt.com/docs/environments/cloud-environments),
+checked 2026-11-03. UI options and plan entitlements may change; do not
+infer the current user's actual Cloud environment availability from the
+historical October test alone.
