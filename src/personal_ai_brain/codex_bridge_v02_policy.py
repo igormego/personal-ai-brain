@@ -12,6 +12,9 @@ import uuid
 
 PROTOCOL = "pab-codex/v0.2"
 EXECUTION_PROFILE = "sandboxed-repo-dev"
+# Exact opt-in sentinel: the trusted local worker resolves its already-approved
+# clean canonical source HEAD before the durable task reservation.
+PINNED_BASE = "operator-pinned"
 MAX_TEXT = 8000
 MAX_BODY = 20000
 MAX_CHANGED_FILES = 64
@@ -98,7 +101,9 @@ def validate_request(value: object) -> dict:
             any(ord(c) == 0 for c in value_text)
         ):
             raise ValueError("invalid_text")
-    if type(value["base_sha"]) is not str or not re.fullmatch("[0-9a-f]{40}", value["base_sha"]):
+    if (type(value["base_sha"]) is not str or
+            (value["base_sha"] != PINNED_BASE and
+             not re.fullmatch("[0-9a-f]{40}", value["base_sha"]))):
         raise ValueError("invalid_base")
     return dict(value)
 
