@@ -75,7 +75,7 @@ def project_for(project_id: object) -> TrustedProject:
     return TRUSTED_PROJECTS[project_id]
 
 
-def validate_request(value: object) -> dict:
+def validate_request(value: object, *, allow_pinned: bool = False) -> dict:
     """Validate caller fields; no payload-specified repo, checkout or command."""
     if type(value) is not dict or set(value) != {
         "request_id", "task_id", "project_id", "execution_profile",
@@ -102,6 +102,7 @@ def validate_request(value: object) -> dict:
         ):
             raise ValueError("invalid_text")
     if (type(value["base_sha"]) is not str or
+            (value["base_sha"] == PINNED_BASE and not allow_pinned) or
             (value["base_sha"] != PINNED_BASE and
              not re.fullmatch("[0-9a-f]{40}", value["base_sha"]))):
         raise ValueError("invalid_base")
