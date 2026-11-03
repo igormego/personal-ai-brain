@@ -156,7 +156,7 @@ def envelope_v02(result: dict, payload: dict) -> dict:
 
 def execute(ledger: Ledger, payload: dict) -> dict:
     # Policy and canonical directory are independently fixed by trusted code.
-    selected = validate_request(payload)
+    selected = validate_request(payload, allow_pinned=True)
     backend = TrustedV02Backend(selected["project_id"])
     if selected["base_sha"] == PINNED_BASE:
         try:
