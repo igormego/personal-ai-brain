@@ -75,21 +75,24 @@ current_state: >
   Brain selects among registered capabilities, and backend policy is authority.
 
 exact_next_action: >
-  General Agent Workspace #77 is SOURCE_READY / LOCAL PREFLIGHT BLOCKED,
-  not live. Operator-reported 2026-11-02: existing SSH, builder/broker and
-  Core/control services work, but new workspace modules are not installed.
-  Noninteractive sudo prevented private-ledger inspection and real pab-builder
-  Bubblewrap identity tests; no service/config/ledger was modified. Exact next:
-  establish ONE trusted interactive operator SSH/TTY sudo session locally
-  (password stays in the trusted terminal, not ChatGPT/Codex/GitHub);
-  finish read-only host identity/isolation and ledger/pin checks in that SAME
-  session, prepare private backup/rollback and exact installation diff.
-  Record PASS/BLOCKED evidence in Issue #77 without publishing host secrets.
-  Separate explicit operator authorization remains required before any
-  control/builder deployment or generic_enabled activation. Then independently
-  accept real ChatGPT work.submit/status/replay/conflict and varied generic
-  tasks. No broad sudoers permission, host shell via Codex v0.2 or new
-  one-off domain capability.
+  General Agent Workspace #77 remains SOURCE_READY / ACTIVATION BLOCKED.
+  On 2026-11-03, Codex Local reported partial live operator preflight PASS:
+  real pab-builder UID 999 Bubblewrap probes denied host home/ledger/Docker
+  socket, observed loopback-only network and a 16 MiB workspace; installed
+  existing binaries/image matched prior fingerprint. No host changes.
+  Exact next action for Codex Local in same #77: (1) correct or explain one
+  unknown task status in private preflight classifier without modifying the
+  authoritative ledger; confirm no in-flight tasks, (2) stage and fully test
+  the exact reviewed generic worker candidate under effective pab-builder
+  identity, including script and read-only input accessibility (0600/0700
+  source-vs-65534 sandbox UID hypothesis), denial paths, replay/conflict and
+  restart recovery, and (3) verify private backup plus isolated restoration
+  drill with hashes, permissions and pinned control image. Return sanitized
+  PASS/BLOCKED evidence and exact scoped activation/rollback proposal. Only
+  after all gates PASS and owner authorization may builder/control modules and
+  generic_enabled be activated; do not grant Codex privileged host shell,
+  modify sudoers, touch existing ledgers or bypass the private operator gate.
+  The ordinary ChatGPT-originated varied-task acceptance remains pending.
 
 blockers: []
 
@@ -100,6 +103,7 @@ dependencies:
     dependency: "Hosts Core and control containers, separate credentials and durable private audit."
 
 important_open_loops:
+  - "2026-11-03 #77 PARTIAL PASS operator preflight (user-relayed Codex Local): existing rootless Bubblewrap isolation under UID 999 passed selected checks with 16MiB tmpfs; prior installed binary/control image pins match. Candidate generic module still not installed/tested; one unknown task-state classifier unresolved; backup/restore unverified. STOP production enablement. See Issue #77 comment 6599184030 for Codex-owned fix and real candidate/recovery acceptance gates."
   - "2026-11-02 #77 PRIVATE OPERATOR PREFLIGHT BLOCKED: local Codex reported SSH works and current builder/broker plus Core/control healthy; new generic modules absent; no changes performed. Interactive sudo unavailable in noninteractive Codex SSH context, so private ledger and pab-builder Bubblewrap isolation tests not run, backup/rollback not yet verified, activation NOT APPROVED. Private report remains only on local Windows under .operator-bootstrap-private; do not claim remote inspection. Next gate is one trusted interactive SSH/TTY sudo session for READ-ONLY checks, then separately reviewed bounded activation; see #77 issuecomment-6574052813."
   - "GENERAL AGENT WORKSPACE #77 updated 2026-11-02: PR #79 merged as dfe8ba05dc481d85d7855960aee2dc4e06314c50; existing Work Runner/transport now has source-only opt-in workspace.python.v1 code, rootless Bubblewrap generic mode with bounded anonymous tmpfs (no writable host bind), strict task-local inline inputs, stdout JSON artifacts with bounded previews and existing durable ledger. Generic profile defaults disabled and has NOT been host-accepted or deployed. GitHub tests workflow 41422252087 green. Exact next: one trusted local operator run of docs/general-agent-workspace-v01.md, preserving existing services/ledgers, stage/verify isolation and only then authorize enablement; followed by external ChatGPT acceptance. Source completion is not a live general-agent milestone."
   - "GENERAL AGENT WORKSPACE #77 (2026-11-02): approved reusable sandbox/resource-broker direction; PR #78 merged as 57a8ac9587846ae6819e83a1b30c6da1bdcd25c9 with green GitHub CI. Task-local trusted input grants and post-execution artifact inspection are source-ready and generic across formats; they do NOT execute model code, expose host resources, create a task route or modify live workers. Blocker remains an independently reviewed opt-in sandbox runner + authenticated task.submit/status/result backed by existing durable truth, then one-time operator installation/host isolation acceptance. No per-user-goal new handler should be required."
@@ -137,8 +141,9 @@ portfolio:
     deployment, production control or elevated worker permissions.
 
 verification:
-  last_verified: "2026-11-02"
+  last_verified: "2026-11-03"
   sources:
+    - "2026-11-03 Codex Local reported #77 partial pass, no changes: actual pab-builder Bubblewrap UID 999 isolation checks passed, unknown ledger-state classifier unresolved, candidate untested, backup/restore not accepted; source-reviewed 0600/0700 input/script accessibility under sandbox UID 65534 requires host positive test. Evidence user-relayed, private report not read. Issue #77 comment 6599184030."
     - "2026-11-02 Codex Local operator-reported read-only preflight for Issue #77 (user-relayed, private local report not accessible): SSH and services running, generic worker modules absent; noninteractive sudo blocks private ledger + pab-builder identity tests. No deployment/changes; approval not ready. Tracked in Issue #77 comment 6574052813."
     - "2026-11-02 source-only General Agent Workspace profile: PR #79 squash-merged as dfe8ba05dc481d85d7855960aee2dc4e06314c50 after GitHub CI workflow 41422252087 succeeded. Fixed opt-in workspace.python.v1 task type reuses Work Runner's durable ledger/work.submit, rootless Bubblewrap task-local tmpfs, no writable host binds, bounded stdout/artifact path/hash/preview validation. Actual host isolation and installer acceptance pending; no service/profile/container/credential changed."
     - "2026-11-02 reusable General Agent Workspace #77 source milestone: PR #78 merged as 57a8ac9587846ae6819e83a1b30c6da1bdcd25c9 after tests workflow 41419464259 success. Exactly two additive files workspace_artifacts.py and test_workspace_artifacts.py; no live execution/credential/permission change. Issue #77 records actual cross-project blocker and future opt-in runner gate."
