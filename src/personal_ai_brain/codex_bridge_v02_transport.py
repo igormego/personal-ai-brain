@@ -43,4 +43,4 @@ def parse_request(body: object) -> dict:
     return validate_request({
         key: value for key, value in envelope.items()
         if key not in {"transport_version", "operation"}
-    })
+    }, allow_pinned=True)
