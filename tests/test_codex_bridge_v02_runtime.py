@@ -307,3 +307,10 @@ def test_operator_pinned_base_preserves_task_conflict_after_resolution(monkeypat
     with pytest.raises(ValueError, match="task_conflict"):
         rt.execute(ledger, incoming)
     assert len(ledger.load()["tasks"]) == 1
+
+def test_operator_pinned_cannot_reach_ledger_without_trusted_resolution(tmp_path):
+    from personal_ai_brain.codex_bridge_v02_policy import PINNED_BASE
+    ledger = Ledger(tmp_path, validator=rt.validate_request, repository_for=rt.repository_for)
+    with pytest.raises(ValueError, match="invalid_base"):
+        ledger.submit(payload() | {"base_sha": PINNED_BASE})
+    assert ledger.load()["tasks"] == {}
