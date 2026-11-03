@@ -6,7 +6,7 @@ project:
   owner: "Project OS & Agent Architecture chat"
 
 status: "active"
-phase: "chatgpt-no-postman-delegation-source-ready-windows-acceptance-pending"
+phase: "chatgpt-no-postman-windows-ready-external-acceptance-pending"
 
 current_gate: >
   Remote Codex v0.2 and the separate trusted draft-PR publisher are accepted.
@@ -34,9 +34,10 @@ current_gate: >
   2026-11-03 no-postman delegation source milestone: PR #80 was squash-merged
   after green CI for a strict operator-pinned base selector on the existing
   Windows Remote Codex v0.2 transport; ChatGPT plugin v0.3.1 was installed and
-  verified with a conditional delegate-task skill. Neither change proves the
-  Windows v0.2 worker was updated or that plugin-origin delegated execution
-  passed yet. Gateway #25 and orchestration #64 retain ownership of the
+  verified with a conditional delegate-task skill. Codex Local installed PR #80,
+  verified protected ledgers and canonical pins, and restarted only v0.2 on
+  2026-11-03: READY_FOR_EXTERNAL_CHATGPT_ACCEPTANCE. Plugin-origin execution
+  remains pending. Gateway #25 and orchestration #64 retain ownership of the
   cross-turn resume and WhatsApp routing gates.
 
 current_state: >
@@ -97,25 +98,22 @@ current_state: >
   rejected by the durable ledger validator. Required GitHub CI run
   41626250530 passed. ChatGPT private plugin v0.3.1 release
   pluginrel_6ae9c36bd544819192ae948cf3cd475c was installed and read back;
-  its new delegation skill remains activation-gated on actual Windows v0.2
-  rollout. No Codex session, host privilege, runtime or WhatsApp change
-  was performed by the source/plugin acceptance.
+  Codex Local completed the Windows v0.2 rollout at source pin
+  b0cdfb834e9372aafc524334d962ee6a08c42944 with PR #80 executable source.
+  Two prior succeeded tasks and both v0.1/v0.2 ledger files remained unchanged;
+  owner identity, ACL/mailbox/Contents-denied checks and new fail-closed
+  preflight passed. No model session, credential or permission expansion.
+  Sanitized operator evidence: Issue #64 comment 6602708707.
 
 exact_next_action: >
-  The next priority is one practical ChatGPT->Remote Codex no-postman
-  acceptance, not another runner or Resource Broker. In the existing trusted
-  Codex Local operator context, verify the exact merged PR #80 source, current
-  clean Windows v0.2 installation and durable ledger, stage rollback and update
-  only the existing v0.2 service/source within its prior permission boundary.
-  Then from ordinary ChatGPT invoke plugin v0.3.1 to submit one real allowlisted
-  task using operator-pinned source, verify worker-authored result and task
-  correlation, and resume from the same issue without Igor relaying prompts.
-  This Windows deployment/acceptance is NOT YET VERIFIED. After G1, use the
-  same task IDs for a small durable cross-turn status/delivery loop (G2),
-  then add one authenticated WhatsApp Gateway adapter (G3); no parallel
-  ledger, auto-merge/deploy, new paid provider or blanket sudo.
+  STOP at READY_FOR_EXTERNAL_CHATGPT_ACCEPTANCE. Independent ordinary ChatGPT
+  using plugin v0.3.1 submits one meaningful allowlisted Remote Codex v0.2 task
+  with base_sha=operator-pinned and fresh IDs. Verify authenticated correlated
+  result with actual 40-hex source SHA. Codex Local must not fabricate its own
+  external acceptance. G2 durable cross-turn resume and G3 WhatsApp follow
+  separately; no new ledger, paid provider or permission expansion.
 blockers:
-  - "PR #80 source and plugin v0.3.1 are accepted as installed artifacts, but Windows v0.2 runtime activation and one genuine plugin-origin delegated task are still unverified; this ChatGPT tool session has no local Windows operator access."
+  - "PR #80 Windows rollout verified; one independent plugin-origin delegated task remains pending. G1 extension is READY, not externally LIVE_ACCEPTED."
 
 dependencies:
   - project: "Personal Project Brain / Project OS"
@@ -124,7 +122,7 @@ dependencies:
     dependency: "Hosts Core and control containers, separate credentials and durable private audit."
 
 important_open_loops:
-  - "NEXT G1 no-postman ChatGPT coding: PR #80 merged (CI green), plugin v0.3.1 installed; Windows v0.2 operator upgrade and real plugin-origin E2E test are PENDING, not LIVE. G2 cross-turn durable orchestration and G3 WhatsApp Gateway follow; see #64 audit and PR #80."
+  - "NEXT G1 no-postman ChatGPT coding: PR #80 merged (CI green), plugin v0.3.1 installed; Windows v0.2 operator upgrade is VERIFIED (Issue #64 comment 6602708707); real plugin-origin E2E remains PENDING, extension not yet LIVE_ACCEPTED. G2 cross-turn durable orchestration and G3 WhatsApp Gateway follow; see #64 audit and PR #80."
   - "COMPLETED 2026-11-03: General Agent Workspace #77 offline Python is LIVE_ACCEPTED by normal ChatGPT external GitHub tests #98-#105 with three distinct successes and idempotent duplicate/conflict checks. Existing production code and ledger preserved per Codex Local. Future general coding, Resource Broker, Gateway and native plugin remain separate gates. Issue #77 comment 6600365441."
   - "COMPLETED: Credentialless Coding Agent Broker v0.1 foundation; Local Bridge durable core, request/task idempotency, dispatcher, approval_required, bounded lifecycle/recovery, WSL2 backend, managed ChatGPT auth, Linux workspace isolation and internal real coding acceptance. See docs/codex-bridge-checkpoint.md."
   - "COMPLETED: Remote Transport v0.1 is live-accepted. PR #23 implemented the outbound Windows Issues mailbox; PR #31 repaired restricted completion validation; external ChatGPT Issues #44-#48 proved execution, replay/conflict safety and Homelab coexistence."
