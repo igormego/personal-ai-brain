@@ -6,7 +6,7 @@ project:
   owner: "Project OS & Agent Architecture chat"
 
 status: "active"
-phase: "g2-foreground-task-resume-verified-g3-next"
+phase: "g1-accepted-g2-foreground-resume-g3-delegated"
 
 current_gate: >
   Remote Codex v0.2 and the separate trusted draft-PR publisher are accepted.
@@ -115,14 +115,17 @@ current_state: >
   Sanitized operator evidence: Issue #64 comment 6602708707.
 
 exact_next_action: >
-  G2 minimum foreground resume is verified: private plugin v0.3.2 installed,
-  and owner-authenticated newest-task discovery identified completed Core
-  Issue #106 without asking Igor for its ID, with verified source and result;
-  no new Codex execution. A separate fresh ChatGPT conversation has not
-  independently exercised the route, and proactive delivery is unsupported.
-  Next G3: build one supported authenticated WhatsApp inbound/outbound
-  Gateway surface using the same durable request/task IDs. External provider
-  enrollment, message costs and credentials must be verified before activation.
+  Agent Platform G1 ChatGPT -> scoped Remote Codex execution is LIVE_ACCEPTED
+  via private Core Issue #106. G2 bounded foreground latest-task resume is
+  verified with private plugin v0.3.2 and existing GitHub issue truth; a
+  separate fresh ChatGPT conversation and proactive delivery remain untested.
+  User explicitly assigned WhatsApp G3 to the separate Personal Assistant /
+  WhatsApp owner: its standalone implementation handoff is PAB Issue #81
+  linked from parent #25. Do NOT implement WhatsApp in this Agent Platform
+  workstream or repeat accepted G1 coding transport gates. Continue here
+  with the next user-directed agent platform automation/general repo-scope
+  milestone, reusing existing bridge, capability contracts and ledgers;
+  never imply unbounded Codex, publication, deployment or admin authority.
 blockers:
   - "G2 no durable cross-turn goal/delivery acceptance into arbitrary new ChatGPT sessions; the existing GitHub Issue/task handle allows foreground resume."
   - "G3 WhatsApp adapter, trusted sender, provider compliance/credentials, and outbound reply are not implemented or externally accepted."
@@ -134,6 +137,7 @@ dependencies:
     dependency: "Hosts Core and control containers, separate credentials and durable private audit."
 
 important_open_loops:
+  - "2026-11-03 owner routing: WhatsApp/G3 belongs to separate Personal Assistant Gateway owner in dedicated PAB Issue #81 (parent #25). This Agent Platform chat does not own its implementation. G1 and G2 bounded foreground milestones remain accepted with existing constraints; no new runtime permission is granted by the handoff."
   - "COMPLETED G1 2026-11-03: private plugin v0.3.1 ordinary ChatGPT sent one meaningful coding request via Core Issue #106, Windows pinned source resolved to b0cdfb834e9372aafc524334d962ee6a08c42944, owner-authored result succeeded with 249 restricted sandbox tests, attempts=1, two pure module/test files; issue CLOSED. Locally retained patch not published/merged. PAB #64 comment 6602839141. NEXT G2 durable cross-turn goal/result resume, THEN G3 authenticated WhatsApp adapter."
   - "COMPLETED 2026-11-03: General Agent Workspace #77 offline Python is LIVE_ACCEPTED by normal ChatGPT external GitHub tests #98-#105 with three distinct successes and idempotent duplicate/conflict checks. Existing production code and ledger preserved per Codex Local. Future general coding, Resource Broker, Gateway and native plugin remain separate gates. Issue #77 comment 6600365441."
   - "COMPLETED: Credentialless Coding Agent Broker v0.1 foundation; Local Bridge durable core, request/task idempotency, dispatcher, approval_required, bounded lifecycle/recovery, WSL2 backend, managed ChatGPT auth, Linux workspace isolation and internal real coding acceptance. See docs/codex-bridge-checkpoint.md."
