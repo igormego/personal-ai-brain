@@ -6,7 +6,7 @@ project:
   owner: "Project OS & Agent Architecture chat"
 
 status: "active"
-phase: "chatgpt-no-postman-g1-live-accepted-g2-durable-resume-next"
+phase: "g2-foreground-task-resume-verified-g3-next"
 
 current_gate: >
   Remote Codex v0.2 and the separate trusted draft-PR publisher are accepted.
@@ -115,17 +115,14 @@ current_state: >
   Sanitized operator evidence: Issue #64 comment 6602708707.
 
 exact_next_action: >
-  G1 is independently LIVE_ACCEPTED through private Issue #106 and PAB #64
-  comment 6602839141. Next G2: demonstrate the minimum durable
-  user-goal -> trusted task handle -> correlated terminal result ->
-  resumable ChatGPT response across chat turns using the existing private
-  transport/ledger. Reuse #106 as the first zero-Codex-session resume
-  fixture instead of rerunning accepted execution. Add only the missing
-  bounded goal/correlation/delivery state if real acceptance requires it.
-  G3 then adds one real authenticated WhatsApp inbound/outbound adapter
-  sharing the same backend truth; provider eligibility and credentials
-  need separate approval. No new framework, second ledger, blanket sudo,
-  auto-publication, merge or deployment.
+  G2 minimum foreground resume is verified: private plugin v0.3.2 installed,
+  and owner-authenticated newest-task discovery identified completed Core
+  Issue #106 without asking Igor for its ID, with verified source and result;
+  no new Codex execution. A separate fresh ChatGPT conversation has not
+  independently exercised the route, and proactive delivery is unsupported.
+  Next G3: build one supported authenticated WhatsApp inbound/outbound
+  Gateway surface using the same durable request/task IDs. External provider
+  enrollment, message costs and credentials must be verified before activation.
 blockers:
   - "G2 no durable cross-turn goal/delivery acceptance into arbitrary new ChatGPT sessions; the existing GitHub Issue/task handle allows foreground resume."
   - "G3 WhatsApp adapter, trusted sender, provider compliance/credentials, and outbound reply are not implemented or externally accepted."
