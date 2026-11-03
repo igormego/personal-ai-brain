@@ -75,21 +75,24 @@ current_state: >
   Brain selects among registered capabilities, and backend policy is authority.
 
 exact_next_action: >
-  General Agent Workspace #77 is source-ready, activation BLOCKED. Codex Local
-  operator follow-up (user-relayed 2026-11-03): selected actual pab-builder
-  Bubblewrap isolation/read access to private script and nested inputs PASS;
-  previous unknown ledger record is valid blocked, ledger unchanged and no
-  active tasks observed; 27 backup files restored with matching bytes/modes.
-  Do not repeat these verified checks solely from inertia. Exact next Codex
-  Local action in the SAME #77: fix regression packet to include test scripts
-  and actually execute it as pab-builder against the pinned generic candidate
-  under service-equivalent restrictions, with isolated replay/conflict/recovery
-  acceptance; prove rollback UID/GID ownership and private control config
-  restoration; independently test/pin the EXACT candidate control image and
-  produce minimal builder/control/profile diff and rollback plan. If any check
-  fails, STOP and report. No host activation or generic_enabled before full
-  release gate and separate scoped owner authorization. After activation,
-  independently check ChatGPT-origin work.submit/status and diverse tasks.
+  General Agent Workspace #77 is SOURCE_READY / READY_FOR_ACTIVATION_REVIEW,
+  not owner-approved or deployed. Codex Local user-relayed 2026-11-03 candidate
+  release evidence: 1170 PASS / 1 skipped regression; actual pab-builder
+  service-equivalent Bubblewrap PASS; replay/conflict/cancel/recovery PASS;
+  restore bytes, UID/GID, modes and private control config PASS; exact control
+  candidate image 65 PASS. The immutable SHA/image digest and private manifest
+  are held only in local C:/Projects/personal-ai-brain/.operator-bootstrap-private/
+  activation-proposal.md and activation-manifest.json, NOT read or independently
+  verified by this ChatGPT surface. Exact next: locally compare immutable
+  candidate/backup manifest against unchanged current installed baseline,
+  ledger quiescence, no pending/running tasks and tested rollback; STOP on drift
+  or incomplete evidence. Obtain explicit owner approval of the **bounded**
+  builder modules + exact control image pin + generic_enabled=true while
+  coding_enabled stays false + only builder/control restart. Do not make
+  other host/service/auth/ledger changes. Then perform staged operator-owned
+  activation with rollback on failed checks. Only after success do real
+  ChatGPT-origin work.submit/status and multi-domain one-off task acceptance.
+  Read-only @personal-ai-brain plugin permissions are not implicitly expanded.
 
 blockers: []
 
@@ -100,6 +103,7 @@ dependencies:
     dependency: "Hosts Core and control containers, separate credentials and durable private audit."
 
 important_open_loops:
+  - "2026-11-03 #77 RELEASE CANDIDATE (Codex Local user-relayed): READY FOR ACTIVATION REVIEW, NOT APPROVED / NOT DEPLOYED. Candidate tests: 1170 passed 1 skipped, service-equivalent pab-builder Bubblewrap PASS, replay/conflict/cancel/recovery PASS, rollback bytes/modes/UID/GID/control config PASS, pinned candidate control image 65 PASS. Exact hashes/image digest remain only in private local proposal/manifest, not independently read here. Recheck baseline drift and no active jobs immediately before separately approved builder/control-only activation (generic_enabled true, coding_enabled false); see #77 comment 6599760941."
   - "2026-11-03 #77 FOLLOW-UP (user-relayed Codex): tested pab-builder private script + nested input readability PASS, previous unknown ledger status identified as valid blocked, no observed active tasks; 27 backup files restored with matching bytes and modes. Remaining: runnable complete regression packet (test scripts previously omitted), ownership and control config rollback, exact new control image service-equivalent test. No activation; see #77 issuecomment-6599472333."
   - "2026-11-03 #77 PARTIAL PASS operator preflight (user-relayed Codex Local): existing rootless Bubblewrap isolation under UID 999 passed selected checks with 16MiB tmpfs; prior installed binary/control image pins match. Candidate generic module still not installed/tested; one unknown task-state classifier unresolved; backup/restore unverified. STOP production enablement. See Issue #77 comment 6599184030 for Codex-owned fix and real candidate/recovery acceptance gates."
   - "2026-11-02 #77 PRIVATE OPERATOR PREFLIGHT BLOCKED: local Codex reported SSH works and current builder/broker plus Core/control healthy; new generic modules absent; no changes performed. Interactive sudo unavailable in noninteractive Codex SSH context, so private ledger and pab-builder Bubblewrap isolation tests not run, backup/rollback not yet verified, activation NOT APPROVED. Private report remains only on local Windows under .operator-bootstrap-private; do not claim remote inspection. Next gate is one trusted interactive SSH/TTY sudo session for READ-ONLY checks, then separately reviewed bounded activation; see #77 issuecomment-6574052813."
@@ -141,6 +145,7 @@ portfolio:
 verification:
   last_verified: "2026-11-03"
   sources:
+    - "2026-11-03 operator-reported candidate READY FOR ACTIVATION REVIEW (#77 comment 6599760941): 1170 passed/1 skipped code tests, actual pab-builder sandbox PASS, replay/conflict/cancel/recovery PASS, full file ownership/modes/control-config rollback PASS and exact image 65 PASS; all results privately reported, not independently host-verified by this session; no production activation, final baseline/quiescence and owner authorization still required."
     - "2026-11-03 Codex operator follow-up relayed by user for #77: private script and nested inputs readable under actual pab-builder sandbox, previous unknown ledger record correctly classified blocked without writes, isolated 27-file bytes/modes restore match; regression harness incomplete, owner/mode rollback incomplete and new control image/service-equivalent tests pending. Private local report uninspected. Issue #77 comment 6599472333."
     - "2026-11-03 Codex Local reported #77 partial pass, no changes: actual pab-builder Bubblewrap UID 999 isolation checks passed, unknown ledger-state classifier unresolved, candidate untested, backup/restore not accepted; source-reviewed 0600/0700 input/script accessibility under sandbox UID 65534 requires host positive test. Evidence user-relayed, private report not read. Issue #77 comment 6599184030."
     - "2026-11-02 Codex Local operator-reported read-only preflight for Issue #77 (user-relayed, private local report not accessible): SSH and services running, generic worker modules absent; noninteractive sudo blocks private ledger + pab-builder identity tests. No deployment/changes; approval not ready. Tracked in Issue #77 comment 6574052813."
