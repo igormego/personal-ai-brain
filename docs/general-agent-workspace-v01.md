@@ -1,11 +1,26 @@
 # General Agent Workspace v0.1 — opt-in execution acceptance (#77)
 
-**Status: SOURCE ONLY, NOT ACTIVATED.** This change adds an operator-disabled
+**Status: LIVE_ACCEPTED (2026-11-03) for bounded offline `workspace.python.v1` through normal ChatGPT → private GitHub Issues → authenticated control → existing durable Work Runner → isolated sandbox → artifact status.** This change adds an operator-disabled
 `workspace.python.v1` profile to the *existing* durable Work Runner. It does
 not create a new daemon, ledger, queue, MCP server or host shell. This document
 describes the **one-time operator bootstrap** needed to make a whole class of
 novel scratch Python tasks available through the already-authenticated
 `work.submit/status/cancel` control transport.
+
+## Verified live acceptance (2026-11-03)
+
+Codex Local operator reported the reviewed builder/control deployment completed with
+`generic_enabled=true`, `coding_enabled=false`, original durable ledger preserved,
+and local fixture/three generic/replay-conflict tests passing. Normal ChatGPT
+independently submitted three new distinct private GitHub tasks:
+
+- [#98](https://github.com/igormego/personal-project-brain/issues/98) → [#99](https://github.com/igormego/personal-project-brain/issues/99): inline-number aggregation, correct `answer.json` preview and SHA-256, one execution.
+- [#102](https://github.com/igormego/personal-project-brain/issues/102) → [#104](https://github.com/igormego/personal-project-brain/issues/104): word-frequency count, correct `frequency.json` preview/hash, one execution.
+- [#103](https://github.com/igormego/personal-project-brain/issues/103) → [#105](https://github.com/igormego/personal-project-brain/issues/105): CSV-to-Markdown ranking, correct `ranked.md` preview/hash, one execution.
+
+An exact retry through [#100](https://github.com/igormego/personal-project-brain/issues/100) returned `created=false` with `attempts=1`; a changed payload with the same task ID through [#101](https://github.com/igormego/personal-project-brain/issues/101) was rejected as `task_id_payload_conflict`. These results verify the external transport, durable identity and bounded artifact return, **not** arbitrary host authority, autonomous coding, semantics verification by the worker or native plugin write access. See [Issue #77 acceptance](https://github.com/igormego/personal-ai-brain/issues/77#issuecomment-6600365441).
+
+The following installation procedure is retained as the historical operator acceptance/runbook. Do not repeat activation merely because the historical steps are written in imperative form; re-check current installed state before future upgrades.
 
 ## What it unlocks, and what it does not
 
