@@ -6,7 +6,7 @@ project:
   owner: "Project OS & Agent Architecture chat"
 
 status: "active"
-phase: "g1-accepted-g2-foreground-resume-g3-delegated"
+phase: "travel-mode-github-ready-cloud-current-access-unverified"
 
 current_gate: >
   Remote Codex v0.2 and the separate trusted draft-PR publisher are accepted.
@@ -37,7 +37,8 @@ current_gate: >
   verified with a conditional delegate-task skill. Codex Local installed PR #80,
   verified protected ledgers and canonical pins, and restarted only v0.2 on
   2026-11-03: READY_FOR_EXTERNAL_CHATGPT_ACCEPTANCE. Plugin-origin execution
-  remains pending. Gateway #25 and orchestration #64 retain ownership of the
+  was subsequently accepted via Core Issue #106. Gateway #25 and
+  orchestration #64 retain ownership of the
   cross-turn resume and WhatsApp routing gates.
 
   G1 ChatGPT -> GitHub -> pinned Windows Codex v0.2 is independently
@@ -47,7 +48,21 @@ current_gate: >
   offline sandbox tests, exactly two pure code/test files and issue CLOSED.
   Native private plugin v0.3.1 delegated the request without Igor acting
   as transport. Retained patch is local/uncommitted; no publication or
-  deployment. G2 cross-turn durable delivery and G3 WhatsApp remain OPEN.
+  deployment. G2 foreground history resume is accepted only within its
+  existing GitHub-backed scope; unsolicited chat push remains unavailable.
+  WhatsApp/G3 is owned by its separate Gateway workstream in Issue #81.
+
+  Laptop-off repository work is SOURCE-READY for 2026-11-06 to 2026-11-11:
+  reviewed PR #82 (squash merge 3c44425193c798f51d8a762eb8cc9e70f4cd8232)
+  updated the existing docs/codex-environments.md; GitHub Actions required
+  tests run 41640499446 succeeded with no dependency on Windows. The same
+  private plugin was updated in place to v0.3.3, read back, and now routes
+  notebook-off requests to connected GitHub branch/PR/CI instead of issuing
+  Windows-only Remote Codex requests. The already existing Codex Cloud
+  pab-homelab-dev environment was VERIFIED_WITH_WARNING on 2026-10-12,
+  but its November published/account availability and an actual new cloud
+  task have NOT been verified from this ChatGPT tool surface. This mode
+  enables repository-only work, not privileged host/deploy operations.
 
 current_state: >
   Remote Codex v0.2 is LIVE_ACCEPTED for personal-ai-brain and
@@ -115,17 +130,18 @@ current_state: >
   Sanitized operator evidence: Issue #64 comment 6602708707.
 
 exact_next_action: >
-  Agent Platform G1 ChatGPT -> scoped Remote Codex execution is LIVE_ACCEPTED
-  via private Core Issue #106. G2 bounded foreground latest-task resume is
-  verified with private plugin v0.3.2 and existing GitHub issue truth; a
-  separate fresh ChatGPT conversation and proactive delivery remain untested.
-  User explicitly assigned WhatsApp G3 to the separate Personal Assistant /
-  WhatsApp owner: its standalone implementation handoff is PAB Issue #81
-  linked from parent #25. Do NOT implement WhatsApp in this Agent Platform
-  workstream or repeat accepted G1 coding transport gates. Continue here
-  with the next user-directed agent platform automation/general repo-scope
-  milestone, reusing existing bridge, capability contracts and ledgers;
-  never imply unbounded Codex, publication, deployment or admin authority.
+  For Igor's 2026-11-06 through 2026-11-11 travel, do repository tasks
+  without the Windows notebook. Prefer normal ChatGPT connected GitHub
+  direct edits on a review branch, PR and required GitHub Actions CI for
+  bounded source changes (demonstrated PR #82). For larger interactive
+  code/test tasks, use the already recorded pab-homelab-dev Codex Cloud
+  environment ONLY after its current published visibility and repository
+  access are confirmed on web/mobile; this chat cannot create Codex Cloud
+  tasks with its current tools. Capture durable work in GitHub PR/commits.
+  Preserve strict ownership/approval and defer local Windows/SSH/production
+  actions. WhatsApp #81 remains owned by the separate Gateway workstream.
+  After the trip resume the agreed next agent platform priority without
+  building another executor or duplicate ledger.
 blockers:
   - "G2 no durable cross-turn goal/delivery acceptance into arbitrary new ChatGPT sessions; the existing GitHub Issue/task handle allows foreground resume."
   - "G3 WhatsApp adapter, trusted sender, provider compliance/credentials, and outbound reply are not implemented or externally accepted."
@@ -137,6 +153,7 @@ dependencies:
     dependency: "Hosts Core and control containers, separate credentials and durable private audit."
 
 important_open_loops:
+  - "2026-11-03 TRAVEL/LAPTOP-OFF: GitHub-only code/doc branch→PR→CI proven with PAB PR #82 and Actions run 41640499446 (success), plugin v0.3.3 installed/read back to route notebook-off tasks to existing GitHub tools; existing Codex Cloud pab-homelab-dev last verified with warnings 2026-10-12, current published/mobile task access unverified. No new executor/credentials, no live Homelab writes. Read docs/codex-environments.md for the reusable route."
   - "2026-11-03 owner routing: WhatsApp/G3 belongs to separate Personal Assistant Gateway owner in dedicated PAB Issue #81 (parent #25). This Agent Platform chat does not own its implementation. G1 and G2 bounded foreground milestones remain accepted with existing constraints; no new runtime permission is granted by the handoff."
   - "COMPLETED G1 2026-11-03: private plugin v0.3.1 ordinary ChatGPT sent one meaningful coding request via Core Issue #106, Windows pinned source resolved to b0cdfb834e9372aafc524334d962ee6a08c42944, owner-authored result succeeded with 249 restricted sandbox tests, attempts=1, two pure module/test files; issue CLOSED. Locally retained patch not published/merged. PAB #64 comment 6602839141. NEXT G2 durable cross-turn goal/result resume, THEN G3 authenticated WhatsApp adapter."
   - "COMPLETED 2026-11-03: General Agent Workspace #77 offline Python is LIVE_ACCEPTED by normal ChatGPT external GitHub tests #98-#105 with three distinct successes and idempotent duplicate/conflict checks. Existing production code and ledger preserved per Codex Local. Future general coding, Resource Broker, Gateway and native plugin remain separate gates. Issue #77 comment 6600365441."
@@ -176,6 +193,7 @@ portfolio:
 verification:
   last_verified: "2026-11-03"
   sources:
+    - "2026-11-03 laptop-off path: PAB PR #82 squash-merged to main commit 3c44425193c798f51d8a762eb8cc9e70f4cd8232, GitHub Actions tests run 41640499446 SUCCESS; docs/codex-environments.md readback contains laptop-off routing. Private personal-ai-brain plugin v0.3.3 release pluginrel_6ae9db884d2c8191ac88f52d49ffeff8 installed/read back with original skills preserved and notebook-off GitHub branch/PR/CI instructions. No Codex Cloud task launched or current published environment visibility tested; previously cloud-github-dev VERIFIED_WITH_WARNING 2026-10-12."
     - "2026-11-03 G1 independent external plugin v0.3.1 acceptance: authenticated private Core Issue #106 CLOSED 11:39:05 UTC, exactly one owner-authored v0.2 result comment 6602808100 matching request 008008c2-bd29-4401-86cc-98bd6bfb0dc3/task 62438fd7-3fe4-44f2-b0d6-5cd1a3f53d5b. Submitted operator-pinned, worker source b0cdfb834e9372aafc524334d962ee6a08c42944, succeeded attempts=1 approval_required=false, two allowed files, 53+/1-, 249 restricted tests PASS. No Igor postman, no source publication/merge/deploy or direct WSL patch inspection. PAB #64 comment 6602839141."
     - "2026-11-03 no-postman source milestone: PR #80 squash-merged as 82e3093cf3c1144c8a2e485f22de2fa6099945bb, GitHub Actions tests run 41626250530 success, branch source code read back. Existing private personal-ai-brain plugin updated to v0.3.1 and read back, with conditional `operator-pinned` source mode; Windows host not accessed, no Codex task acceptance, provider or WhatsApp runtime. Owner #64 handles remaining milestones."
     - "2026-11-03 operator-reported candidate READY FOR ACTIVATION REVIEW (#77 comment 6599760941): 1170 passed/1 skipped code tests, actual pab-builder sandbox PASS, replay/conflict/cancel/recovery PASS, full file ownership/modes/control-config rollback PASS and exact image 65 PASS; all results privately reported, not independently host-verified by this session; no production activation, final baseline/quiescence and owner authorization still required."
