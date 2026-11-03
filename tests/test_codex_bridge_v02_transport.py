@@ -62,3 +62,16 @@ def test_v01_transport_does_not_accept_v02_request():
     assert old_protocol == "pab-codex/v0.1"
     with pytest.raises(ValueError):
         old_parse(json.dumps(payload()))
+
+def test_operator_pinned_selector_only_in_v02():
+    from personal_ai_brain.codex_bridge_v02_policy import PINNED_BASE
+    from personal_ai_brain.codex_bridge_transport import parse_request as parse_v01
+
+    request = payload(base_sha=PINNED_BASE)
+    assert parse_request(json.dumps(request))["base_sha"] == PINNED_BASE
+    for bad_base in ("auto", "operator-pinned/latest", "OPERATOR-PINNED",
+                     "operator-pinned ", "0" * 39):
+        with pytest.raises(ValueError):
+            parse_request(json.dumps(payload(base_sha=bad_base)))
+    with pytest.raises(ValueError):
+        parse_v01(json.dumps(request))

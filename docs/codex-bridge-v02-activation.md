@@ -180,3 +180,40 @@ the committed base Git objects, using importlib mode and task-local scratch.
 Deleting/disabling patched tests cannot remove the original mandatory tests.
 Results count only the actual restricted executions, never the full CI suite.
 Normal GitHub CI still executes the unchanged full repository suite.
+
+
+## Optional no-postman source pin extension — source PR (not deployed)
+
+The v0.2 `codex.submit` envelope may optionally use the exact
+`"base_sha": "operator-pinned"` selector **after this branch has passed
+review, merged, and the trusted Windows operator installed it**. The
+currently accepted deployed v0.2 still requires an explicit 40-hex SHA until
+that operator step has been verified. Do not change the ChatGPT skill to send
+the selector early.
+
+When enabled, the authenticated Windows worker resolves this literal to the
+clean `main` HEAD of its existing dedicated operator-pinned source clone.
+The trusted checkout still checks the canonical repository URL, clean worktree,
+`main` and equality with its local `origin/main` ref. It does not fetch,
+fast-forward, install credentials or choose a new repository. Before durable
+reservation, the worker binds the resolved 40-hex SHA to the task identity.
+Exact same-task replay retains the original recorded SHA even if the trusted
+clone has since been updated. Changed payload with the same task UUID still
+conflicts. The 40-hex value is returned in successful result metadata for
+provenance. Invalid/dirty source fails before a Codex session is started.
+
+The parser accepts the selector only for the explicitly opted-in v0.2
+transport. The ledger validator **still rejects** unresolved selectors and
+all v0.1 behavior remains unchanged. Nothing grants new editable paths, root
+access, remote approvals, publication, unrestricted code execution or
+cross-chat notifications. This eliminates repetitive human transport of the
+Windows local SHA, **not** the separate operator-managed source refresh and
+reapproval of new trust profiles. A locally pinned source may be older than
+GitHub's current default branch; callers must not claim it is latest merely
+because it is approved.
+
+Operator installation of a bridge/security change remains a separately
+reviewed host action: verify the tested commit and local working tree/ledger
+before an isolated v0.2-only update, retain rollback, and run one real
+ChatGPT-originated delegated task with exact result correlation. Leave v0.1
+and any unrelated services alone.

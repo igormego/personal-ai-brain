@@ -21,7 +21,7 @@ from .codex_bridge_transport import (
 )
 from .codex_bridge_transport_runtime import private_acl
 from .codex_bridge_v02_policy import (
-    PROTOCOL, project_for, validate_request,
+    PROTOCOL, PINNED_BASE, project_for, validate_request,
 )
 from .codex_bridge_v02_transport import parse_request
 from .codex_bridge_v02_validation import WSL_ROOT, validate_completion
@@ -118,10 +118,36 @@ def repository_for(project_id: str) -> str:
     return project_for(project_id).repository
 
 
+def resolve_pinned_base(ledger: Ledger, payload: dict, backend: TrustedV02Backend) -> dict:
+    """Bind operator-pinned requests to an immutable local source without a user SHA.
+
+    A previously reserved task keeps its original base after a source refresh.
+    No request may select a filesystem path, branch, Git remote or refresh action.
+    """
+    if payload["base_sha"] != PINNED_BASE:
+        return payload
+    prior = ledger.load()["tasks"].get(payload["task_id"])
+    if prior is not None:
+        if (prior.get("project_id") != payload["project_id"]
+                or prior.get("repository") != backend.project.repository):
+            raise ValueError("task_conflict")
+        pinned = prior.get("base_sha")
+        if type(pinned) is not str or not re.fullmatch(r"[0-9a-f]{40}", pinned):
+            raise ValueError("base_not_approved")
+    else:
+        pinned = backend.head()
+    return {**payload, "base_sha": pinned}
+
+
 def envelope_v02(result: dict, payload: dict) -> dict:
     """Reuse proven v0.1 result projection; replace only protocol identity."""
     safe = envelope(result, payload)
     safe["transport_version"] = PROTOCOL
+    if payload["base_sha"] == PINNED_BASE:
+        actual = result.get("base_sha")
+        if type(actual) is str and re.fullmatch(r"[0-9a-f]{40}", actual):
+            safe["base_sha"] = actual
+    # A failed preflight retains the literal selector, never a fabricated SHA.
     # Never allow a result to assert publication. Successful coding is a local,
     # uncommitted workspace patch, not a GitHub commit, PR or deployment.
     safe.pop("commit_sha", None)
@@ -130,8 +156,18 @@ def envelope_v02(result: dict, payload: dict) -> dict:
 
 def execute(ledger: Ledger, payload: dict) -> dict:
     # Policy and canonical directory are independently fixed by trusted code.
-    selected = validate_request(payload)
+    selected = validate_request(payload, allow_pinned=True)
     backend = TrustedV02Backend(selected["project_id"])
+    if selected["base_sha"] == PINNED_BASE:
+        try:
+            selected = resolve_pinned_base(ledger, selected, backend)
+        except ValueError as error:
+            if str(error).startswith("trusted_checkout_"):
+                # Read-only pinned-source failure. No ledger reservation and
+                # no model session; a new request requires a new task UUID.
+                return {"status": "failed", "attempts": 0,
+                        "failure_class": "base_not_approved"}
+            raise
     return run_local(
         ledger, selected, timeout=900, trusted_backend=backend,
         trusted_source=backend,

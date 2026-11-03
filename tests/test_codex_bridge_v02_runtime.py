@@ -234,3 +234,83 @@ def test_missing_dedicated_source_fails_closed(monkeypatch):
     monkeypatch.setattr(rt.subprocess,'run',lambda *a,**kw:SimpleNamespace(returncode=128,stdout=b''))
     with pytest.raises(ValueError,match='trusted_checkout_unavailable'):
         rt.TrustedV02Backend('personal-ai-brain').head()
+
+def test_operator_pinned_base_uses_trusted_source_without_human_sha(monkeypatch, tmp_path):
+    from personal_ai_brain.codex_bridge_v02_policy import PINNED_BASE
+    ledger = Ledger(tmp_path, validator=rt.validate_request, repository_for=rt.repository_for)
+    incoming = payload("personal-ai-brain") | {"base_sha": PINNED_BASE}
+    observed = []
+    monkeypatch.setattr(rt.TrustedV02Backend, "head", lambda self: "b" * 40)
+
+    def fake_run(_ledger, effective, **kwargs):
+        observed.append(effective)
+        return {"status": "succeeded", "attempts": 1, "base_sha": effective["base_sha"]}
+
+    monkeypatch.setattr(rt, "run_local", fake_run)
+    result = rt.execute(ledger, incoming)
+    assert incoming["base_sha"] == PINNED_BASE
+    assert observed[0]["base_sha"] == "b" * 40
+    assert observed[0]["project_id"] == "personal-ai-brain"
+    response = rt.envelope_v02(result, incoming)
+    assert response["base_sha"] == "b" * 40
+    assert response["transport_version"] == PROTOCOL
+
+
+def test_operator_pinned_base_keeps_prior_task_sha_after_source_refresh(monkeypatch, tmp_path):
+    from personal_ai_brain.codex_bridge_v02_policy import PINNED_BASE
+    ledger = Ledger(tmp_path, validator=rt.validate_request, repository_for=rt.repository_for)
+    earlier = payload("homelab-infrastructure") | {"base_sha": "a" * 40}
+    ledger.submit(earlier)
+    incoming = earlier | {"request_id": str(uuid.uuid4()), "base_sha": PINNED_BASE}
+    monkeypatch.setattr(rt.TrustedV02Backend, "head",
+                        lambda self: pytest.fail("existing task must not select a new base"))
+    selected = []
+    monkeypatch.setattr(rt, "run_local",
+                        lambda _ledger, effective, **kw: selected.append(effective)
+                        or {"status": "succeeded", "attempts": 1,
+                            "base_sha": effective["base_sha"]})
+    response = rt.execute(ledger, incoming)
+    assert selected[0]["base_sha"] == "a" * 40
+    assert rt.envelope_v02(response, incoming)["base_sha"] == "a" * 40
+
+
+def test_operator_pinned_base_denies_dirty_source_before_codex(monkeypatch, tmp_path):
+    from personal_ai_brain.codex_bridge_v02_policy import PINNED_BASE
+    ledger = Ledger(tmp_path, validator=rt.validate_request, repository_for=rt.repository_for)
+    incoming = payload() | {"base_sha": PINNED_BASE}
+    def dirty(_self):
+        raise ValueError("trusted_checkout_dirty")
+    monkeypatch.setattr(rt.TrustedV02Backend, "head", dirty)
+    monkeypatch.setattr(rt, "run_local",
+                        lambda *a, **kw: pytest.fail("Codex must not run"))
+    result = rt.execute(ledger, incoming)
+    assert result == {"status": "failed", "attempts": 0,
+                      "failure_class": "base_not_approved"}
+    assert ledger.load()["tasks"] == {}
+    envelope = rt.envelope_v02(result, incoming)
+    assert envelope["base_sha"] == PINNED_BASE
+    assert envelope["failure_class"] == "base_not_approved"
+
+
+def test_operator_pinned_base_preserves_task_conflict_after_resolution(monkeypatch, tmp_path):
+    from personal_ai_brain.codex_bridge_v02_policy import PINNED_BASE
+    from personal_ai_brain.codex_bridge_core import public_result
+    ledger = Ledger(tmp_path, validator=rt.validate_request, repository_for=rt.repository_for)
+    earlier = payload() | {"base_sha": "a" * 40}
+    ledger.submit(earlier)
+    incoming = earlier | {"request_id": str(uuid.uuid4()), "base_sha": PINNED_BASE,
+                          "goal": "Different unapproved goal"}
+    monkeypatch.setattr(rt.TrustedV02Backend, "head",
+                        lambda self: pytest.fail("must use already reserved source SHA"))
+    monkeypatch.setattr(rt, "run_local",
+                        lambda store, effective, **kw: public_result(store.submit(effective)))
+    with pytest.raises(ValueError, match="task_conflict"):
+        rt.execute(ledger, incoming)
+    assert len(ledger.load()["tasks"]) == 1
+
+def test_operator_pinned_cannot_reach_ledger_without_trusted_resolution(tmp_path):
+    from personal_ai_brain.codex_bridge_v02_policy import PINNED_BASE
+    ledger = Ledger(tmp_path, validator=rt.validate_request, repository_for=rt.repository_for)
+    with pytest.raises(ValueError, match="invalid_base"):
+        ledger.submit(payload() | {"base_sha": PINNED_BASE})
+    assert ledger.load()["tasks"] == {}
