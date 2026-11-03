@@ -27,6 +27,10 @@ current_gate: >
   Snapshots still expire after 30 minutes. No autonomous deploy or broad host
   control is live.
 
+  General Agent Workspace #77 offline Python v0.1 is now LIVE_ACCEPTED
+  via user-originated GitHub Issue transport; general coding and host resource
+  broker are still separately permission-gated.
+
 current_state: >
   Remote Codex v0.2 is LIVE_ACCEPTED for personal-ai-brain and
   homelab-infrastructure, with sandboxed offline repository development,
@@ -74,26 +78,27 @@ current_state: >
   North-star Issues #63/#64 record goal-driven delegation: user states a goal,
   Brain selects among registered capabilities, and backend policy is authority.
 
-exact_next_action: >
-  General Agent Workspace #77 is SOURCE_READY / READY_FOR_ACTIVATION_REVIEW,
-  not owner-approved or deployed. Codex Local user-relayed 2026-11-03 candidate
-  release evidence: 1170 PASS / 1 skipped regression; actual pab-builder
-  service-equivalent Bubblewrap PASS; replay/conflict/cancel/recovery PASS;
-  restore bytes, UID/GID, modes and private control config PASS; exact control
-  candidate image 65 PASS. The immutable SHA/image digest and private manifest
-  are held only in local C:/Projects/personal-ai-brain/.operator-bootstrap-private/
-  activation-proposal.md and activation-manifest.json, NOT read or independently
-  verified by this ChatGPT surface. Exact next: locally compare immutable
-  candidate/backup manifest against unchanged current installed baseline,
-  ledger quiescence, no pending/running tasks and tested rollback; STOP on drift
-  or incomplete evidence. Obtain explicit owner approval of the **bounded**
-  builder modules + exact control image pin + generic_enabled=true while
-  coding_enabled stays false + only builder/control restart. Do not make
-  other host/service/auth/ledger changes. Then perform staged operator-owned
-  activation with rollback on failed checks. Only after success do real
-  ChatGPT-origin work.submit/status and multi-domain one-off task acceptance.
-  Read-only @personal-ai-brain plugin permissions are not implicitly expanded.
+  On 2026-11-03 Codex Local reported deployment of generic_enabled=true
+  with coding_enabled=false and unchanged ledger. Independent ordinary ChatGPT
+  GitHub control requests #98-#105 proved three distinct sandbox scripts,
+  one attempt each, correlated status and validated artifact previews, plus
+  duplicate reuse and conflicting-payload refusal. No generic host I/O.
 
+exact_next_action: >
+  General Agent Workspace #77 v0.1 is LIVE_ACCEPTED (2026-11-03) for bounded
+  offline workspace.python.v1 via normal ChatGPT, private GitHub Issues,
+  authenticated control, existing durable Work Runner and artifact result.
+  ChatGPT independently verified three one-off tasks: #98/#99 numeric summary,
+  #102/#104 frequency and #103/#105 CSV Markdown; all succeeded with one
+  execution, correct preview and SHA-256 artifact. Duplicate #100 returned
+  created=false, attempts=1, and conflicting payload #101 was rejected.
+  Local Codex operator reported successful production install, original ledger
+  preserved, fixture+three generic tests PASS, generic_enabled=true and
+  coding_enabled=false. See Issue #77 comment 6600365441. Next: retain
+  current v0.1 production boundaries while planning a reviewed reusable
+  Resource Broker input grant and generalized repo-scoped coding, reusing
+  existing Codex infrastructure. Gateway/native plugin write access and
+  production host/domain writes are separate authorization milestones.
 blockers: []
 
 dependencies:
@@ -103,12 +108,7 @@ dependencies:
     dependency: "Hosts Core and control containers, separate credentials and durable private audit."
 
 important_open_loops:
-  - "2026-11-03 #77 RELEASE CANDIDATE (Codex Local user-relayed): READY FOR ACTIVATION REVIEW, NOT APPROVED / NOT DEPLOYED. Candidate tests: 1170 passed 1 skipped, service-equivalent pab-builder Bubblewrap PASS, replay/conflict/cancel/recovery PASS, rollback bytes/modes/UID/GID/control config PASS, pinned candidate control image 65 PASS. Exact hashes/image digest remain only in private local proposal/manifest, not independently read here. Recheck baseline drift and no active jobs immediately before separately approved builder/control-only activation (generic_enabled true, coding_enabled false); see #77 comment 6599760941."
-  - "2026-11-03 #77 FOLLOW-UP (user-relayed Codex): tested pab-builder private script + nested input readability PASS, previous unknown ledger status identified as valid blocked, no observed active tasks; 27 backup files restored with matching bytes and modes. Remaining: runnable complete regression packet (test scripts previously omitted), ownership and control config rollback, exact new control image service-equivalent test. No activation; see #77 issuecomment-6599472333."
-  - "2026-11-03 #77 PARTIAL PASS operator preflight (user-relayed Codex Local): existing rootless Bubblewrap isolation under UID 999 passed selected checks with 16MiB tmpfs; prior installed binary/control image pins match. Candidate generic module still not installed/tested; one unknown task-state classifier unresolved; backup/restore unverified. STOP production enablement. See Issue #77 comment 6599184030 for Codex-owned fix and real candidate/recovery acceptance gates."
-  - "2026-11-02 #77 PRIVATE OPERATOR PREFLIGHT BLOCKED: local Codex reported SSH works and current builder/broker plus Core/control healthy; new generic modules absent; no changes performed. Interactive sudo unavailable in noninteractive Codex SSH context, so private ledger and pab-builder Bubblewrap isolation tests not run, backup/rollback not yet verified, activation NOT APPROVED. Private report remains only on local Windows under .operator-bootstrap-private; do not claim remote inspection. Next gate is one trusted interactive SSH/TTY sudo session for READ-ONLY checks, then separately reviewed bounded activation; see #77 issuecomment-6574052813."
-  - "GENERAL AGENT WORKSPACE #77 updated 2026-11-02: PR #79 merged as dfe8ba05dc481d85d7855960aee2dc4e06314c50; existing Work Runner/transport now has source-only opt-in workspace.python.v1 code, rootless Bubblewrap generic mode with bounded anonymous tmpfs (no writable host bind), strict task-local inline inputs, stdout JSON artifacts with bounded previews and existing durable ledger. Generic profile defaults disabled and has NOT been host-accepted or deployed. GitHub tests workflow 41422252087 green. Exact next: one trusted local operator run of docs/general-agent-workspace-v01.md, preserving existing services/ledgers, stage/verify isolation and only then authorize enablement; followed by external ChatGPT acceptance. Source completion is not a live general-agent milestone."
-  - "GENERAL AGENT WORKSPACE #77 (2026-11-02): approved reusable sandbox/resource-broker direction; PR #78 merged as 57a8ac9587846ae6819e83a1b30c6da1bdcd25c9 with green GitHub CI. Task-local trusted input grants and post-execution artifact inspection are source-ready and generic across formats; they do NOT execute model code, expose host resources, create a task route or modify live workers. Blocker remains an independently reviewed opt-in sandbox runner + authenticated task.submit/status/result backed by existing durable truth, then one-time operator installation/host isolation acceptance. No per-user-goal new handler should be required."
+  - "COMPLETED 2026-11-03: General Agent Workspace #77 offline Python is LIVE_ACCEPTED by normal ChatGPT external GitHub tests #98-#105 with three distinct successes and idempotent duplicate/conflict checks. Existing production code and ledger preserved per Codex Local. Future general coding, Resource Broker, Gateway and native plugin remain separate gates. Issue #77 comment 6600365441."
   - "COMPLETED: Credentialless Coding Agent Broker v0.1 foundation; Local Bridge durable core, request/task idempotency, dispatcher, approval_required, bounded lifecycle/recovery, WSL2 backend, managed ChatGPT auth, Linux workspace isolation and internal real coding acceptance. See docs/codex-bridge-checkpoint.md."
   - "COMPLETED: Remote Transport v0.1 is live-accepted. PR #23 implemented the outbound Windows Issues mailbox; PR #31 repaired restricted completion validation; external ChatGPT Issues #44-#48 proved execution, replay/conflict safety and Homelab coexistence."
   - "COMPLETED: Remote Codex v0.2 LIVE_ACCEPTED 2026-10-27, Issue #41. PRs #42/#43/#44/#45 merged. Real ChatGPT coding acceptance #64/#65 succeeded once each, 256/19 offline sandbox tests. Pre-restart replay/conflicts #66-#68 and post-restart replay/conflict #69-#71 passed; operator verified preserved WSL patches, one execution attempt each, unchanged v0.1/v0.2 ledger/delivery hashes across one v0.2-only restart. Approval/publishing/deployment remains separate and disabled; current remote editing uses only fixed bounded allowlists and exact local HEADs."
