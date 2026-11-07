@@ -15,7 +15,15 @@ The offline tests use fake Meta and control clients; no production activation, p
 The following is a **plan, not authorization to deploy**. Public ingress and real inbound acceptance require a separate explicit operational authorization. The existing `personal-ai-brain-control` Compose project, image, mounts and ledger must not be recreated or modified. Do not expose a public port or create a tunnel as part of this plan.
 
 1. In an authorized maintenance window, record the actual running control service image ID, health, Compose configuration and ledger metadata without reading secrets. Verify a backup of its ledger and retain its accepted image. Select a private host directory for the new gateway state, owned by the dedicated numeric service UID/GID, mode 0700; choose a free loopback port. Verify the host filesystem supports durable atomic rename and `fsync` and that only one gateway instance can use that state. Preserve this directory across every restart and rollback.
-2. At the reviewed merged source commit, build the existing `docker/Dockerfile` as a new image in isolation. Record its exact local image ID with `docker image inspect --format '{{.Id}}' IMAGE`; do not retag or rebuild the control image. Pin `PAB_WHATSAPP_IMAGE` to that `sha256:...` ID in the gateway's private operator environment file, not a mutable tag.
+2. At the reviewed merged source commit, build the existing Dockerfile as a separate image and capture its immutable local image ID; this does not retag or rebuild the control image:
+
+   ```sh
+   docker build -f docker/Dockerfile -t pab-whatsapp-candidate .
+   gateway_image_id=$(docker image inspect pab-whatsapp-candidate --format '{{.Id}}')
+   printf '%s\n' "$gateway_image_id"
+   ```
+
+   Pin `PAB_WHATSAPP_IMAGE` to that `sha256:...` ID in the gateway's private operator environment file, not a mutable tag.
 3. Create a private `whatsapp.json` with only `owner_id` (numeric GitHub issue/result author ID), `user_id`, `waba_id`, `phone_id`, `recipient` (exact Meta display phone string), `sender` (authorized digits), and `api_version` (for example `v22.0`). Create or reference four separately protected files for the existing narrowly scoped control Issues token, Meta access token, Meta app secret and webhook verify token. Only path names belong in the environment file; never place token values in Compose, Git, shell history or logs. Ensure the dedicated UID can read only those files and can write the state directory. Do not copy the control worker's ledger or its other secrets.
 4. In a mode-0600 private environment file set `PAB_WHATSAPP_IMAGE`, `PAB_WHATSAPP_UID`, `PAB_WHATSAPP_GID`, `PAB_WHATSAPP_PORT`, `PAB_WHATSAPP_STATE`, `PAB_WHATSAPP_CONFIG`, `PAB_WHATSAPP_GITHUB_TOKEN_FILE`, `PAB_WHATSAPP_META_TOKEN_FILE`, `PAB_WHATSAPP_APP_SECRET_FILE`, and `PAB_WHATSAPP_VERIFY_TOKEN_FILE` to the reviewed image ID, numeric identity, loopback port and absolute paths. Validate without starting anything:
 
