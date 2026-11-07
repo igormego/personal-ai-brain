@@ -198,3 +198,22 @@ def test_wrong_result_uuid_and_multiple_results_fail_closed(tmp_path):
     with pytest.raises(GatewayRejected, match="ambiguous_result"):
         gateway.poll()
     assert not meta.calls
+
+
+def test_runtime_end_to_end_over_loopback_with_fake_clients(tmp_path):
+    import http.client
+    import threading
+    from personal_ai_brain.whatsapp_runtime import RuntimeHTTPServer
+    backend, meta = Backend(), Meta()
+    gateway = make(tmp_path, backend, meta)
+    server = RuntimeHTTPServer(("127.0.0.1", 0), gateway, "verify")
+    worker = threading.Thread(target=server.serve_forever, daemon=True); worker.start()
+    try:
+        raw, signature = wire(event(timestamp=str(int(datetime.now(timezone.utc).timestamp()))))
+        conn = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=3)
+        conn.request("POST", "/webhook", raw, {"X-Hub-Signature-256": signature})
+        response = conn.getresponse(); assert response.status == 200; response.read(); conn.close()
+        backend.finish(); assert gateway.poll() == ["sent"]
+        assert backend.creates == 1 and len(meta.calls) == 1
+    finally:
+        server.shutdown(); worker.join(); server.server_close()
