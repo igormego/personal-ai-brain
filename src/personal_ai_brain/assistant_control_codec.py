@@ -1,4 +1,4 @@
-"""Pure ChatGPT <-> existing private PAB control protocol v0.1 codec.
+"""Pure authenticated assistant <-> existing private PAB control protocol v0.1 codec.
 
 This module NEVER contacts GitHub, validates connector permissions, or sends replies.
 A real ChatGPT adapter must authenticate the connection and check that a result
@@ -37,13 +37,13 @@ class ControlSubmission:
 
 
 def encode_project_status(request: AssistantRequest, selector: object) -> ControlSubmission:
-    """Encode an authenticated, normalized ChatGPT request to the existing worker.
+    """Encode an authenticated, normalized assistant request to the existing worker.
 
     The actual caller must establish the GitHub identity/private repository
     permission separately; 'requested_by' is *not* authorization.
     """
-    if not isinstance(request, AssistantRequest) or request.surface != "chatgpt":
-        raise ControlCodecRejected("trusted_chatgpt_request_required")
+    if not isinstance(request, AssistantRequest) or request.surface not in {"chatgpt", "whatsapp"}:
+        raise ControlCodecRejected("trusted_assistant_request_required")
     try:
         normalized = validate_selector(selector)
     except StatusRejected:
@@ -53,7 +53,7 @@ def encode_project_status(request: AssistantRequest, selector: object) -> Contro
         "request_id": request.request_id,
         "capability": CAPABILITY,
         "arguments": normalized,
-        "requested_by": "chatgpt_assistant",
+        "requested_by": f"{request.surface}_assistant",
         "requested_at": request.created_at,
     }
     body = json.dumps(wire, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
@@ -93,8 +93,8 @@ def decode_project_status(
     Exactly one authoritative owner-produced result must be selected; this
     function does not discover or send Issues.
     """
-    if not isinstance(request, AssistantRequest) or request.surface != "chatgpt":
-        raise ControlCodecRejected("trusted_chatgpt_request_required")
+    if not isinstance(request, AssistantRequest) or request.surface not in {"chatgpt", "whatsapp"}:
+        raise ControlCodecRejected("trusted_assistant_request_required")
     if (type(comment_author_id) is not int or type(authorized_author_id) is not int
             or authorized_author_id <= 0 or comment_author_id != authorized_author_id):
         raise ControlCodecRejected("untrusted_result_author")
