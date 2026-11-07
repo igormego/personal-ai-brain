@@ -86,11 +86,14 @@ def test_selector_fail_closed(selector):
         encode_project_status(req(), selector)
 
 
-def test_non_chatgpt_surface_cannot_use_early_adaptor():
-    with pytest.raises(ControlCodecRejected, match="trusted_chatgpt_request_required"):
-        encode_project_status(req("whatsapp"), {"project_id": "homelab"})
-    with pytest.raises(ControlCodecRejected, match="trusted_chatgpt_request_required"):
-        decode(req("whatsapp"), wire_comment(req().request_id))
+def test_whatsapp_preserves_surface_and_authenticated_result_validation():
+    request = req("whatsapp")
+    payload = parse_request(encode_project_status(request, {"project_id": "homelab"}).body, now=NOW)
+    assert payload["requested_by"] == "whatsapp_assistant"
+    response = decode(request, wire_comment(request.request_id))
+    assert response.surface == "whatsapp"
+    with pytest.raises(ControlCodecRejected, match="untrusted_result_author"):
+        decode(request, wire_comment(request.request_id), comment_author_id=AUTHOR_ID + 1)
 
 
 def test_completed_response_correlated_to_trusted_reply_target():
