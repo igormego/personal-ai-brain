@@ -1,0 +1,47 @@
+name: pab-whatsapp-gateway
+services:
+  gateway:
+    image: ${PAB_WHATSAPP_IMAGE:?Set an immutable locally available image ID}
+    pull_policy: never
+    command: [python, -m, personal_ai_brain.whatsapp_runtime, serve]
+    user: "${PAB_WHATSAPP_UID:?Set UID}:${PAB_WHATSAPP_GID:?Set GID}"
+    init: true
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 128m
+    cpus: 0.5
+    stop_grace_period: 30s
+    ports:
+      - "127.0.0.1:${PAB_WHATSAPP_PORT:?Set loopback port}:8080"
+    volumes:
+      - type: bind
+        source: ${PAB_WHATSAPP_STATE:?Set private persistent state directory}
+        target: /state
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${PAB_WHATSAPP_CONFIG:?Set private config path}
+        target: /run/config/whatsapp.json
+        read_only: true
+        bind: {create_host_path: false}
+    secrets: [github_control_token, meta_token, meta_app_secret, meta_verify_token]
+    healthcheck:
+      test: [CMD, python, -m, personal_ai_brain.whatsapp_runtime, health]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    logging:
+      driver: local
+      options: {max-size: 5m, max-file: "3"}
+secrets:
+  github_control_token:
+    file: ${PAB_WHATSAPP_GITHUB_TOKEN_FILE:?Set token file path}
+  meta_token:
+    file: ${PAB_WHATSAPP_META_TOKEN_FILE:?Set token file path}
+  meta_app_secret:
+    file: ${PAB_WHATSAPP_APP_SECRET_FILE:?Set secret file path}
+  meta_verify_token:
+    file: ${PAB_WHATSAPP_VERIFY_TOKEN_FILE:?Set verification token file path}
