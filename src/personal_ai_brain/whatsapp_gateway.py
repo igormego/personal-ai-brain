@@ -123,9 +123,9 @@ def authenticated_events(raw, signature, secret, *, waba_id, phone_id, recipient
 
 
 @contextmanager
-def _lock(root):
+def _lock(root, filename="gateway.lock"):
     """An OS-held exclusive lock is released by the OS on process death."""
-    with (root / "gateway.lock").open("a+b") as stream:
+    with (root / filename).open("a+b") as stream:
         if os.name == "nt":
             import msvcrt
             stream.seek(0)
@@ -185,6 +185,7 @@ class Gateway:
         self.backend, self.meta, self.repository, self.owner_id = backend, meta, repository, owner_id
         self.user_id, self.waba_id, self.phone_id = user_id, waba_id, phone_id
         self.recipient, self.sender, self.app_secret = recipient, sender, app_secret
+        self._work_cursor = ""  # round-robin scan; terminal/uncertain states do not starve ingress
         self.binding = hashlib.sha256(json.dumps([repository, owner_id, user_id, waba_id, phone_id,
                                                   recipient, sender], separators=(",", ":")).encode()).hexdigest()
 
@@ -203,8 +204,9 @@ class Gateway:
                     raise GatewayRejected("invalid_configuration") from None
                 continue
             accepted.append((message_id, created, body))
-        with _lock(self.root):
-            return [self._process(mid, created, body, now) for mid, created, body in accepted]
+        with _lock(self.root, "gateway-worker.lock"):
+            with _lock(self.root):
+                return [self._process(mid, created, body, now) for mid, created, body in accepted]
 
     def ingest(self, events, *, now=None):
         """Durably reserve already authenticated events without external effects.
@@ -261,7 +263,7 @@ class Gateway:
         records = {}
         artifact_count = total_bytes = 0
         for item in self.root.iterdir():
-            if item.name == "gateway.lock":
+            if item.name in {"gateway.lock", "gateway-worker.lock"}:
                 continue
             info = item.lstat()
             if not stat.S_ISREG(info.st_mode):
@@ -331,23 +333,86 @@ class Gateway:
 
     def poll(self):
         """Resume submitted requests without storing or replaying private message text."""
-        with _lock(self.root):
-            results = []
-            for path in sorted(self.root.glob("*.json")):
-                if not re.fullmatch(r"[0-9a-f]{64}\.json", path.name):
+        with _lock(self.root, "gateway-worker.lock"):
+            with _lock(self.root):
+                results = []
+                for path in sorted(self.root.glob("*.json")):
+                    if not re.fullmatch(r"[0-9a-f]{64}\.json", path.name):
+                        raise GatewayRejected("state_or_transport_invalid")
+                    try:
+                        record = json.loads(path.read_text(encoding="utf-8"))
+                        if record["binding"] != self.binding:
+                            raise GatewayRejected("state_binding_mismatch")
+                        req = AssistantRequest("0.1", record["request_id"], self.user_id, "whatsapp", "",
+                                               record["created_at"], self.sender, record["request_hash"])
+                        results.append(self._advance(path, record, req))
+                    except GatewayRejected:
+                        raise
+                    except (KeyError, TypeError, ValueError, OSError):
+                        raise GatewayRejected("state_or_transport_invalid") from None
+                return results
+
+    def work(self, *, max_items=8):
+        """Process bounded durable receipts without blocking the ingress lock on I/O.
+
+        One worker owns the external-effect path across processes. Its round-robin
+        cursor advances through active records and prevents pending records from
+        indefinitely starving later receipts. Terminal and uncertain records are
+        never retried or removed.
+        """
+        if type(max_items) is not int or not 1 <= max_items <= 32:
+            raise GatewayRejected("invalid_worker_limit")
+        results = []
+        with _lock(self.root, "gateway-worker.lock"):
+            with _lock(self.root):
+                paths = sorted(self.root.glob("*.json"))
+                if any(p.suffix != ".json" or not re.fullmatch(r"[0-9a-f]{64}", p.stem) for p in paths):
                     raise GatewayRejected("state_or_transport_invalid")
+            if self._work_cursor:
+                cut = next((i for i, p in enumerate(paths) if p.name > self._work_cursor), len(paths))
+                paths = paths[cut:] + paths[:cut]
+            for path in paths:
+                if len(results) >= max_items:
+                    break
+                self._work_cursor = path.name
                 try:
-                    record = json.loads(path.read_text(encoding="utf-8"))
-                    if record["binding"] != self.binding:
-                        raise GatewayRejected("state_binding_mismatch")
-                    req = AssistantRequest("0.1", record["request_id"], self.user_id, "whatsapp", "",
-                                           record["created_at"], self.sender, record["request_hash"])
+                    with _lock(self.root):
+                        record = json.loads(path.read_text(encoding="utf-8"))
+                        if record["binding"] != self.binding:
+                            raise GatewayRejected("state_binding_mismatch")
+                        status, delivery = record["control"], record["delivery"]
+                        if status in {"submitting", "uncertain"} or delivery in {"sent", "failed", "sending", "uncertain"}:
+                            continue
+                        if status not in {"received", "submitted"} or delivery != "pending":
+                            raise GatewayRejected("state_or_transport_invalid")
+                        req = AssistantRequest("0.1", record["request_id"], self.user_id, "whatsapp", "",
+                                               record["created_at"], self.sender, record["request_hash"])
+                        if status == "received":
+                            record["control"] = "submitting"
+                            _save(path, record)  # irreversible external-effect reservation
+                    if status == "received":
+                        try:
+                            submission = encode_project_status(req, SELECTOR)
+                            number = self.backend.create_issue(submission.title, submission.body)
+                        except Exception:
+                            number = None
+                        with _lock(self.root):
+                            if type(number) is int and number > 0:
+                                record.update(control="submitted", issue=number)
+                            else:
+                                record["control"] = "uncertain"
+                            _save(path, record)
+                        if type(number) is not int or number <= 0:
+                            results.append("control_uncertain")
+                            continue
+                    # Only the worker lock spans network operations. The short
+                    # ingress lock is released before GitHub/Meta calls.
                     results.append(self._advance(path, record, req))
                 except GatewayRejected:
                     raise
                 except (KeyError, TypeError, ValueError, OSError):
                     raise GatewayRejected("state_or_transport_invalid") from None
-            return results
+        return results
 
     def _advance(self, path, record, req):
         if record.get("binding") != self.binding:
