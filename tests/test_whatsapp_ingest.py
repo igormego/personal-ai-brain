@@ -186,7 +186,7 @@ def test_worker_resumes_received_and_reuses_original_uuid(tmp_path):
     assert json.loads(backend.issues[1]["body"])["request_id"] == ids[0]
     backend.finish()
     assert gateway.work() == ["sent"]
-    assert gateway.work() == ["sent"]
+    assert gateway.work() == []
     assert gateway.ingest(one(), now=NOW) == ids
     assert backend.creates == 1 and len(meta.calls) == 1
 
@@ -200,7 +200,7 @@ def test_worker_ambiguous_create_is_not_repeated(tmp_path):
     gateway = make(tmp_path, backend)
     gateway.ingest(one(), now=NOW)
     assert gateway.work() == ["control_uncertain"]
-    assert make(tmp_path, backend).work() == ["control_uncertain"]
+    assert make(tmp_path, backend).work() == []
     assert backend.creates == 1
 
 
@@ -225,7 +225,7 @@ def test_worker_reservation_survives_interruption_and_blocks_recreate(tmp_path):
     record = json.loads(path.read_text())
     record["control"] = "submitting"
     path.write_text(json.dumps(record))
-    assert make(tmp_path).work() == ["control_uncertain"]
+    assert make(tmp_path).work() == []
 
 
 def test_worker_limit_and_duplicate_guard(tmp_path):
@@ -237,4 +237,15 @@ def test_worker_limit_and_duplicate_guard(tmp_path):
     assert len(gateway.work(max_items=1)) == 1
     assert backend.creates == 1
     assert len(gateway.work(max_items=1)) == 1
-    assert backend.creates <= 2
+    assert backend.creates <= 2  # sorted records may include the first pending item again
+
+
+def test_worker_round_robin_does_not_starve_new_receipts(tmp_path):
+    backend = Backend()
+    gateway = make(tmp_path, backend)
+    mids = [f"wamid.{i}" for i in range(18)]
+    gateway.ingest([one(mid)[0] for mid in mids], now=NOW)
+    for _ in range(18):
+        gateway.work(max_items=1)
+    assert backend.creates == 18
+    assert gateway.work(max_items=1) == []
