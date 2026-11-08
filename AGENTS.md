@@ -43,6 +43,12 @@ When reusing older conversation context, Project State, notes, tool output, or p
 
 This policy applies across chats, agents, Project State reading, research, planning, and operations.
 
+## Live Homelab operator access (cross-project)
+
+For any explicitly authorized PAB/Gateway task requiring **live Homelab SSH**, use the authoritative [Infrastructure AGENTS.md](https://github.com/igormego/homelab-infrastructure/blob/main/AGENTS.md) and [remote-access Issue #41](https://github.com/igormego/homelab-infrastructure/issues/41) before selecting the Codex environment. This PAB repository does not own the SSH connection configuration or grant host access.
+
+**Verified 2026-11-08 pitfall:** `ssh homelab` is the LAN alias. The already accepted off-LAN NordVPN Meshnet SSH alias is in a **separate existing operator-managed OpenSSH config**, loaded explicitly via `ssh -F`; it is not included by the default SSH config. Finding only `homelab` in the default config is **not** evidence that Meshnet is missing or down. For authorized off-LAN preflight, reuse the original Desktop Local operator context and its existing `-F` config/alias; first run a bounded, authenticated, non-mutating probe with strict host-key verification. Do not invent, copy, commit or disclose SSH paths, host details, credentials or new permissions. Cloud/GitHub-only tasks do not inherit this operator route. A successful past probe does not guarantee current reachability or unattended reliability.
+
 ## Current implementation priority
 
 Core Agent v0.1 is read-only.
