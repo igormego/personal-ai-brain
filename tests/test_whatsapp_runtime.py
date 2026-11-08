@@ -8,7 +8,7 @@ from urllib.parse import urlencode
 
 import pytest
 
-from personal_ai_brain.whatsapp_gateway import GatewayRejected, MAX_WEBHOOK_BYTES
+from personal_ai_brain.whatsapp_gateway import GatewayRejected, MAX_META_WEBHOOK_BYTES
 from personal_ai_brain.whatsapp_runtime import JsonHTTP, RuntimeHTTPServer, load_runtime, poll_loop
 
 
@@ -20,6 +20,12 @@ class FakeGateway:
         if signature != "fake-valid":
             raise GatewayRejected("invalid_signature")
         self.received.append(raw)
+
+    def receive(self, raw, signature):
+        return self.post(raw, signature)
+
+    def work(self):
+        return self.poll()
 
     def poll(self):
         self.polls += 1
@@ -53,7 +59,7 @@ def test_http_challenge_signature_size_and_health(running):
     assert call(server, "POST", "/webhook", b"{}", {"X-Hub-Signature-256": "bad"})[0] == 403
     assert call(server, "POST", "/webhook", b"{}", {"X-Hub-Signature-256": "fake-valid"})[0] == 200
     assert gateway.received == [b"{}"]
-    assert call(server, "POST", "/webhook", b"x" * (MAX_WEBHOOK_BYTES + 1), {"X-Hub-Signature-256": "fake-valid"})[0] == 413
+    assert call(server, "POST", "/webhook", b"x" * (MAX_META_WEBHOOK_BYTES + 1), {"X-Hub-Signature-256": "fake-valid"})[0] == 413
     assert call(server, "GET", "/health")[0] == 503
     server.poll_at = time.monotonic(); server.poll_ok = True
     assert call(server, "GET", "/health") == (200, b"ok")
