@@ -23,7 +23,8 @@ from uuid import UUID, uuid4
 from .assistant_contract import AssistantRequest, normalize_request, RequestRejected
 from .assistant_control_codec import encode_project_status, decode_project_status, TITLE
 
-MAX_WEBHOOK_BYTES = 65536
+MAX_WEBHOOK_BYTES = 65536  # Legacy synchronous API, retained for backward compatibility
+MAX_META_WEBHOOK_BYTES = 3 * 1024 * 1024  # Meta documents up to 3 MB
 # G3.6A only: no automatic deletion; old and uncertain reservations count too.
 MAX_INGEST_RECORDS = 10000
 MAX_INGEST_BYTES = 16 * 1024 * 1024
@@ -57,9 +58,10 @@ def _unique(pairs):
     return out
 
 
-def authenticated_events(raw, signature, secret, *, waba_id, phone_id, recipient, sender):
+def authenticated_events(raw, signature, secret, *, waba_id, phone_id, recipient, sender,
+                         max_bytes=MAX_WEBHOOK_BYTES, max_items=100):
     """Verify exact raw bytes before parsing, and authenticate both endpoints."""
-    if not isinstance(raw, bytes) or len(raw) > MAX_WEBHOOK_BYTES:
+    if not isinstance(raw, bytes) or len(raw) > max_bytes:
         raise GatewayRejected("payload_size")
     if (not isinstance(secret, bytes) or not secret or not isinstance(signature, str)
             or not re.fullmatch(r"sha256=[0-9a-f]{64}", signature, re.ASCII)):
@@ -77,27 +79,40 @@ def authenticated_events(raw, signature, secret, *, waba_id, phone_id, recipient
         if not isinstance(data, dict) or data.get("object") != "whatsapp_business_account":
             raise ValueError()
         entries = data["entry"]
-        if not isinstance(entries, list) or len(entries) > 100:
+        if not isinstance(entries, list) or len(entries) > max_items:
             raise ValueError()
         events = []
+        updates = 0
         for entry in entries:
             if not isinstance(entry, dict):
                 raise ValueError()
-            if entry.get("id") != waba_id:
-                continue
             changes = entry["changes"]
-            if not isinstance(changes, list) or len(changes) > 100:
+            if not isinstance(changes, list) or len(changes) > max_items:
                 raise ValueError()
             for change in changes:
+                if not isinstance(change, dict):
+                    raise ValueError()
                 if change.get("field") != "messages":
+                    updates += 1
+                    if updates > max_items:
+                        raise ValueError()
                     continue
                 value = change["value"]
-                meta = value["metadata"]
-                if meta.get("phone_number_id") != phone_id or meta.get("display_phone_number") != recipient:
-                    continue
-                messages = value.get("messages", [])
-                if not isinstance(messages, list) or len(messages) > 100:
+                if not isinstance(value, dict):
                     raise ValueError()
+                messages, statuses = value.get("messages", []), value.get("statuses", [])
+                if (not isinstance(messages, list) or not isinstance(statuses, list)
+                        or len(messages) > max_items or len(statuses) > max_items):
+                    raise ValueError()
+                updates += max(1, len(messages) + len(statuses))
+                if updates > max_items:
+                    raise ValueError()
+                if entry.get("id") != waba_id:
+                    continue
+                meta = value["metadata"]
+                if (not isinstance(meta, dict) or meta.get("phone_number_id") != phone_id
+                        or meta.get("display_phone_number") != recipient):
+                    continue
                 for message in messages:
                     if not isinstance(message, dict):
                         continue
@@ -207,6 +222,33 @@ class Gateway:
         with _lock(self.root, "gateway-worker.lock"):
             with _lock(self.root):
                 return [self._process(mid, created, body, now) for mid, created, body in accepted]
+
+    def receive(self, raw, signature, *, now=None):
+        """Provider POST path: authenticate, bound, durably ingest, then ACK.
+
+        No GitHub or Meta operation is executed before this returns.
+        Received messages are resumed by the separate bounded worker.
+        """
+        events = authenticated_events(
+            raw, signature, self.app_secret, waba_id=self.waba_id,
+            phone_id=self.phone_id, recipient=self.recipient, sender=self.sender,
+            max_bytes=MAX_META_WEBHOOK_BYTES, max_items=MAX_INGEST_EVENTS,
+        )
+        # A malformed/unsupported individual text must not poison eligible
+        # siblings in the same authenticated Meta batch.
+        accepted = []
+        for message_id, created, body in events:
+            try:
+                normalize_request({"schema_version": "0.1", "request_id": str(uuid4()),
+                                   "message": body, "created_at": created},
+                                  trusted_user_id=self.user_id, trusted_surface="whatsapp",
+                                  trusted_reply_target=self.sender, now=now)
+            except RequestRejected as error:
+                if str(error) not in {"message", "message_size", "request_size", "created_at", "request_expired_or_future"}:
+                    raise GatewayRejected("invalid_configuration") from None
+                continue
+            accepted.append((message_id, created, body))
+        return self.ingest(accepted, now=now)
 
     def ingest(self, events, *, now=None):
         """Durably reserve already authenticated events without external effects.

@@ -249,3 +249,95 @@ def test_worker_round_robin_does_not_starve_new_receipts(tmp_path):
         gateway.work(max_items=1)
     assert backend.creates == 18
     assert gateway.work(max_items=1) == ["pending"]
+
+
+def test_signed_large_batch_is_durable_before_worker_and_survives_restart(tmp_path):
+    backend, meta = Backend(), Meta()
+    gateway = make(tmp_path, backend, meta)
+    data = event(message_id="wamid.bulk")
+    message = data["entry"][0]["changes"][0]["value"]["messages"][0]
+    data["entry"][0]["changes"][0]["value"]["messages"] = [message] * 1000
+    raw, signature = wire(data)
+    assert len(raw) > module.MAX_WEBHOOK_BYTES
+    ids = gateway.receive(raw, signature, now=NOW)
+    assert len(ids) == 1000 and len(set(ids)) == 1
+    assert backend.creates == 0 and not meta.calls
+    restarted = make(tmp_path, backend, meta)
+    assert restarted.receive(raw, signature, now=NOW) == ids
+    assert restarted.work() == ["pending"]
+    assert backend.creates == 1
+
+
+def test_meta_request_byte_limit_hmac_and_aggregate_updates(tmp_path):
+    gateway = make(tmp_path)
+    raw, sig = wire(event())
+    padded = raw + b" " * (module.MAX_META_WEBHOOK_BYTES - len(raw))
+    signed = "sha256=" + __import__("hmac").new(SECRET, padded, hashlib.sha256).hexdigest()
+    assert gateway.receive(padded, signed, now=NOW)
+    with pytest.raises(GatewayRejected, match="payload_size"):
+        gateway.receive(padded + b" ", signed, now=NOW)
+    with pytest.raises(GatewayRejected, match="invalid_signature"):
+        gateway.receive(raw + b" ", sig, now=NOW)
+    data = event()
+    changes = data["entry"][0]["changes"]
+    changes[:] = changes * 1001
+    with pytest.raises(GatewayRejected, match="invalid_payload"):
+        gateway.receive(*wire(data), now=NOW)
+
+
+def test_meta_http_ack_is_independent_of_slow_backend(tmp_path):
+    import http.client
+    from datetime import datetime, timezone
+    from personal_ai_brain.whatsapp_runtime import RuntimeHTTPServer
+    from test_whatsapp_gateway import event, wire
+    gate_started, release = threading.Event(), threading.Event()
+    backend = Backend()
+    old_create = backend.create_issue
+    def delayed(title, body):
+        gate_started.set()
+        assert release.wait(3)
+        return old_create(title, body)
+    backend.create_issue = delayed
+    gateway = make(tmp_path, backend)
+    server = RuntimeHTTPServer(("127.0.0.1", 0), gateway, "verify")
+    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    server_thread.start()
+    raw, signature = wire(event(message_id="wamid.slow", timestamp=str(int(datetime.now(timezone.utc).timestamp()))))
+    conn = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=3)
+    try:
+        conn.request("POST", "/webhook", raw, {"X-Hub-Signature-256": signature})
+        reply = conn.getresponse()
+        assert reply.status == 200
+        reply.read()
+        worker_thread = threading.Thread(target=gateway.work)
+        worker_thread.start()
+        assert gate_started.wait(3)
+        raw2, signature2 = wire(event(message_id="wamid.other", timestamp=str(int(datetime.now(timezone.utc).timestamp()))))
+        conn2 = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=3)
+        conn2.request("POST", "/webhook", raw2, {"X-Hub-Signature-256": signature2})
+        reply2 = conn2.getresponse()
+        assert reply2.status == 200
+        reply2.read()
+        conn2.close()
+        assert backend.creates == 0
+    finally:
+        release.set()
+        conn.close()
+        if "worker_thread" in locals():
+            worker_thread.join(timeout=5)
+        server.shutdown()
+        server_thread.join(timeout=5)
+        server.server_close()
+    assert len(list(tmp_path.glob("*.json"))) == 2
+
+
+def test_meta_mixed_batch_skips_invalid_text_without_poisoning_valid(tmp_path):
+    backend = Backend()
+    gateway = make(tmp_path, backend)
+    data = event(message_id="wamid.good")
+    messages = data["entry"][0]["changes"][0]["value"]["messages"]
+    messages.append(dict(messages[0], id="wamid.bad", text={"body": "x" * 4097}))
+    accepted = gateway.receive(*wire(data), now=NOW)
+    assert len(accepted) == 1
+    assert gateway.work() == ["pending"]
+    assert backend.creates == 1

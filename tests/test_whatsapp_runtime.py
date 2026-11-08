@@ -8,7 +8,7 @@ from urllib.parse import urlencode
 
 import pytest
 
-from personal_ai_brain.whatsapp_gateway import GatewayRejected, MAX_WEBHOOK_BYTES
+from personal_ai_brain.whatsapp_gateway import GatewayRejected, MAX_META_WEBHOOK_BYTES
 from personal_ai_brain.whatsapp_runtime import JsonHTTP, RuntimeHTTPServer, load_runtime, poll_loop
 
 
@@ -20,6 +20,12 @@ class FakeGateway:
         if signature != "fake-valid":
             raise GatewayRejected("invalid_signature")
         self.received.append(raw)
+
+    def receive(self, raw, signature):
+        return self.post(raw, signature)
+
+    def work(self):
+        return self.poll()
 
     def poll(self):
         self.polls += 1
@@ -53,7 +59,16 @@ def test_http_challenge_signature_size_and_health(running):
     assert call(server, "POST", "/webhook", b"{}", {"X-Hub-Signature-256": "bad"})[0] == 403
     assert call(server, "POST", "/webhook", b"{}", {"X-Hub-Signature-256": "fake-valid"})[0] == 200
     assert gateway.received == [b"{}"]
-    assert call(server, "POST", "/webhook", b"x" * (MAX_WEBHOOK_BYTES + 1), {"X-Hub-Signature-256": "fake-valid"})[0] == 413
+    # Headers alone suffice: the server rejects before reading a 3 MiB body.
+    oversize = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=3)
+    oversize.putrequest("POST", "/webhook")
+    oversize.putheader("Content-Length", str(MAX_META_WEBHOOK_BYTES + 1))
+    oversize.putheader("X-Hub-Signature-256", "fake-valid")
+    oversize.endheaders()
+    response = oversize.getresponse()
+    assert response.status == 413
+    response.read()
+    oversize.close()
     assert call(server, "GET", "/health")[0] == 503
     server.poll_at = time.monotonic(); server.poll_ok = True
     assert call(server, "GET", "/health") == (200, b"ok")
@@ -112,3 +127,12 @@ def test_isolated_compose_contract():
     assert service["read_only"] is True and service["cap_drop"] == ["ALL"]
     assert {mount["target"] for mount in service["volumes"]} == {"/state", "/run/config/whatsapp.json"}
     assert len(service["secrets"]) == 4 and "build" not in service
+
+
+def test_http_capacity_denial_is_retryable_not_false_ack(running):
+    server, gateway = running
+    def unavailable(*_):
+        raise GatewayRejected("ingest_capacity")
+    gateway.receive = unavailable
+    assert call(server, "POST", "/webhook", b"{}", {"X-Hub-Signature-256": "fake-valid"})[0] == 503
+    assert gateway.received == []
