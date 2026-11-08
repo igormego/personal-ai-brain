@@ -329,3 +329,15 @@ def test_meta_http_ack_is_independent_of_slow_backend(tmp_path):
         server_thread.join(timeout=5)
         server.server_close()
     assert len(list(tmp_path.glob("*.json"))) == 2
+
+
+def test_meta_mixed_batch_skips_invalid_text_without_poisoning_valid(tmp_path):
+    backend = Backend()
+    gateway = make(tmp_path, backend)
+    data = event(message_id="wamid.good")
+    messages = data["entry"][0]["changes"][0]["value"]["messages"]
+    messages.append(dict(messages[0], id="wamid.bad", text={"body": "x" * 4097}))
+    accepted = gateway.receive(*wire(data), now=NOW)
+    assert len(accepted) == 1
+    assert gateway.work() == ["pending"]
+    assert backend.creates == 1
