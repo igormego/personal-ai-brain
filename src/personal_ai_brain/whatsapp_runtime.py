@@ -13,7 +13,7 @@ from urllib.parse import parse_qs, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from .github_issues import REPOSITORY
-from .whatsapp_gateway import Gateway, GatewayRejected, MAX_WEBHOOK_BYTES, MetaCloudClient, PrivateControlIssues, verify_challenge
+from .whatsapp_gateway import Gateway, GatewayRejected, MAX_META_WEBHOOK_BYTES, MetaCloudClient, PrivateControlIssues, verify_challenge
 
 MAX_RESPONSE = 2_000_000
 TIMEOUT = 10
@@ -139,16 +139,19 @@ class Handler(BaseHTTPRequestHandler):
                 or len(signatures) != 1 or self.headers.get_all("Transfer-Encoding")):
             self.reply(400); return
         length = int(lengths[0])
-        if length > MAX_WEBHOOK_BYTES:
+        if length > MAX_META_WEBHOOK_BYTES:
             self.reply(413); return
         try:
             body = self.rfile.read(length)
             if len(body) != length:
                 self.reply(400); return
-            self.server.gateway.post(body, signatures[0])
+            self.server.gateway.receive(body, signatures[0])
             self.reply(200, b"ok")
         except GatewayRejected as error:
-            self.reply(503 if str(error) in {"gateway_busy", "control_unavailable", "state_or_transport_invalid"} else 403)
+            self.reply(503 if str(error) in {"gateway_busy", "ingest_unavailable", "ingest_capacity",
+                                           "ingest_state_invalid", "state_or_transport_invalid"} else
+                       413 if str(error) == "payload_size" else
+                       400 if str(error) in {"invalid_payload", "ingest_batch"} else 403)
         except Exception:
             self.reply(503)
 
@@ -165,7 +168,7 @@ class RuntimeHTTPServer(HTTPServer):
 def poll_loop(server, stop, interval=30):
     while not stop.is_set():
         try:
-            server.gateway.poll()
+            server.gateway.work()
             server.poll_ok = True
         except Exception:
             server.poll_ok = False
