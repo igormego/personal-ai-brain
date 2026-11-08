@@ -234,7 +234,21 @@ class Gateway:
             phone_id=self.phone_id, recipient=self.recipient, sender=self.sender,
             max_bytes=MAX_META_WEBHOOK_BYTES, max_items=MAX_INGEST_EVENTS,
         )
-        return self.ingest(events, now=now)
+        # A malformed/unsupported individual text must not poison eligible
+        # siblings in the same authenticated Meta batch.
+        accepted = []
+        for message_id, created, body in events:
+            try:
+                normalize_request({"schema_version": "0.1", "request_id": str(uuid4()),
+                                   "message": body, "created_at": created},
+                                  trusted_user_id=self.user_id, trusted_surface="whatsapp",
+                                  trusted_reply_target=self.sender, now=now)
+            except RequestRejected as error:
+                if str(error) not in {"message", "message_size", "request_size", "created_at", "request_expired_or_future"}:
+                    raise GatewayRejected("invalid_configuration") from None
+                continue
+            accepted.append((message_id, created, body))
+        return self.ingest(accepted, now=now)
 
     def ingest(self, events, *, now=None):
         """Durably reserve already authenticated events without external effects.
