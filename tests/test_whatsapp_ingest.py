@@ -175,3 +175,66 @@ def test_corrupted_record_and_foreign_binding_fail_closed(tmp_path):
     with pytest.raises(GatewayRejected, match="ingest_state_invalid"):
         gateway.ingest(one("wamid.other"), now=NOW)
     assert len(list(tmp_path.glob("*.json"))) == 1
+
+
+def test_worker_resumes_received_and_reuses_original_uuid(tmp_path):
+    backend, meta = Backend(), Meta()
+    gateway = make(tmp_path, backend, meta)
+    ids = gateway.ingest(one(), now=NOW)
+    assert gateway.work() == ["pending"]
+    assert backend.creates == 1
+    assert json.loads(backend.issues[1]["body"])["request_id"] == ids[0]
+    backend.finish()
+    assert gateway.work() == ["sent"]
+    assert gateway.work() == ["sent"]
+    assert gateway.ingest(one(), now=NOW) == ids
+    assert backend.creates == 1 and len(meta.calls) == 1
+
+
+def test_worker_ambiguous_create_is_not_repeated(tmp_path):
+    class Broken(Backend):
+        def create_issue(self, title, body):
+            super().create_issue(title, body)
+            raise TimeoutError()
+    backend = Broken()
+    gateway = make(tmp_path, backend)
+    gateway.ingest(one(), now=NOW)
+    assert gateway.work() == ["control_uncertain"]
+    assert make(tmp_path, backend).work() == ["control_uncertain"]
+    assert backend.creates == 1
+
+
+def test_worker_releases_ingress_lock_during_network(tmp_path):
+    backend = Backend()
+    gateway = make(tmp_path, backend)
+    gateway.ingest(one("wamid.original"), now=NOW)
+    old_create = backend.create_issue
+    def create(title, body):
+        assert len(gateway.ingest(one("wamid.new"), now=NOW)) == 1
+        return old_create(title, body)
+    backend.create_issue = create
+    assert gateway.work(max_items=1) == ["pending"]
+    assert backend.creates == 1
+    assert len(list(tmp_path.glob("*.json"))) == 2
+
+
+def test_worker_reservation_survives_interruption_and_blocks_recreate(tmp_path):
+    gateway = make(tmp_path)
+    gateway.ingest(one(), now=NOW)
+    path = next(tmp_path.glob("*.json"))
+    record = json.loads(path.read_text())
+    record["control"] = "submitting"
+    path.write_text(json.dumps(record))
+    assert make(tmp_path).work() == ["control_uncertain"]
+
+
+def test_worker_limit_and_duplicate_guard(tmp_path):
+    backend = Backend()
+    gateway = make(tmp_path, backend)
+    gateway.ingest(one("wamid.first") + one("wamid.second"), now=NOW)
+    with pytest.raises(GatewayRejected, match="invalid_worker_limit"):
+        gateway.work(max_items=0)
+    assert len(gateway.work(max_items=1)) == 1
+    assert backend.creates == 1
+    assert len(gateway.work(max_items=1)) == 1
+    assert backend.creates <= 2
