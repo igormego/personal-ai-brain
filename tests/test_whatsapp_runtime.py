@@ -59,7 +59,16 @@ def test_http_challenge_signature_size_and_health(running):
     assert call(server, "POST", "/webhook", b"{}", {"X-Hub-Signature-256": "bad"})[0] == 403
     assert call(server, "POST", "/webhook", b"{}", {"X-Hub-Signature-256": "fake-valid"})[0] == 200
     assert gateway.received == [b"{}"]
-    assert call(server, "POST", "/webhook", b"x" * (MAX_META_WEBHOOK_BYTES + 1), {"X-Hub-Signature-256": "fake-valid"})[0] == 413
+    # Headers alone suffice: the server rejects before reading a 3 MiB body.
+    oversize = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=3)
+    oversize.putrequest("POST", "/webhook")
+    oversize.putheader("Content-Length", str(MAX_META_WEBHOOK_BYTES + 1))
+    oversize.putheader("X-Hub-Signature-256", "fake-valid")
+    oversize.endheaders()
+    response = oversize.getresponse()
+    assert response.status == 413
+    response.read()
+    oversize.close()
     assert call(server, "GET", "/health")[0] == 503
     server.poll_at = time.monotonic(); server.poll_ok = True
     assert call(server, "GET", "/health") == (200, b"ok")
