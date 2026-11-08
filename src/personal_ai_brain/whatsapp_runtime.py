@@ -135,8 +135,9 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(404); return
         lengths = self.headers.get_all("Content-Length", [])
         signatures = self.headers.get_all("X-Hub-Signature-256", [])
-        if (len(lengths) != 1 or not lengths[0].isascii() or not lengths[0].isdigit()
-                or len(signatures) != 1 or self.headers.get_all("Transfer-Encoding")):
+        if (len(lengths) != 1 or len(lengths[0]) > 10 or not lengths[0].isascii()
+                or not lengths[0].isdigit() or len(signatures) != 1
+                or self.headers.get_all("Transfer-Encoding")):
             self.reply(400); return
         length = int(lengths[0])
         if length > MAX_META_WEBHOOK_BYTES:
