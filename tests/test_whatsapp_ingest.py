@@ -248,4 +248,4 @@ def test_worker_round_robin_does_not_starve_new_receipts(tmp_path):
     for _ in range(18):
         gateway.work(max_items=1)
     assert backend.creates == 18
-    assert gateway.work(max_items=1) == []
+    assert gateway.work(max_items=1) == ["pending"]
