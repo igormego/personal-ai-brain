@@ -301,3 +301,28 @@ def test_http_signed_out_of_scope_event_is_acknowledged(tmp_path):
         assert backend.creates == 0
     finally:
         server.shutdown(); worker.join(); server.server_close()
+
+
+def test_http_retry_after_transient_failure_reuses_reserved_issue(tmp_path):
+    import http.client
+    import threading
+    from personal_ai_brain.whatsapp_runtime import RuntimeHTTPServer
+    class Interrupted(Backend):
+        def __init__(self):
+            super().__init__(); self.once = True
+        def get_issue(self, number):
+            if self.once:
+                self.once = False
+                raise TimeoutError()
+            return super().get_issue(number)
+    backend = Interrupted(); server = RuntimeHTTPServer(("127.0.0.1", 0), make(tmp_path, backend), "verify")
+    worker = threading.Thread(target=server.serve_forever, daemon=True); worker.start()
+    try:
+        raw, signature = wire(event(timestamp=str(int(datetime.now(timezone.utc).timestamp()))))
+        for expected in (503, 200):
+            conn = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=3)
+            conn.request("POST", "/webhook", raw, {"X-Hub-Signature-256": signature})
+            response = conn.getresponse(); assert response.status == expected; response.read(); conn.close()
+        assert backend.creates == 1
+    finally:
+        server.shutdown(); worker.join(); server.server_close()
