@@ -210,7 +210,9 @@ def test_runtime_end_to_end_over_loopback_with_fake_clients(tmp_path):
         conn = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=3)
         conn.request("POST", "/webhook", raw, {"X-Hub-Signature-256": signature})
         response = conn.getresponse(); assert response.status == 200; response.read(); conn.close()
-        backend.finish(); assert gateway.poll() == ["sent"]
+        assert backend.creates == 0  # durable ACK occurs before GitHub create
+        assert gateway.work() == ["pending"]
+        backend.finish(); assert gateway.work() == ["sent"]
         assert backend.creates == 1 and len(meta.calls) == 1
     finally:
         server.shutdown(); worker.join(); server.server_close()
@@ -315,14 +317,19 @@ def test_http_retry_after_transient_failure_reuses_reserved_issue(tmp_path):
                 self.once = False
                 raise TimeoutError()
             return super().get_issue(number)
-    backend = Interrupted(); server = RuntimeHTTPServer(("127.0.0.1", 0), make(tmp_path, backend), "verify")
+    backend = Interrupted(); gateway = make(tmp_path, backend)
+    server = RuntimeHTTPServer(("127.0.0.1", 0), gateway, "verify")
     worker = threading.Thread(target=server.serve_forever, daemon=True); worker.start()
     try:
         raw, signature = wire(event(timestamp=str(int(datetime.now(timezone.utc).timestamp()))))
-        for expected in (503, 200):
+        for expected in (200, 200):
             conn = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=3)
             conn.request("POST", "/webhook", raw, {"X-Hub-Signature-256": signature})
             response = conn.getresponse(); assert response.status == expected; response.read(); conn.close()
+        assert backend.creates == 0
+        with pytest.raises(GatewayRejected, match="control_unavailable"):
+            gateway.work()
         assert backend.creates == 1
+        assert gateway.work() == ["pending"]
     finally:
         server.shutdown(); worker.join(); server.server_close()
