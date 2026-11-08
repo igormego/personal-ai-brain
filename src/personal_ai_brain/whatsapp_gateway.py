@@ -185,6 +185,7 @@ class Gateway:
         self.backend, self.meta, self.repository, self.owner_id = backend, meta, repository, owner_id
         self.user_id, self.waba_id, self.phone_id = user_id, waba_id, phone_id
         self.recipient, self.sender, self.app_secret = recipient, sender, app_secret
+        self._work_cursor = ""  # round-robin scan; terminal/uncertain states do not starve ingress
         self.binding = hashlib.sha256(json.dumps([repository, owner_id, user_id, waba_id, phone_id,
                                                   recipient, sender], separators=(",", ":")).encode()).hexdigest()
 
@@ -352,11 +353,12 @@ class Gateway:
                 return results
 
     def work(self, *, max_items=8):
-        """Single bounded worker; never hold the ingress lock during external I/O.
+        """Process bounded durable receipts without blocking the ingress lock on I/O.
 
-        A received record is reserved as submitting before any GitHub create.
-        An interrupted/ambiguous create or send is never automatically retried.
-        Legacy post/poll share the worker lock to prevent competing effects.
+        One worker owns the external-effect path across processes. Its round-robin
+        cursor advances through active records and prevents pending records from
+        indefinitely starving later receipts. Terminal and uncertain records are
+        never retried or removed.
         """
         if type(max_items) is not int or not 1 <= max_items <= 32:
             raise GatewayRejected("invalid_worker_limit")
@@ -366,21 +368,29 @@ class Gateway:
                 paths = sorted(self.root.glob("*.json"))
                 if any(p.suffix != ".json" or not re.fullmatch(r"[0-9a-f]{64}", p.stem) for p in paths):
                     raise GatewayRejected("state_or_transport_invalid")
-            for path in paths[:max_items]:
+            if self._work_cursor:
+                cut = next((i for i, p in enumerate(paths) if p.name > self._work_cursor), len(paths))
+                paths = paths[cut:] + paths[:cut]
+            for path in paths:
+                if len(results) >= max_items:
+                    break
+                self._work_cursor = path.name
                 try:
                     with _lock(self.root):
                         record = json.loads(path.read_text(encoding="utf-8"))
                         if record["binding"] != self.binding:
                             raise GatewayRejected("state_binding_mismatch")
+                        status, delivery = record["control"], record["delivery"]
+                        if status in {"submitting", "uncertain"} or delivery in {"sent", "failed", "sending", "uncertain"}:
+                            continue
+                        if status not in {"received", "submitted"} or delivery != "pending":
+                            raise GatewayRejected("state_or_transport_invalid")
                         req = AssistantRequest("0.1", record["request_id"], self.user_id, "whatsapp", "",
                                                record["created_at"], self.sender, record["request_hash"])
-                        submit = record["control"] == "received"
-                        if submit:
-                            if record["delivery"] != "pending":
-                                raise GatewayRejected("state_or_transport_invalid")
+                        if status == "received":
                             record["control"] = "submitting"
-                            _save(path, record)
-                    if submit:
+                            _save(path, record)  # irreversible external-effect reservation
+                    if status == "received":
                         try:
                             submission = encode_project_status(req, SELECTOR)
                             number = self.backend.create_issue(submission.title, submission.body)
@@ -392,11 +402,11 @@ class Gateway:
                             else:
                                 record["control"] = "uncertain"
                             _save(path, record)
-                        if number is None or type(number) is not int or number <= 0:
+                        if type(number) is not int or number <= 0:
                             results.append("control_uncertain")
                             continue
-                    # Worker ownership excludes other external-effect paths;
-                    # ingress can still reserve unrelated messages concurrently.
+                    # Only the worker lock spans network operations. The short
+                    # ingress lock is released before GitHub/Meta calls.
                     results.append(self._advance(path, record, req))
                 except GatewayRejected:
                     raise
