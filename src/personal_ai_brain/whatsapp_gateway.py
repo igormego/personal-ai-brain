@@ -364,7 +364,7 @@ class Gateway:
         with _lock(self.root, "gateway-worker.lock"):
             with _lock(self.root):
                 paths = sorted(self.root.glob("*.json"))
-                if any(not re.fullmatch(r"[0-9a-f]{64}\\.json", p.name) for p in paths):
+                if any(p.suffix != ".json" or not re.fullmatch(r"[0-9a-f]{64}", p.stem) for p in paths):
                     raise GatewayRejected("state_or_transport_invalid")
             for path in paths[:max_items]:
                 try:
