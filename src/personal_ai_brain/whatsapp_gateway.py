@@ -17,12 +17,17 @@ import json
 import os
 from pathlib import Path
 import re
-from uuid import uuid4
+import stat
+from uuid import UUID, uuid4
 
 from .assistant_contract import AssistantRequest, normalize_request, RequestRejected
 from .assistant_control_codec import encode_project_status, decode_project_status, TITLE
 
 MAX_WEBHOOK_BYTES = 65536
+# G3.6A only: no automatic deletion; old and uncertain reservations count too.
+MAX_INGEST_RECORDS = 10000
+MAX_INGEST_BYTES = 16 * 1024 * 1024
+MAX_INGEST_EVENTS = 1000
 SELECTOR = {"project_id": "homelab"}
 _ID = re.compile(r"[A-Za-z0-9_.=+/\-]{1,160}\Z", re.ASCII)
 _PHONE = re.compile(r"[0-9]{1,32}\Z", re.ASCII)
@@ -147,6 +152,15 @@ def _lock(root):
                 fcntl.flock(stream, fcntl.LOCK_UN)
 
 
+def _sync_directory(root):
+    if os.name != "nt":
+        fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+
+
 def _save(path, record):
     temp = path.with_name(path.name + "." + uuid4().hex + ".tmp")
     try:
@@ -155,12 +169,7 @@ def _save(path, record):
             json.dump(record, stream, sort_keys=True, separators=(",", ":"))
             stream.flush(); os.fsync(stream.fileno())
         os.replace(temp, path)
-        if os.name != "nt":
-            fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
-            try:
-                os.fsync(fd)
-            finally:
-                os.close(fd)
+        _sync_directory(path.parent)
     finally:
         temp.unlink(missing_ok=True)
 
@@ -196,6 +205,96 @@ class Gateway:
             accepted.append((message_id, created, body))
         with _lock(self.root):
             return [self._process(mid, created, body, now) for mid, created, body in accepted]
+
+    def ingest(self, events, *, now=None):
+        """Durably reserve already authenticated events without external effects.
+
+        The caller must authenticate the original provider bytes and identities;
+        tuples have the same (message_id, created_at, body) shape returned by
+        authenticated_events. This is not connected to the HTTP path or a worker.
+        Records, including uncertain ones, are never automatically deleted.
+        """
+        if not isinstance(events, (list, tuple)) or len(events) > MAX_INGEST_EVENTS:
+            raise GatewayRejected("ingest_batch")
+        try:
+            with _lock(self.root):
+                existing, artifact_count, total_bytes = self._ingest_inventory()
+                proposed = {}
+                results = []
+                for event in events:
+                    if not isinstance(event, (tuple, list)) or len(event) != 3:
+                        raise GatewayRejected("ingest_batch")
+                    message_id, created, body = event
+                    if not isinstance(message_id, str) or not _ID.fullmatch(message_id):
+                        raise GatewayRejected("ingest_batch")
+                    key = hashlib.sha256(message_id.encode("ascii")).hexdigest()
+                    previous = existing.get(key) or proposed.get(key)
+                    request_id = previous["request_id"] if previous else str(uuid4())
+                    req = normalize_request({"schema_version": "0.1", "request_id": request_id,
+                                             "message": body, "created_at": created},
+                                            trusted_user_id=self.user_id, trusted_surface="whatsapp",
+                                            trusted_reply_target=self.sender, now=now)
+                    if previous:
+                        if previous["binding"] != self.binding or previous["request_hash"] != req.payload_hash:
+                            raise GatewayRejected("message_conflict")
+                    else:
+                        proposed[key] = {"request_id": req.request_id, "request_hash": req.payload_hash,
+                                         "control": "received", "delivery": "pending",
+                                         "created_at": req.created_at, "binding": self.binding}
+                    results.append(request_id)
+                new_bytes = sum(len(json.dumps(record, sort_keys=True, separators=(",", ":")).encode("utf-8"))
+                                for record in proposed.values())
+                if artifact_count + len(proposed) > MAX_INGEST_RECORDS or total_bytes + new_bytes > MAX_INGEST_BYTES:
+                    raise GatewayRejected("ingest_capacity")
+                for key, record in proposed.items():
+                    _save(self.root / (key + ".json"), record)
+                # Also sync duplicate-only retries after a previous rename/fsync failure.
+                _sync_directory(self.root)
+                return results
+        except GatewayRejected:
+            raise
+        except (RequestRejected, OSError, ValueError, TypeError, KeyError, RecursionError):
+            raise GatewayRejected("ingest_unavailable") from None
+
+    def _ingest_inventory(self):
+        """Check all records and charge orphaned temporary files against capacity."""
+        records = {}
+        artifact_count = total_bytes = 0
+        for item in self.root.iterdir():
+            if item.name == "gateway.lock":
+                continue
+            info = item.lstat()
+            if not stat.S_ISREG(info.st_mode):
+                raise GatewayRejected("ingest_state_invalid")
+            artifact_count += 1
+            total_bytes += info.st_size
+            if artifact_count > MAX_INGEST_RECORDS or total_bytes > MAX_INGEST_BYTES:
+                raise GatewayRejected("ingest_capacity")
+            if re.fullmatch(r"[0-9a-f]{64}\.json\.[0-9a-f]{32}\.tmp", item.name):
+                # A crash can leave a temporary file. Never interpret it as a record.
+                continue
+            if not re.fullmatch(r"[0-9a-f]{64}\.json", item.name) or info.st_size > 8192:
+                raise GatewayRejected("ingest_state_invalid")
+            record = json.loads(item.read_text(encoding="utf-8"), object_pairs_hook=_unique,
+                                parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
+            if not isinstance(record, dict):
+                raise GatewayRejected("ingest_state_invalid")
+            rid, rhash, binding = record.get("request_id"), record.get("request_hash"), record.get("binding")
+            if (not isinstance(rid, str) or str(UUID(rid)) != rid or UUID(rid).version != 4
+                    or not isinstance(rhash, str) or not re.fullmatch(r"[0-9a-f]{64}", rhash)
+                    or binding != self.binding or not isinstance(record.get("created_at"), str)
+                    or record.get("control") not in {"received", "submitting", "submitted", "uncertain"}
+                    or record.get("delivery") not in {"pending", "sending", "uncertain", "sent", "failed"}):
+                raise GatewayRejected("ingest_state_invalid")
+            if record["control"] == "received" and record["delivery"] != "pending":
+                raise GatewayRejected("ingest_state_invalid")
+            if record["control"] == "submitted" and (type(record.get("issue")) is not int or record["issue"] < 1):
+                raise GatewayRejected("ingest_state_invalid")
+            created_at = datetime.fromisoformat(record["created_at"])
+            if created_at.tzinfo is None:
+                raise GatewayRejected("ingest_state_invalid")
+            records[item.name[:-5]] = record
+        return records, artifact_count, total_bytes
 
     def _process(self, message_id, created, body, now):
         key = hashlib.sha256(message_id.encode("ascii")).hexdigest()
@@ -254,6 +353,8 @@ class Gateway:
         if record.get("binding") != self.binding:
             raise GatewayRejected("state_binding_mismatch")
         try:
+            if record["control"] == "received":
+                return "received"  # This milestone deliberately has no worker for received events.
             if record["control"] in {"submitting", "uncertain"}:
                 return "control_uncertain"
             if record["delivery"] in {"sending", "uncertain"}:
