@@ -76,8 +76,10 @@ def authenticated_events(raw, signature, secret, *, waba_id, phone_id, recipient
             raise ValueError()
         events = []
         for entry in entries:
-            if not isinstance(entry, dict) or entry.get("id") != waba_id:
-                raise GatewayRejected("untrusted_recipient")
+            if not isinstance(entry, dict):
+                raise ValueError()
+            if entry.get("id") != waba_id:
+                continue
             changes = entry["changes"]
             if not isinstance(changes, list) or len(changes) > 100:
                 raise ValueError()
@@ -87,21 +89,26 @@ def authenticated_events(raw, signature, secret, *, waba_id, phone_id, recipient
                 value = change["value"]
                 meta = value["metadata"]
                 if meta.get("phone_number_id") != phone_id or meta.get("display_phone_number") != recipient:
-                    raise GatewayRejected("untrusted_recipient")
+                    continue
                 messages = value.get("messages", [])
                 if not isinstance(messages, list) or len(messages) > 100:
                     raise ValueError()
                 for message in messages:
+                    if not isinstance(message, dict):
+                        continue
                     if message.get("from") != sender:
-                        raise GatewayRejected("untrusted_sender")
+                        continue
                     if message.get("type") != "text" or not isinstance(message.get("text"), dict):
-                        raise GatewayRejected("unsupported_message")
+                        continue
                     msg_id, stamp, body = message.get("id"), message.get("timestamp"), message["text"].get("body")
                     if not isinstance(msg_id, str) or not _ID.fullmatch(msg_id):
-                        raise ValueError()
+                        continue
                     if not isinstance(stamp, str) or not re.fullmatch(r"[0-9]{1,12}", stamp, re.ASCII):
-                        raise ValueError()
-                    created = datetime.fromtimestamp(int(stamp), timezone.utc).isoformat()
+                        continue
+                    try:
+                        created = datetime.fromtimestamp(int(stamp), timezone.utc).isoformat()
+                    except (ValueError, OverflowError, OSError):
+                        continue
                     events.append((msg_id, created, body))
         return events
     except GatewayRejected:
@@ -176,15 +183,19 @@ class Gateway:
         events = authenticated_events(raw, signature, self.app_secret, waba_id=self.waba_id,
                                       phone_id=self.phone_id, recipient=self.recipient, sender=self.sender)
         # Validate the whole batch before causing any external effects.
-        for _, created, body in events:
+        accepted = []
+        for message_id, created, body in events:
             try:
                 normalize_request({"schema_version": "0.1", "request_id": str(uuid4()),
                                    "message": body, "created_at": created}, trusted_user_id=self.user_id,
                                   trusted_surface="whatsapp", trusted_reply_target=self.sender, now=now)
-            except RequestRejected:
-                raise GatewayRejected("invalid_message") from None
+            except RequestRejected as error:
+                if str(error) not in {"message", "message_size", "request_size", "created_at", "request_expired_or_future"}:
+                    raise GatewayRejected("invalid_configuration") from None
+                continue
+            accepted.append((message_id, created, body))
         with _lock(self.root):
-            return [self._process(mid, created, body, now) for mid, created, body in events]
+            return [self._process(mid, created, body, now) for mid, created, body in accepted]
 
     def _process(self, message_id, created, body, now):
         key = hashlib.sha256(message_id.encode("ascii")).hexdigest()

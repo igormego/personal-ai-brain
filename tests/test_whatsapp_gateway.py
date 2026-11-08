@@ -32,9 +32,10 @@ class Backend:
 
     def create_issue(self, title, body):
         self.creates += 1
-        self.issues[1] = {"number": 1, "repository": REPO, "private": True, "title": title,
-                          "body": body, "author_id": 42, "is_pull_request": False}
-        return 1
+        number = self.creates
+        self.issues[number] = {"number": number, "repository": REPO, "private": True, "title": title,
+                               "body": body, "author_id": 42, "is_pull_request": False}
+        return number
 
     def get_issue(self, number):
         return self.issues[number]
@@ -104,13 +105,10 @@ def test_conflict_and_wrong_endpoints_no_effect(tmp_path):
     for key, value in [("from", "421900000003"), ("type", "image"), ("timestamp", "not-a-time")]:
         item = event(message_id="wamid.other")
         item["entry"][0]["changes"][0]["value"]["messages"][0][key] = value
-        with pytest.raises(GatewayRejected):
-            gateway.post(*wire(item), now=NOW)
+        assert gateway.post(*wire(item), now=NOW) == []
     item = event(); item["entry"][0]["changes"][0]["value"]["metadata"]["phone_number_id"] = "777"
-    with pytest.raises(GatewayRejected, match="untrusted_recipient"):
-        gateway.post(*wire(item), now=NOW)
-    with pytest.raises(GatewayRejected):
-        gateway.post(*wire(event(timestamp="1")), now=NOW)
+    assert gateway.post(*wire(item), now=NOW) == []
+    assert gateway.post(*wire(event(timestamp="1")), now=NOW) == []
     assert backend.creates == 1
 
 
@@ -183,8 +181,7 @@ def test_forged_signed_json_duplicate_fields_and_oversized_text(tmp_path):
     signature = "sha256=" + hmac.new(SECRET, raw, hashlib.sha256).hexdigest()
     with pytest.raises(GatewayRejected):
         gateway.post(raw, signature, now=NOW)
-    with pytest.raises(GatewayRejected):
-        gateway.post(*wire(event(body="x" * 4097)), now=NOW)
+    assert gateway.post(*wire(event(body="x" * 4097)), now=NOW) == []
     assert list(tmp_path.glob("*.json")) == []
 
 
@@ -215,5 +212,92 @@ def test_runtime_end_to_end_over_loopback_with_fake_clients(tmp_path):
         response = conn.getresponse(); assert response.status == 200; response.read(); conn.close()
         backend.finish(); assert gateway.poll() == ["sent"]
         assert backend.creates == 1 and len(meta.calls) == 1
+    finally:
+        server.shutdown(); worker.join(); server.server_close()
+
+
+def test_signed_mixed_batch_ignores_out_of_scope_and_replay_is_idempotent(tmp_path):
+    backend, meta = Backend(), Meta(); gateway = make(tmp_path, backend, meta)
+    data = event(message_id="wamid.one")
+    value = data["entry"][0]["changes"][0]["value"]
+    valid = value["messages"][0]
+    value["messages"] = [dict(valid, **{"from": "999"}), dict(valid, type="image"),
+                         dict(valid, id="wamid.invalid", timestamp="bad"),
+                         valid, dict(valid, id="wamid.two"), valid]
+    value["statuses"] = [{"id": "irrelevant", "status": "delivered"}]
+    assert gateway.post(*wire(data), now=NOW) == ["pending", "pending", "pending"]
+    assert gateway.post(*wire(data), now=NOW) == ["pending", "pending", "pending"]
+    assert backend.creates == 2 and len(list(tmp_path.glob("*.json"))) == 2
+    assert not meta.calls
+    # A valid event for another recipient or WABA cannot poison the trusted batch.
+    other = event(message_id="wamid.other")["entry"][0]
+    other["id"] = "999"
+    data["entry"].insert(0, other)
+    assert len(gateway.post(*wire(data), now=NOW)) == 3
+    assert backend.creates == 2
+
+
+def test_batch_retry_after_partial_progress_never_recreates_issue(tmp_path):
+    class Interrupted(Backend):
+        def __init__(self):
+            super().__init__(); self.once = True
+        def get_issue(self, number):
+            if self.once:
+                self.once = False
+                raise TimeoutError()
+            return super().get_issue(number)
+    backend = Interrupted(); gateway = make(tmp_path, backend)
+    data = event(message_id="wamid.first")
+    messages = data["entry"][0]["changes"][0]["value"]["messages"]
+    messages.append(dict(messages[0], id="wamid.second"))
+    with pytest.raises(GatewayRejected, match="control_unavailable"):
+        gateway.post(*wire(data), now=NOW)
+    assert backend.creates == 1
+    assert make(tmp_path, backend).post(*wire(data), now=NOW) == ["pending", "pending"]
+    assert backend.creates == 2
+
+
+def test_signed_payload_and_array_bounds_are_explicit(tmp_path):
+    from personal_ai_brain.whatsapp_gateway import MAX_WEBHOOK_BYTES
+    gateway = make(tmp_path)
+    data = event(); messages = data["entry"][0]["changes"][0]["value"]["messages"]
+    messages[:] = [dict(messages[0], **{"from": "999"}) for _ in range(100)]
+    raw, _ = wire(data)
+    assert len(raw) < MAX_WEBHOOK_BYTES
+    padded = raw + b" " * (MAX_WEBHOOK_BYTES - len(raw))
+    sign = lambda b: "sha256=" + hmac.new(SECRET, b, hashlib.sha256).hexdigest()
+    assert gateway.post(padded, sign(padded), now=NOW) == []
+    with pytest.raises(GatewayRejected, match="payload_size"):
+        gateway.post(padded + b" ", sign(padded + b" "), now=NOW)
+    messages.append(messages[0])
+    with pytest.raises(GatewayRejected, match="invalid_payload"):
+        gateway.post(*wire(data), now=NOW)
+    assert not list(tmp_path.glob("*.json"))
+
+
+def test_untrusted_and_unsupported_do_not_bypass_raw_signature(tmp_path):
+    gateway = make(tmp_path)
+    data = event(); data["entry"][0]["changes"][0]["value"]["messages"][0]["type"] = "image"
+    raw, sig = wire(data)
+    with pytest.raises(GatewayRejected, match="invalid_signature"):
+        gateway.post(raw + b" ", sig, now=NOW)
+    assert gateway.post(raw, sig, now=NOW) == []
+
+
+def test_http_signed_out_of_scope_event_is_acknowledged(tmp_path):
+    import http.client
+    import threading
+    from personal_ai_brain.whatsapp_runtime import RuntimeHTTPServer
+    backend = Backend(); gateway = make(tmp_path, backend)
+    server = RuntimeHTTPServer(("127.0.0.1", 0), gateway, "verify")
+    worker = threading.Thread(target=server.serve_forever, daemon=True); worker.start()
+    try:
+        data = event(timestamp=str(int(datetime.now(timezone.utc).timestamp())))
+        data["entry"][0]["changes"][0]["value"]["messages"][0]["type"] = "image"
+        raw, signature = wire(data)
+        conn = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=3)
+        conn.request("POST", "/webhook", raw, {"X-Hub-Signature-256": signature})
+        response = conn.getresponse(); assert response.status == 200; response.read(); conn.close()
+        assert backend.creates == 0
     finally:
         server.shutdown(); worker.join(); server.server_close()
