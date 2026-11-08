@@ -123,9 +123,9 @@ def authenticated_events(raw, signature, secret, *, waba_id, phone_id, recipient
 
 
 @contextmanager
-def _lock(root):
+def _lock(root, filename="gateway.lock"):
     """An OS-held exclusive lock is released by the OS on process death."""
-    with (root / "gateway.lock").open("a+b") as stream:
+    with (root / filename).open("a+b") as stream:
         if os.name == "nt":
             import msvcrt
             stream.seek(0)
@@ -203,8 +203,9 @@ class Gateway:
                     raise GatewayRejected("invalid_configuration") from None
                 continue
             accepted.append((message_id, created, body))
-        with _lock(self.root):
-            return [self._process(mid, created, body, now) for mid, created, body in accepted]
+        with _lock(self.root, "gateway-worker.lock"):
+            with _lock(self.root):
+                return [self._process(mid, created, body, now) for mid, created, body in accepted]
 
     def ingest(self, events, *, now=None):
         """Durably reserve already authenticated events without external effects.
@@ -261,7 +262,7 @@ class Gateway:
         records = {}
         artifact_count = total_bytes = 0
         for item in self.root.iterdir():
-            if item.name == "gateway.lock":
+            if item.name in {"gateway.lock", "gateway-worker.lock"}:
                 continue
             info = item.lstat()
             if not stat.S_ISREG(info.st_mode):
@@ -331,23 +332,77 @@ class Gateway:
 
     def poll(self):
         """Resume submitted requests without storing or replaying private message text."""
-        with _lock(self.root):
-            results = []
-            for path in sorted(self.root.glob("*.json")):
-                if not re.fullmatch(r"[0-9a-f]{64}\.json", path.name):
+        with _lock(self.root, "gateway-worker.lock"):
+            with _lock(self.root):
+                results = []
+                for path in sorted(self.root.glob("*.json")):
+                    if not re.fullmatch(r"[0-9a-f]{64}\.json", path.name):
+                        raise GatewayRejected("state_or_transport_invalid")
+                    try:
+                        record = json.loads(path.read_text(encoding="utf-8"))
+                        if record["binding"] != self.binding:
+                            raise GatewayRejected("state_binding_mismatch")
+                        req = AssistantRequest("0.1", record["request_id"], self.user_id, "whatsapp", "",
+                                               record["created_at"], self.sender, record["request_hash"])
+                        results.append(self._advance(path, record, req))
+                    except GatewayRejected:
+                        raise
+                    except (KeyError, TypeError, ValueError, OSError):
+                        raise GatewayRejected("state_or_transport_invalid") from None
+                return results
+
+    def work(self, *, max_items=8):
+        """Single bounded worker; never hold the ingress lock during external I/O.
+
+        A received record is reserved as submitting before any GitHub create.
+        An interrupted/ambiguous create or send is never automatically retried.
+        Legacy post/poll share the worker lock to prevent competing effects.
+        """
+        if type(max_items) is not int or not 1 <= max_items <= 32:
+            raise GatewayRejected("invalid_worker_limit")
+        results = []
+        with _lock(self.root, "gateway-worker.lock"):
+            with _lock(self.root):
+                paths = sorted(self.root.glob("*.json"))
+                if any(not re.fullmatch(r"[0-9a-f]{64}\\.json", p.name) for p in paths):
                     raise GatewayRejected("state_or_transport_invalid")
+            for path in paths[:max_items]:
                 try:
-                    record = json.loads(path.read_text(encoding="utf-8"))
-                    if record["binding"] != self.binding:
-                        raise GatewayRejected("state_binding_mismatch")
-                    req = AssistantRequest("0.1", record["request_id"], self.user_id, "whatsapp", "",
-                                           record["created_at"], self.sender, record["request_hash"])
+                    with _lock(self.root):
+                        record = json.loads(path.read_text(encoding="utf-8"))
+                        if record["binding"] != self.binding:
+                            raise GatewayRejected("state_binding_mismatch")
+                        req = AssistantRequest("0.1", record["request_id"], self.user_id, "whatsapp", "",
+                                               record["created_at"], self.sender, record["request_hash"])
+                        submit = record["control"] == "received"
+                        if submit:
+                            if record["delivery"] != "pending":
+                                raise GatewayRejected("state_or_transport_invalid")
+                            record["control"] = "submitting"
+                            _save(path, record)
+                    if submit:
+                        try:
+                            submission = encode_project_status(req, SELECTOR)
+                            number = self.backend.create_issue(submission.title, submission.body)
+                        except Exception:
+                            number = None
+                        with _lock(self.root):
+                            if type(number) is int and number > 0:
+                                record.update(control="submitted", issue=number)
+                            else:
+                                record["control"] = "uncertain"
+                            _save(path, record)
+                        if number is None or type(number) is not int or number <= 0:
+                            results.append("control_uncertain")
+                            continue
+                    # Worker ownership excludes other external-effect paths;
+                    # ingress can still reserve unrelated messages concurrently.
                     results.append(self._advance(path, record, req))
                 except GatewayRejected:
                     raise
                 except (KeyError, TypeError, ValueError, OSError):
                     raise GatewayRejected("state_or_transport_invalid") from None
-            return results
+        return results
 
     def _advance(self, path, record, req):
         if record.get("binding") != self.binding:
