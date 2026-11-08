@@ -118,3 +118,12 @@ def test_isolated_compose_contract():
     assert service["read_only"] is True and service["cap_drop"] == ["ALL"]
     assert {mount["target"] for mount in service["volumes"]} == {"/state", "/run/config/whatsapp.json"}
     assert len(service["secrets"]) == 4 and "build" not in service
+
+
+def test_http_capacity_denial_is_retryable_not_false_ack(running):
+    server, gateway = running
+    def unavailable(*_):
+        raise GatewayRejected("ingest_capacity")
+    gateway.receive = unavailable
+    assert call(server, "POST", "/webhook", b"{}", {"X-Hub-Signature-256": "fake-valid"})[0] == 503
+    assert gateway.received == []
