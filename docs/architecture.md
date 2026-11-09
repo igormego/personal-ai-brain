@@ -153,3 +153,86 @@ single platform credential metadata authority; values are never recorded there.
 boundary with one fixed deterministic task, a constrained systemd identity,
 per-task Bubblewrap isolation and fsynced task truth/artifacts. It has no model,
 remote task intake, GitHub publication or deployment capability.
+
+## Next reviewed slice — guarded Homelab resources and effects (#83)
+
+**Status: architecture contract only, not deployed or authorized host access.**
+This is the first security review for the existing
+[guarded resource/effect broker issue](https://github.com/igormego/personal-ai-brain/issues/83),
+under the [general workspace](general-agent-workspace-v01.md) and existing
+[control bridge](control-bridge.md). Do not deploy merely because this text exists.
+
+### Reuse map and trust boundaries
+
+| Existing component | Verified/sourced role | Reuse boundary |
+| --- | --- | --- |
+| `pab-control/v0.1` private GitHub Issue transport | Correlated request UUID, durable reservation, replay/conflict check, bounded result delivery | Reuse request/ledger/owner-authenticated transport; no second queue or generic shell |
+| `control.build_registry` and `media.resource_read` | Source-only opt-in; strict selector currently only `sonarr/overview` | Extend a **typed resource family**, not one handler per question |
+| `media_snapshot.py` + host Sonarr overview collector | Credential-free sanitized fixed-path reader and separate host-side GET adapter, not live activated | Preserve host-only credentials, read-only mount and explicit collector admission |
+| `workspace.python.v1` (#77) | LIVE_ACCEPTED bounded offline Python sandbox | May analyze explicitly granted sanitized inputs; **no** private host files, network, secrets, Plex, Docker or SSH |
+| Homelab Movie Intelligence + Media Automation | Own canonical media.db/identity, Plex availability, Radarr/Seerr and episode diagnosis semantics | Domain adapters and fixes stay with the Media owner; PAB owns grants/audit |
+| Notebook Meshnet SSH / temporary browser tunnels | Operator-only access demonstrated via separate machine-local config | Neither path is available to cloud ChatGPT or its GitHub connector |
+
+The first consumers are [movie availability audit #26](https://github.com/igormego/homelab-infrastructure/issues/26)
+and [Plex/Dexter evidence #47](https://github.com/igormego/homelab-infrastructure/issues/47).
+The historical Plex Watched shelf uses metadata placeholders; it must **never**
+be counted as playable real media. ČSFD lifetime-watchlist membership is not
+authorization to download. A Plex red-trash item indicates unavailable media
+metadata, not independently proven file deletion.
+
+### Read contract: first end-to-end user value
+
+The **caller specifies a typed purpose and narrowly authorized identity**, e.g.
+an aggregate movie watchlist/availability view or a selected Plex item / Sonarr
+episode. The caller does **not** specify URLs, paths, SQL, arbitrary host
+commands, Docker operations, credentials, environment, or HTTP methods.
+The trusted broker must enforce:
+
+- A resource class, allowlisted selector schema and immutable source/provider
+  version; an authenticated principal and per-resource read grant. `requested_by`
+  is audit metadata only, never authorization.
+- A fixed host-side adapter using only vetted passive GETs / SQLite read mode
+  with live-WAL-safe semantics. APIs whose GET initiates provider searches or
+  scans are excluded. Production secrets are never mounted into the control
+  container or serialized into Issues.
+- Canonical TMDb/IMDb and exact Plex/Sonarr identifiers; ambiguous or
+  conflicting identity stays unresolved. Source-specific inventory completeness,
+  physical file accessibility, stale timestamps, active download/request status,
+  and source-error/unknown distinctions are retained.
+- A bounded, sanitized, versioned response with collection time, provenance,
+  completeness, fixed category counts and limited per-item evidence. For large
+  private title sets, use a **reviewed bounded cursor/pagination contract**
+  (no silent truncation represented as completeness); keep raw personal rows
+  out of public repositories and CI artifacts. The private transport is not
+  itself a public media catalog.
+- Explicit operator enablement, read-only data mount and independently accepted
+  real ChatGPT request/result correlation. A passing synthetic CI test or a
+  working notebook SSH tunnel alone is not host deployment acceptance.
+
+The existing fixed `sonarr/overview` contract remains unchanged unless a
+reviewed PR and regression tests explicitly change it. The initial PAB adapter
+may provide only aggregates while per-title selectors/pagination are reviewed;
+do not invent missing titles or claim a complete cross-system audit from a
+partial response.
+
+### Effects: a **separate** permission gate
+
+Read success cannot authorize a write. An eventual fix starts as a **reviewed
+immutable plan** with exact target identities, before-state fingerprints,
+permitted effects, bounded impact, operator-approved artifact/source version,
+expiry, rollback expectations and one-use owner consent. A deterministic trusted
+host broker validates those bindings and durably reserves the request **before**
+one execution. It then independently reads back the resulting state. Any
+ambiguous external outcome remains uncertain, with **no automatic retry**.
+
+In particular, Plex trash cleanup, real media deletion, subtitle edits,
+downloads/grabs, Radarr monitoring/quality changes, service restarts and network
+exposure are **not authorized** by this architecture review. No unrestricted
+ChatGPT-origin shell/SSH, arbitrary script promotion, credentials in GitHub,
+new public API or second queue/ledger is introduced.
+
+**Next implementation/acceptance order:** source-only typed resource adapter +
+negative tests and required CI → separately reviewed host-only collector/
+credential boundary → independently correlated ChatGPT read acceptance for #26
+or #47 → later action-specific synthetic/reversible effect acceptance under #83.
+The Media owner retains exact domain evidence and desired repair behavior.
