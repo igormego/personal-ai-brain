@@ -236,3 +236,35 @@ negative tests and required CI → separately reviewed host-only collector/
 credential boundary → independently correlated ChatGPT read acceptance for #26
 or #47 → later action-specific synthetic/reversible effect acceptance under #83.
 The Media owner retains exact domain evidence and desired repair behavior.
+
+### Source-only movie watchlist overview — first reviewed implementation slice
+
+The existing opt-in `media.resource_read` now also recognizes the fixed
+`movies/watchlist-overview` selector with **no caller-supplied path, URL, SQL,
+command, cursor or execution flag**. A separately approved trusted operator
+may later provide one sanitized, complete snapshot; the deployed worker is **not
+yet configured to produce or mount one**. This source change alone does not
+expose `media.db` or Plex from ChatGPT.
+
+The new versioned `0.1` packet requires all four authoritative sources
+(`movie_db`, `plex`, `radarr`, `seerr`) to report `ok`, a fresh collected
+timestamp, `complete=true`, counts of catalog total/watched/watchlist/overlap,
+Plex's number of **physically playable main-Movies** titles, and an exact
+partition of the personal watchlist into `playable`,
+`managed_or_requested`, `reviewable_missing`, `unresolved`.
+The category sum must equal `catalog.watchlist`; contradictory counts,
+missing providers, malformed fields, stale results or unknown extra data fail
+closed. The old `sonarr/overview` contract and existing private file reader
+remain unchanged. Only aggregates are model-visible in this initial slice.
+
+**Host-side domain contract (not implemented by this PR):** source-specific
+adapters must prove Plex accessibility of actual media parts (not the Watched
+placeholder shelf), stable TMDb/IMDb identity, current Radarr file/queue and
+Seerr request status before assigning categories. Unknown, duplicate or
+conflicting matches belong in `unresolved`, never silently in
+`reviewable_missing`. Neither a lifetime watched flag nor a watchlist record
+is authorization to download. The operator must build/validate the sanitized
+snapshot privately and explicitly approve a read-only control mount/deployment;
+then a separate ordinary-ChatGPT correlated request must verify runtime
+acceptance. Per-title private pagination and any guarded effect require their
+own later review; no automatic cleanup, scans or downloads are enabled.
