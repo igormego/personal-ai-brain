@@ -212,6 +212,7 @@ def serve(state=STATE, heartbeat=BEAT):
     # Ignore every other environment value; do not accept a caller path.
     audit_file = (Path("/host-audit/snapshot.json")
                   if os.environ.get("PAB_HOST_AUDIT_ENABLED") == "1" else None)
+    # Explicitly opted-in, fixed, read-only mount.
     # The existing master read grant is OFF by default. Legacy Sonarr is the
     # only resource at master enablement; Movies requires its own explicit grant
     # AND a separate fixed read-only mount. No model-selected paths or endpoints.
