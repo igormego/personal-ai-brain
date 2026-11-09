@@ -182,7 +182,7 @@ def test_movie_overview_aggregate_only_and_consistent():
     lambda p: p["catalog"].update(total=0),
     lambda p: p["catalog"].update(watched=True),
     lambda p: p["catalog"].update(overlap=562),
-    lambda p: p["catalog"].update(overlap=1),
+    lambda p: p["catalog"].update(total=686),
     lambda p: p["catalog"].update(watchlist=200),
     lambda p: p["disposition"].update(playable=40),
     lambda p: p["disposition"].update(unresolved=-1),
