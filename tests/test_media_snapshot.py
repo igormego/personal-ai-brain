@@ -125,3 +125,32 @@ def test_reader_does_not_mutate_file(tmp_path):
     before = (path.read_bytes(), os.stat(path).st_mtime_ns)
     read_media_snapshot(path, "sonarr/overview", now=NOW)
     assert before == (path.read_bytes(), os.stat(path).st_mtime_ns)
+
+def test_movie_overview_fixed_path_private_reader(tmp_path):
+    path = tmp_path / "snapshot.json"
+    packet = {
+        "schema_version": "0.1",
+        "resource_id": "movies/watchlist-overview",
+        "collected_at": NOW.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "complete": True,
+        "source_status": {"movie_db": "ok", "plex": "ok", "radarr": "ok", "seerr": "ok"},
+        "catalog": {"total": 6, "watched": 4, "watchlist": 2, "overlap": 0},
+        "disposition": {
+            "playable": 1, "managed_or_requested": 0,
+            "reviewable_missing": 1, "unresolved": 0,
+        },
+        "plex": {"playable_movies": 3},
+    }
+    write_private(path, packet)
+    before = (path.read_bytes(), path.stat().st_mtime_ns)
+    assert read_media_snapshot(path, "movies/watchlist-overview", now=NOW) == packet
+    assert (path.read_bytes(), path.stat().st_mtime_ns) == before
+    with pytest.raises(MediaResourceUnavailable):
+        read_media_snapshot(path, "sonarr/overview", now=NOW)
+
+
+def test_movie_snapshot_does_not_use_untrusted_resource_path(tmp_path):
+    missing = tmp_path / "absent.json"
+    for resource in ("movies/../../etc", "movies/watchlist-overview?url=x"):
+        with pytest.raises(MediaResourceUnavailable):
+            read_media_snapshot(missing, resource, now=NOW)
