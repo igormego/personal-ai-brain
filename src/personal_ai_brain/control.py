@@ -244,7 +244,7 @@ def build_registry(core_state: Path, reader_factory, redactor, work_client=None,
             {"type": "object", "additionalProperties": False,
              "required": ["resource_id"],
              "properties": {"resource_id": {"type": "string",
-                                            "enum": ["sonarr/overview"]}}},
+                                            "enum": ["sonarr/overview", "movies/watchlist-overview"]}}},
             media_selector, media_read,
         ))
     if media_plan_provider is not None:

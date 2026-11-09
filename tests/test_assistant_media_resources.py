@@ -141,3 +141,98 @@ def test_incomplete_unknown_source_does_not_fall_back_to_zero(tmp_path):
     ).resolve("media.resource_read", {"resource_id": "sonarr/overview"})
     with pytest.raises(CapabilityFailed, match="media_resource_unavailable"):
         cap.handler(args)
+
+def movie_sample():
+    return {
+        "schema_version": "0.1",
+        "resource_id": "movies/watchlist-overview",
+        "collected_at": NOW.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "complete": True,
+        "source_status": {"movie_db": "ok", "plex": "ok", "radarr": "ok", "seerr": "ok"},
+        "catalog": {"total": 687, "watched": 561, "watchlist": 126, "overlap": 0},
+        "disposition": {
+            "playable": 13, "managed_or_requested": 9,
+            "reviewable_missing": 94, "unresolved": 10,
+        },
+        "plex": {"playable_movies": 49},
+    }
+
+
+def test_movie_overview_aggregate_only_and_consistent():
+    result = sanitize_media_resource(
+        "movies/watchlist-overview", movie_sample(), now=NOW
+    )
+    assert result["catalog"]["watchlist"] == 126
+    assert result["disposition"]["reviewable_missing"] == 94
+    assert sum(result["disposition"].values()) == result["catalog"]["watchlist"]
+    assert result["source"] == "operator_media_snapshot_not_live_probe"
+    assert result["effect_performed"] is False
+    assert all(k not in result for k in ("items", "titles", "paths", "api_key"))
+    assert len(str(result)) < 4096
+
+
+@pytest.mark.parametrize("mutation", [
+    lambda p: p.update(secret="private-film-title"),
+    lambda p: p.update(complete=False),
+    lambda p: p.update(resource_id="sonarr/overview"),
+    lambda p: p.update(collected_at=(NOW - timedelta(minutes=31)).strftime("%Y-%m-%dT%H:%M:%SZ")),
+    lambda p: p.update(collected_at=(NOW + timedelta(minutes=3)).strftime("%Y-%m-%dT%H:%M:%SZ")),
+    lambda p: p["source_status"].update(seerr="unavailable"),
+    lambda p: p["source_status"].update(extra="api_key"),
+    lambda p: p["catalog"].update(total=0),
+    lambda p: p["catalog"].update(watched=True),
+    lambda p: p["catalog"].update(overlap=562),
+    lambda p: p["catalog"].update(total=686),
+    lambda p: p["catalog"].update(watchlist=200),
+    lambda p: p["disposition"].update(playable=40),
+    lambda p: p["disposition"].update(unresolved=-1),
+    lambda p: p["disposition"].update(extra=1),
+    lambda p: p["plex"].update(playable_movies=1),
+    lambda p: p["plex"].update(file_path="/secrets"),
+])
+def test_movie_overview_bad_provenance_or_counts_fail_closed(mutation):
+    packet = deepcopy(movie_sample())
+    mutation(packet)
+    with pytest.raises(MediaResourceUnavailable):
+        sanitize_media_resource("movies/watchlist-overview", packet, now=NOW)
+
+
+def test_movie_resource_registry_reuses_opt_in_read_only_capability(tmp_path):
+    calls = []
+
+    def provider(resource_id):
+        calls.append(resource_id)
+        return movie_sample()
+
+    registry = build_registry(
+        tmp_path, None, Redactor(), media_resource_provider=provider
+    )
+    cap, selected = registry.resolve(
+        "media.resource_read", {"resource_id": "movies/watchlist-overview"}
+    )
+    assert selected == {"resource_id": "movies/watchlist-overview"}
+    assert cap.risk_level == "read_only"
+    assert cap.side_effect_class == "none"
+    assert cap.handler(selected)["disposition"]["playable"] == 13
+    assert calls == ["movies/watchlist-overview"]
+    for invalid in (
+        {"resource_id": "movies/watchlist-overview", "cursor": "next"},
+        {"resource_id": "movies/123"},
+        {"resource_id": "../etc/passwd"},
+        {"resource_id": "movies/watchlist-overview", "execute": True},
+    ):
+        with pytest.raises(Rejected, match="invalid_media_resource"):
+            registry.resolve("media.resource_read", invalid)
+    assert calls == ["movies/watchlist-overview"]
+
+
+def test_movie_provider_exception_fails_closed_without_exposing_secret(tmp_path):
+    def provider(_):
+        raise RuntimeError("api_key=private-secret /home/host/location")
+
+    cap, selector = build_registry(
+        tmp_path, None, Redactor(), media_resource_provider=provider
+    ).resolve("media.resource_read", {"resource_id": "movies/watchlist-overview"})
+    with pytest.raises(CapabilityFailed) as error:
+        cap.handler(selector)
+    assert str(error.value) == "media_resource_unavailable"

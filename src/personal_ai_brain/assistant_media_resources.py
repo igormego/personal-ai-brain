@@ -11,7 +11,7 @@ from datetime import datetime, timezone, timedelta
 import json
 import re
 
-RESOURCE_IDS = frozenset({"sonarr/overview"})
+RESOURCE_IDS = frozenset({"sonarr/overview", "movies/watchlist-overview"})
 MAX_SOURCE_AGE = timedelta(minutes=30)
 FUTURE_SKEW = timedelta(minutes=2)
 MAX_FINDINGS = 12
@@ -49,9 +49,74 @@ def _counts(raw, fields, *, total=None):
     return {key: raw[key] for key in fields}
 
 
+def _sanitize_movie_overview(resource_id: str, source: dict, *, now=None) -> dict:
+    """Aggregate-only movie readiness; never return personal titles or raw paths.
+
+    The trusted host collector must prove identity and complete source snapshots.
+    A missing Seerr/Plex/Radarr/DB source is NOT proof that a movie is absent.
+    """
+    if set(source) != {
+        "schema_version", "resource_id", "collected_at", "complete",
+        "source_status", "catalog", "disposition", "plex",
+    } or source["schema_version"] != "0.1" or source["resource_id"] != resource_id or (
+        source["complete"] is not True
+    ):
+        _fail()
+
+    timestamp = source["collected_at"]
+    if type(timestamp) is not str or not re.fullmatch(
+        r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", timestamp
+    ):
+        _fail()
+    try:
+        collected = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%SZ").replace(
+            tzinfo=timezone.utc
+        )
+        age = (now or datetime.now(timezone.utc)) - collected
+    except (ValueError, TypeError, OverflowError):
+        _fail()
+    if not -FUTURE_SKEW <= age <= MAX_SOURCE_AGE:
+        _fail()
+
+    sources = source["source_status"]
+    required = {"movie_db", "plex", "radarr", "seerr"}
+    if type(sources) is not dict or set(sources) != required or any(
+        type(sources[k]) is not str or sources[k] != "ok" for k in required
+    ):
+        _fail()
+    catalog = _counts(source["catalog"], ("total", "watched", "watchlist", "overlap"), total="total")
+    if (catalog["overlap"] > min(catalog["watched"], catalog["watchlist"])
+            or catalog["watched"] + catalog["watchlist"] - catalog["overlap"] > catalog["total"]):
+        _fail()
+    disposition = _counts(source["disposition"], (
+        "playable", "managed_or_requested", "reviewable_missing", "unresolved",
+    ))
+    if sum(disposition.values()) != catalog["watchlist"]:
+        _fail()
+    plex = _counts(source["plex"], ("playable_movies",))
+    if disposition["playable"] > plex["playable_movies"]:
+        _fail()
+
+    result = {
+        "resource_id": resource_id, "collected_at": timestamp,
+        "source": "operator_media_snapshot_not_live_probe",
+        "freshness": "current", "complete": True,
+        "source_status": {k: sources[k] for k in sorted(required)},
+        "catalog": catalog, "disposition": disposition, "plex": plex,
+        "effect_performed": False,
+    }
+    if len(json.dumps(result, ensure_ascii=True, separators=(",", ":")).encode()) > MAX_OUTPUT_BYTES:
+        _fail()
+    return result
+
+
 def sanitize_media_resource(resource_id: str, source: object, *, now=None) -> dict:
     """Validate a complete operator-produced record before exposing any facts."""
-    if resource_id not in RESOURCE_IDS or type(source) is not dict or set(source) != {
+    if resource_id not in RESOURCE_IDS or type(source) is not dict:
+        _fail()
+    if resource_id == "movies/watchlist-overview":
+        return _sanitize_movie_overview(resource_id, source, now=now)
+    if set(source) != {
         "schema_version", "resource_id", "collected_at", "complete",
         "series", "episodes", "queue", "health", "findings", "findings_truncated",
     }:
