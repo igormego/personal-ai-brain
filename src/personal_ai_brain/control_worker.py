@@ -212,14 +212,20 @@ def serve(state=STATE, heartbeat=BEAT):
     # Ignore every other environment value; do not accept a caller path.
     audit_file = (Path("/host-audit/snapshot.json")
                   if os.environ.get("PAB_HOST_AUDIT_ENABLED") == "1" else None)
-    # Explicitly opted-in, fixed, read-only mount. Sonarr key and host collector
-    # never enter the control container. No caller-provided path/endpoint.
+    # Explicitly opted-in, fixed, read-only mount.
+    # The existing master read grant is OFF by default. Legacy Sonarr is the
+    # only resource at master enablement; Movies requires its own explicit grant
+    # AND a separate fixed read-only mount. No model-selected paths or endpoints.
     media_provider = None
     if os.environ.get("PAB_MEDIA_RESOURCE_ENABLED") == "1":
-        from .media_snapshot import MOUNTED_SNAPSHOT_PATH, read_media_snapshot
+        from .media_snapshot import read_mounted_media_snapshot
+
+        movies_enabled = os.environ.get("PAB_MEDIA_MOVIES_ENABLED") == "1"
 
         def media_provider(resource_id):
-            return read_media_snapshot(MOUNTED_SNAPSHOT_PATH, resource_id)
+            return read_mounted_media_snapshot(
+                resource_id, movies_enabled=movies_enabled
+            )
 
     registry = build_registry(
         Path("/core-state"), lambda: RunReader(core_token),

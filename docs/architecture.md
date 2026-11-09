@@ -268,3 +268,43 @@ snapshot privately and explicitly approve a read-only control mount/deployment;
 then a separate ordinary-ChatGPT correlated request must verify runtime
 acceptance. Per-title private pagination and any guarded effect require their
 own later review; no automatic cleanup, scans or downloads are enabled.
+
+
+### Fixed-scope Movie snapshot handoff (Issue #83, source-only gate)
+
+The existing `media.resource_read` transport/registry and durable GitHub
+Issues request ledger are reused unchanged. The control worker previously
+had only one fixed `/media-audit/snapshot.json` file for Sonarr; the Movie
+resource now has a **separate**, constant, never caller-supplied
+`/media-audit/movies-watchlist-overview.json` path. Those are two **pre-sanitized,
+bounded, credential-free** resource files, not a general directory browser.
+
+**Explicit two-level activation** (operator permission/deployment is NOT part
+of this PR): `PAB_MEDIA_RESOURCE_ENABLED=1` is the already-existing master
+opt-in for the fixed Sonarr reader; a Movie snapshot additionally requires
+`PAB_MEDIA_MOVIES_ENABLED=1`. A request cannot override either switch,
+select any other file, set a URL or reach a host-side API. When denied, missing,
+stale, malformed, too large or overly permissively readable, the resource
+fails closed with a fixed error. Reading one resource never falls back to
+the other's snapshot; neither enablement flag installs collectors.
+
+**Separate host-side operator acceptance required:** Movie Intelligence owns
+its fixed-scope collector and the creation of **one private atomic snapshot**
+(no raw titles/IDs and no LLM-facing API keys). A designated operator must
+review the exact committed producer/consumer source pins, proof of bounded GET
+and read-only SQLite inputs, source freshness, file owner/0600 permissions,
+private parent directory, immutable read-only container mount, and rollback
+of any added flag/mount. A host collector can run without any control grant.
+No snapshot data/host configuration/secrets may be placed in public GitHub.
+A passing CI integration fixture does not prove host UID parity, deployed
+collector freshness or actual ChatGPT delivery.
+
+**Acceptance gate:** independently verify a fresh operator-published file
+and one genuine ordinary ChatGPT `media.resource_read` request with exact
+`{"resource_id":"movies/watchlist-overview"}` → authenticated private
+control Issue → correlated, bounded sanitized aggregate → duplicate/replay
+read-back without changed execution truth. Explicitly verify the original
+`homelab.audit` and Sonarr configuration remains unchanged. No resource
+read grants any effect. The accepted **125/125 unresolved ČSFD watchlist**
+aggregate is evidence of missing canonical mapping, not 125 absent films
+or authority to request them.

@@ -1,8 +1,8 @@
-"""Credential-free, fixed-path Sonarr snapshot reader for the trusted control worker.
+"""Credential-free, fixed-path Media snapshot reader for trusted control.
 
-The collector and write-capable Sonarr credential MUST remain on the host.
-This reader only consumes one pre-sanitized, operator-mounted read-only file.
-No network calls, arbitrary filesystem selectors or writes are possible.
+Host-only collectors and application API keys never enter the control
+container. Each allowlisted resource has one independently mounted, read-only,
+private file. Callers can never supply URLs, paths or file names.
 """
 from __future__ import annotations
 
@@ -16,7 +16,8 @@ from .assistant_media_resources import (
 )
 
 MAX_SNAPSHOT_BYTES = 4096
-MOUNTED_SNAPSHOT_PATH = Path("/media-audit/snapshot.json")
+MOUNTED_SNAPSHOT_PATH = Path("/media-audit/snapshot.json")  # Existing Sonarr contract.
+MOUNTED_MOVIES_SNAPSHOT_PATH = Path("/media-audit/movies-watchlist-overview.json")
 
 
 def _unique(pairs):
@@ -67,3 +68,26 @@ def read_media_snapshot(path: Path, resource_id: str, *, now=None) -> dict:
     finally:
         if descriptor is not None:
             os.close(descriptor)
+
+
+def read_mounted_media_snapshot(resource_id: str, *, movies_enabled: bool = False,
+                                now=None) -> dict:
+    """Strict resource->file mapping; movie grant is separate and OFF by default.
+
+    This function is called only after the control worker has enabled the
+    existing master PAB_MEDIA_RESOURCE_ENABLED switch. It must NOT accept a
+    request-selected path, resource alias, URL or environment-provided filename.
+    """
+    try:
+        validate_media_selector({"resource_id": resource_id})
+        if type(movies_enabled) is not bool:
+            raise ValueError("invalid_grant")
+        if resource_id == "sonarr/overview":
+            path = MOUNTED_SNAPSHOT_PATH
+        elif resource_id == "movies/watchlist-overview" and movies_enabled:
+            path = MOUNTED_MOVIES_SNAPSHOT_PATH
+        else:
+            raise ValueError("resource_not_granted")
+        return read_media_snapshot(path, resource_id, now=now)
+    except (OSError, ValueError, TypeError):
+        raise MediaResourceUnavailable("media_resource_unavailable") from None
