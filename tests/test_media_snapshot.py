@@ -8,7 +8,8 @@ import pytest
 
 from personal_ai_brain.assistant_media_resources import MediaResourceUnavailable
 from personal_ai_brain.control import Redactor, Rejected, build_registry
-from personal_ai_brain.media_snapshot import read_media_snapshot
+from personal_ai_brain.media_snapshot import read_media_snapshot, read_mounted_media_snapshot
+import personal_ai_brain.media_snapshot as media_module
 
 
 NOW = datetime.now(timezone.utc).replace(microsecond=0)
@@ -154,3 +155,97 @@ def test_movie_snapshot_does_not_use_untrusted_resource_path(tmp_path):
     for resource in ("movies/../../etc", "movies/watchlist-overview?url=x"):
         with pytest.raises(MediaResourceUnavailable):
             read_media_snapshot(missing, resource, now=NOW)
+
+
+def movie_packet(*, collected_at=None):
+    return {
+        "schema_version": "0.1",
+        "resource_id": "movies/watchlist-overview",
+        "collected_at": (collected_at or NOW).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "complete": True,
+        "source_status": {"movie_db": "ok", "plex": "ok", "radarr": "ok", "seerr": "ok"},
+        "catalog": {"total": 690, "watched": 565, "watchlist": 125, "overlap": 0},
+        "disposition": {
+            "playable": 0, "managed_or_requested": 0,
+            "reviewable_missing": 0, "unresolved": 125,
+        },
+        "plex": {"playable_movies": 50},
+    }
+
+
+def test_fixed_mounted_resources_are_isolated_and_movie_opt_in_required(tmp_path, monkeypatch):
+    sonarr = tmp_path / "sonarr.json"
+    movies = tmp_path / "movies.json"
+    write_private(sonarr, packet())
+    write_private(movies, movie_packet())
+    monkeypatch.setattr(media_module, "MOUNTED_SNAPSHOT_PATH", sonarr)
+    monkeypatch.setattr(media_module, "MOUNTED_MOVIES_SNAPSHOT_PATH", movies)
+
+    assert read_mounted_media_snapshot("sonarr/overview", now=NOW)["series"]["total"] == 64
+    with pytest.raises(MediaResourceUnavailable):
+        read_mounted_media_snapshot("movies/watchlist-overview", now=NOW)
+    assert read_mounted_media_snapshot(
+        "movies/watchlist-overview", movies_enabled=True, now=NOW
+    )["catalog"]["watchlist"] == 125
+    assert read_mounted_media_snapshot(
+        "sonarr/overview", movies_enabled=True, now=NOW
+    )["series"]["total"] == 64
+
+    # One resource must never read the other's fixed file.
+    write_private(movies, packet())
+    with pytest.raises(MediaResourceUnavailable):
+        read_mounted_media_snapshot("movies/watchlist-overview", movies_enabled=True, now=NOW)
+    write_private(movies, movie_packet())
+    write_private(sonarr, movie_packet())
+    with pytest.raises(MediaResourceUnavailable):
+        read_mounted_media_snapshot("sonarr/overview", now=NOW)
+
+
+@pytest.mark.parametrize("resource", [
+    "movies/../secrets", "movies/watchlist-overview?path=/etc/passwd",
+    "file:///etc/passwd", "radarr/overview", "", None,
+])
+def test_mounted_reader_denies_unknown_or_arbitrary_resource(resource, tmp_path, monkeypatch):
+    monkeypatch.setattr(media_module, "MOUNTED_SNAPSHOT_PATH", tmp_path / "unreadable")
+    monkeypatch.setattr(media_module, "MOUNTED_MOVIES_SNAPSHOT_PATH", tmp_path / "unreadable")
+    with pytest.raises(MediaResourceUnavailable):
+        read_mounted_media_snapshot(resource, movies_enabled=True, now=NOW)
+
+
+def test_movie_mounted_reader_stale_permissions_and_missing_are_fail_closed(tmp_path, monkeypatch):
+    movies = tmp_path / "movie.json"
+    monkeypatch.setattr(media_module, "MOUNTED_MOVIES_SNAPSHOT_PATH", movies)
+    with pytest.raises(MediaResourceUnavailable):
+        read_mounted_media_snapshot("movies/watchlist-overview", movies_enabled=True, now=NOW)
+    write_private(movies, movie_packet(collected_at=NOW - timedelta(minutes=31)))
+    with pytest.raises(MediaResourceUnavailable):
+        read_mounted_media_snapshot("movies/watchlist-overview", movies_enabled=True, now=NOW)
+    write_private(movies, movie_packet())
+    movies.chmod(0o644)
+    with pytest.raises(MediaResourceUnavailable):
+        read_mounted_media_snapshot("movies/watchlist-overview", movies_enabled=True, now=NOW)
+    movies.chmod(0o600)
+    assert read_mounted_media_snapshot(
+        "movies/watchlist-overview", movies_enabled=True, now=NOW
+    )["disposition"]["unresolved"] == 125
+
+
+def test_control_registry_mounted_provider_read_only_contract(tmp_path, monkeypatch):
+    movies = tmp_path / "movie.json"
+    write_private(movies, movie_packet())
+    monkeypatch.setattr(media_module, "MOUNTED_MOVIES_SNAPSHOT_PATH", movies)
+
+    provider = lambda name: read_mounted_media_snapshot(
+        name, movies_enabled=True, now=NOW
+    )
+    registry = build_registry(tmp_path, None, Redactor(), media_resource_provider=provider)
+    capability, selector = registry.resolve(
+        "media.resource_read", {"resource_id": "movies/watchlist-overview"}
+    )
+    assert capability.risk_level == "read_only"
+    assert capability.side_effect_class == "none"
+    result = capability.handler(selector)
+    assert result["catalog"]["watchlist"] == 125
+    assert result["disposition"]["unresolved"] == 125
+    assert result["effect_performed"] is False
+    assert "title" not in str(result).lower()
