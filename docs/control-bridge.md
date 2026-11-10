@@ -321,3 +321,20 @@ one bounded ARR update and independent read-after-write verification. Even
 settings mutation, bulk operation or movie acquisition is authorized by this
 GET-only implementation. This source milestone does not replace domain-owner
 review of Radarr/Sonarr API semantics or the existing PAB #38 Seerr workflow.
+
+## Source-only typed effect-plan boundary (2026-11-10)
+
+The source-only `effect_plan.plan_effect` pure function accepts an exact
+resource/operation/target proposal and a **trusted operator-constructed**
+`EffectGrant`, obtains the current typed field from a trusted injected GET
+provider, then returns a five-minute expiring plan with expected/desired
+values, principal, policy version and a SHA-256 plan hash. The same planning
+path handles distinct typed resource/field combinations; it does not install a
+handler for each user utterance. It refuses unchanged targets, invented fields,
+unsanctioned operations, wrong callers and malformed/ambiguous reads.
+
+**This is not an approved effect or an executable capability.** No live
+request can invoke it yet; it does not authorize the user, persist a durable
+reservation, apply an API mutation, provide read-back, contact a host or spend
+OpenAI API credit. Those follow-on requirements belong to Issue #83, with
+separate reviewed operator grants and exact user authorization.
