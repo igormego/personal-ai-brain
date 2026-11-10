@@ -24,9 +24,16 @@ MOUNTED_WATCHLIST_SNAPSHOT_PATH = Path("/watchlist-audit/snapshot.json")
 def read_mounted_watchlist_items():
     """Fixed operator-published snapshot; no provider is wired by the worker."""
     descriptor = None
+    directory = None
     try:
-        descriptor = os.open(MOUNTED_WATCHLIST_SNAPSHOT_PATH,
-                             os.O_RDONLY | os.O_CLOEXEC | getattr(os, "O_NOFOLLOW", 0))
+        directory = os.open(MOUNTED_WATCHLIST_SNAPSHOT_PATH.parent,
+                            os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW)
+        parent = os.fstat(directory)
+        if (not stat.S_ISDIR(parent.st_mode) or parent.st_uid not in (0, os.geteuid())
+                or stat.S_IMODE(parent.st_mode) != 0o700):
+            raise ValueError("snapshot_directory_unsafe")
+        descriptor = os.open(MOUNTED_WATCHLIST_SNAPSHOT_PATH.name,
+                             os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW, dir_fd=directory)
         info = os.fstat(descriptor)
         if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1
                 or info.st_size <= 0 or info.st_size > 2_000_000
@@ -44,6 +51,8 @@ def read_mounted_watchlist_items():
     finally:
         if descriptor is not None:
             os.close(descriptor)
+        if directory is not None:
+            os.close(directory)
 
 
 def _unique(pairs):
