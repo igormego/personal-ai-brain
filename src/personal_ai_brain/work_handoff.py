@@ -146,7 +146,7 @@ def summary(record):
                     or receipt['resource_id'] != contract.HOST_RESOURCE
                     or receipt['source'] != 'host_collector_snapshot_not_live_probe'
                     or type(receipt['collected_at']) is not str
-                    or not re.fullmatch(r'\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z', receipt['collected_at'])
+                    or not re.fullmatch(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z', receipt['collected_at'])
                     or type(receipt['sha256']) is not str
                     or not re.fullmatch('[0-9a-f]{64}', receipt['sha256'])
                     or type(receipt['size']) is not int or not 1 <= receipt['size'] <= 4096):
