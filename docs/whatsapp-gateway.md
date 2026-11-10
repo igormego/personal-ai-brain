@@ -8,6 +8,92 @@ A `sent` record means the Meta API returned a message ID, not that the recipient
 
 The offline tests use fake Meta and control clients; no production activation, public ingress, real Meta calls or credentials are included. A separately reviewed deployment and live acceptance remain necessary.
 
+## G3.7 ngrok Free HTTPS ingress — source-only, not activated
+
+The operator's ngrok Free account has the dashboard-assigned **development** hostname
+`disperser-greedless-shifty.ngrok-free.dev`. Target Meta callback:
+`https://disperser-greedless-shifty.ngrok-free.dev/webhook`.
+This is a reserved account hostname, **not a running endpoint** and not evidence of
+actual Meta callback reachability. This dev-domain option replaces the earlier
+Cloudflare-domain requirement for the first acceptance test; no separate purchased
+domain is required.
+
+A reviewed **candidate** edge policy is kept in
+[`config/ngrok-whatsapp-traffic-policy.yml`](../config/ngrok-whatsapp-traffic-policy.yml):
+deny all HTTP methods/paths except exact `GET /webhook` and `POST /webhook` at the
+ngrok edge, with HTTP 404. An allowed request passes unchanged to the already
+loopback-bound Gateway (GET challenge including query string; POST signature and
+original body). It does **not** expose `/health`, any control-worker endpoint, SSH,
+Docker API or another private network path. Do not add OAuth, browser login,
+Basic Auth or request-body modifications to the webhook; Meta must invoke it
+noninteractively. Gateway retains the definitive Meta token/HMAC and trusted
+sender/recipient checks. Edge policy is defense in depth, **not** provider
+authentication.
+
+**Required checks before activation (not completed):**
+
+1. Operator separately authorizes the new public HTTPS endpoint and a narrowly
+   scoped ngrok agent/credential. Confirm the target Ubuntu distribution,
+   approved signed ngrok installation method and agent version; do not blindly
+   paste the dashboard's Debian Bookworm APT example. Use a native host agent
+   with a dedicated protected config/credential readable only by its service
+   identity; never paste the `authtoken` into GitHub, terminal history, CI or
+   chat. The dashboard's `ngrok http 80` demo is **not** our Gateway port.
+2. First meet the independently approved Gateway host deployment/recoverability
+   gates from the runtime plan below (Infrastructure #33 is owned by another
+   workstream). Confirm the Gateway's actual dedicated host-loopback port,
+   immutable image, private state and health; previous candidate port `18881`
+   is **not reserved or an authorization**. Keep the private control worker,
+   mounts and ledger untouched.
+3. With that one reviewed local port and source-controlled policy copied to
+   an operator-owned absolute path, the **example only** for the approved
+   operator is:
+
+   ```sh
+   ngrok http "http://127.0.0.1:${APPROVED_GATEWAY_PORT:?set-reviewed-port}" \
+     --url https://disperser-greedless-shifty.ngrok-free.dev \
+     --traffic-policy-file /absolute/approved/path/ngrok-whatsapp-traffic-policy.yml
+   ```
+
+   Do **not** run until public ingress and host changes are separately
+   authorized. One dedicated tunnel; no router port forwarding or wildcard
+   forwarding. Do not expose the agent's local inspector/administration API.
+4. Verify in ngrok **Settings → Observability** that **Full Capture is OFF**:
+   metadata-only collection is the vendor default, while Full Capture may
+   retain query tokens, webhook bodies and headers. Keep raw body, Meta app
+   secret, verify token and authorization headers out of logs, browser
+   screenshots and replay tooling. The free tier's browser-warning
+   interstitial may interfere with automated clients; test this **before**
+   Meta subscription using synthetic no-secret GET/POST requests, without
+   assuming Meta can send a bypass header.
+5. In a separately approved synthetic test, verify:
+   `/health`, `/`, `/webhook/other` and other methods do not reach Gateway
+   (edge 404); unsigned/bad-signature `POST /webhook` is rejected by Gateway
+   (403); GET challenge is forwarded without token loss and has the exact
+   verified response; no unauthenticated external effect occurs. Verify edge
+   policy via the installed agent's own validator/actual responses; the
+   repository's offline YAML test **does not** validate ngrok CEL support,
+   live limits, free-plan interstitial or body preservation. Only after this
+   may Meta callback activation and an authorized real inbound/reply test
+   be considered.
+
+**Rollback:** disable only the ngrok endpoint/agent and verify the public
+hostname is no longer routing; preserve the Gateway's private state,
+request/delivery reservations and all unrelated services. Never automatically
+resend uncertain effects. A failure of ingress testing is not permission to
+expose the host port on `0.0.0.0` or relax Gateway authentication.
+
+Free-tier restrictions should be rechecked before long-term reliance:
+one assigned dev hostname, 20,000 HTTP requests/month, 1 GB egress/month,
+and a finite free Traffic Policy rule allowance. The state backlog/retention
+and Meta's finite retry horizon remain independent operational limitations.
+
+Official vendor references:
+[agent endpoints and Traffic Policy](https://ngrok.com/docs/gateway/traffic-policy/getting-started/agent-endpoints),
+[public HTTPS agent endpoints](https://ngrok.com/docs/gateway/endpoints/http),
+[Traffic Inspector privacy](https://ngrok.com/docs/obs/traffic-inspection/http-requests),
+[Free limits](https://ngrok.com/docs/pricing-limits).
+
 ## Source-only runtime and operator plan
 
 `personal_ai_brain.whatsapp_runtime` connects the adapter to a fixed-origin HTTPS GitHub client and Meta client, serves `GET/POST /webhook`, and runs the bounded single worker every 30 seconds. It rejects redirects, bounds external responses and suppresses request, token, payload and exception logging. `GET /health` is 200 only after a recent successful poll; this is process/poll health, not proof of provider delivery or absence of uncertain records. Shutdown stops polling; any interrupted outbound attempt retains the existing uncertain reservation.
@@ -48,6 +134,6 @@ References: [Meta webhook overview](https://developers.facebook.com/documentatio
 
 ### G3.6A offline durable-ingest foundation
 
-`Gateway.ingest` accepts a bounded list of event tuples only from a caller that has already authenticated the raw webhook and trusted sender/recipient. It revalidates each request, preflights conflicts and capacity, and reserves stable UUID/hash/binding in the existing per-message files with control state `received`. It makes no external calls. Existing `post`/HTTP behavior is unchanged; `poll` and `post` defer a `received` record without executing it. This function is not connected to HTTP acknowledgment or a background worker.
+`Gateway.ingest` accepts a bounded list of event tuples only from a caller that has already authenticated the raw webhook and trusted sender/recipient. It revalidates each request, preflights conflicts and capacity, and reserves stable UUID/hash/binding in the existing per-message files with control state `received`. It makes no external calls. Legacy direct `post`/`poll` defer a `received` record without executing it, while the current HTTP runtime now calls `Gateway.receive` and the bounded `Gateway.work` worker.
 
 Ingest accepts at most 1,000 event tuples per call and caps the shared state inventory at 10,000 record/temporary-file artifacts and 16 MiB of file contents. Existing and orphaned temporary files count toward capacity. These are ingest-only limits: the unchanged legacy synchronous path does not enforce them. The operation checks all existing records and fails closed on unknown, foreign or corrupt state; partial writes are safe to submit again. It fsyncs each record and, on POSIX, its parent directory including duplicate-only retries. The state directory must already reside on a durable filesystem; Windows directory fsync is not implemented. There is no automatic deletion: completed and uncertain records are retained indefinitely, satisfying the minimum 14-day retention at the cost of eventually requiring operator capacity management. Source support for 1,000-update/3 MiB webhook input and the received-event executor was added subsequently; production acceptance still requires an authorized live test and recovery gate.

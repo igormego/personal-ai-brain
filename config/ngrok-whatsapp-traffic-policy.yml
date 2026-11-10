@@ -1,0 +1,11 @@
+# G3.7 source-only: ngrok Free HTTPS agent endpoint policy.
+# Default agent-endpoint behavior forwards unmatched requests; deny anything
+# except GET/POST to the exact WhatsApp webhook path before origin forwarding.
+# The application still verifies Meta HMAC, trusted identities and GET token.
+on_http_request:
+  - expressions:
+      - "req.url.path != '/webhook' || !(req.method in ['GET', 'POST'])"
+    actions:
+      - type: deny
+        config:
+          status_code: 404
