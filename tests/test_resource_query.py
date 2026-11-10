@@ -64,6 +64,15 @@ def test_private_transport_and_resource_grants_are_independent():
         broker(source).read(query(), principal="other", now=NOW)
 
 
+def test_provider_errors_are_not_disclosed():
+    def provider():
+        raise RuntimeError("private fixture details")
+    b = ResourceQueryBroker({"movies/watchlist": provider}, frozenset({"movies/watchlist"}),
+                            KEY, disclosure_approved=True)
+    with pytest.raises(QueryUnavailable, match="^resource_query_unavailable$"):
+        b.read(query(), principal="owner", now=NOW)
+
+
 def test_forged_cursor_wrong_limit_and_stale_snapshot_denied():
     source = snapshot(); b = broker(source)
     token = b.read(query(), principal="owner", now=NOW)["next_cursor"]
