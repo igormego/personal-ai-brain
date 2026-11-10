@@ -27,9 +27,10 @@ current_gate: >
   Snapshots still expire after 30 minutes. No autonomous deploy or broad host
   control is live.
 
-  General Agent Workspace #77 offline Python v0.1 is now LIVE_ACCEPTED
-  via user-originated GitHub Issue transport; general coding and host resource
-  broker are still separately permission-gated.
+  General Agent Workspace #77 offline Python v0.1 is LIVE_ACCEPTED via the
+  GitHub Issue transport. The single approved host-snapshot resource is now
+  deployed and awaits independent external ChatGPT acceptance; general coding
+  and additional resource classes remain separately permission-gated.
 
   2026-11-03 no-postman delegation source milestone: PR #80 was squash-merged
   after green CI for a strict operator-pinned base selector on the existing
@@ -130,17 +131,14 @@ current_state: >
   Sanitized operator evidence: Issue #64 comment 6602708707.
 
 exact_next_action: >
-  Issue #77: source-only PAB PR #100 is MERGED and CI-green (1346 pass,
-  1 skip), resolving the previously unhandled cross-UID snapshot-publish
-  design. Next, one operator-reviewed activation on the existing Homelab:
-  privately verify the collector host source UID/path and the builder read
-  group, approve the exact root-only one-shot atomic publisher and limited
-  refresh timer, and verify two fresh generations into the builder-only
-  directory. Then install only pinned builder and Control modules from #99,
-  enable only resource_enabled for the existing trusted builder, preserve
-  ledgers and rollback, and accept one genuine externally correlated
-  ChatGPT work.submit/work.status source-granted task with Bubblewrap checks.
-  Do not claim source merge is deployment or grant new host execution.
+  Issue #77: the owner-approved trusted snapshot publisher and pinned builder
+  and Control components are deployed, and the operator-only checks passed:
+  READY_FOR_EXTERNAL_CHATGPT_ACCEPTANCE. From ordinary ChatGPT submit one
+  benign workspace.resource-python.v1 request for the exact registered
+  homelab/host-snapshot resource, then separately query work.status and verify
+  the correlated source receipt, freshness, bounded artifact and one attempt.
+  Check the separately authorized negative request without fabricating source
+  bytes. External transport acceptance remains pending.
   Next verified goal-level gate in #64: solve two truly different user goals
   end-to-end through the existing tools (read-only Homelab diagnosis and
   unrelated coding/data task), then one specifically approved reversible
@@ -149,7 +147,7 @@ exact_next_action: >
   must be diagnosed without fabricated freshness or extra blanket grants.
   WhatsApp #81 belongs to the Gateway lane; backup #33 stays paused.
 blockers:
-  - "PAB #77 trusted host snapshot resource is SOURCE_MERGED but activation BLOCKED: root-only sanitized atomic publisher in PR #100 not installed/authorized on the host, builder/Control pins not deployed, resource_enabled remains off."
+  - "PAB #77 trusted host snapshot resource is READY_FOR_EXTERNAL_CHATGPT_ACCEPTANCE; actual externally correlated source-granted task, receipt and negative request remain unverified."
   - "PAB Core project_os.status/current core.health direct read is failing at shared source-read gate: private Core request #115 and prior #114 failed on 2026-11-10; original homelab selector worked in #97 on 2026-11-01. Connector can read the full current project map plus 12 mapped states, but this does not establish on-host Core credential/access; precise on-host failure reason remains unknown."
   - "G2 no durable cross-turn goal/delivery acceptance into arbitrary new ChatGPT sessions; the existing GitHub Issue/task handle allows foreground resume."
   - "G3 WhatsApp adapter, trusted sender, provider compliance/credentials, and outbound reply are not implemented or externally accepted."
@@ -201,8 +199,9 @@ portfolio:
 verification:
   last_verified: "2026-11-10"
   sources:
+    - "2026-11-10 #77 owner-approved runtime activation: constrained root publisher and timer active, two source generations verified, builder and Control reviewed module pins deployed, resource_enabled=true, generic_enabled=true, coding_enabled=false. Existing worker active and Control healthy; actual builder-identity Bubblewrap synthetic legacy generic and snapshot-read checks passed, prior ledger records preserved. External ChatGPT work.submit/status acceptance remains pending."
     - "2026-11-10 ordinary ChatGPT read-only incident diagnosis: PAB private Core #115 returned source_read_failure on core.health, #116 returned runtime available with stale last manual job, #117 only lifecycle service logs; #114 project_os.status same failure despite accepted selector in #97. Connected GitHub verified mapped source files present; Core on-host token/API failure cause unknown. Product owner acceptance is a real cross-domain goal-to-verified-result flow, not merely a source merged component; PAB #64 comment 6778433151."
-    - "2026-11-10 PAB #77 activation preflight BLOCKED with no host modifications: private collector UID 0700/0600 snapshot and different builder UID; strict read_snapshot owner rule prevents simple ACL/bind. Follow-up source-only PR #100 merged commit 33e02d84cf05130efdd3efaf53897dfc82e906db; GitHub CI 42890254290 SUCCESS (1346 passed / 1 skipped). Tested root-controlled one-shot publisher validates source ownership/schema/freshness and atomically writes root-owned builder-group 0640 sanitized output; installed root unit, timed refresh, Control and builder deployment and live resource grant remain UNVERIFIED/NOT DEPLOYED. Issue #77 authoritative checkpoint comment 6777814141."
+    - "Historical pre-activation checkpoint: 2026-11-10 PAB #77 activation preflight BLOCKED with no host modifications: private collector UID 0700/0600 snapshot and different builder UID; strict read_snapshot owner rule prevents simple ACL/bind. Follow-up source-only PR #100 merged commit 33e02d84cf05130efdd3efaf53897dfc82e906db; GitHub CI 42890254290 SUCCESS (1346 passed / 1 skipped). Tested root-controlled one-shot publisher validates source ownership/schema/freshness and atomically writes root-owned builder-group 0640 sanitized output; installed root unit, timed refresh, Control and builder deployment and live resource grant remain UNVERIFIED/NOT DEPLOYED. Issue #77 authoritative checkpoint comment 6777814141."
     - "2026-11-03 laptop-off path: PAB PR #82 squash-merged to main commit 3c44425193c798f51d8a762eb8cc9e70f4cd8232, GitHub Actions tests run 41640499446 SUCCESS; docs/codex-environments.md readback contains laptop-off routing. Private personal-ai-brain plugin v0.3.3 release pluginrel_6ae9db884d2c8191ac88f52d49ffeff8 installed/read back with original skills preserved and notebook-off GitHub branch/PR/CI instructions. No Codex Cloud task launched or current published environment visibility tested; previously cloud-github-dev VERIFIED_WITH_WARNING 2026-10-12."
     - "2026-11-03 G1 independent external plugin v0.3.1 acceptance: authenticated private Core Issue #106 CLOSED 11:39:05 UTC, exactly one owner-authored v0.2 result comment 6602808100 matching request 008008c2-bd29-4401-86cc-98bd6bfb0dc3/task 62438fd7-3fe4-44f2-b0d6-5cd1a3f53d5b. Submitted operator-pinned, worker source b0cdfb834e9372aafc524334d962ee6a08c42944, succeeded attempts=1 approval_required=false, two allowed files, 53+/1-, 249 restricted tests PASS. No Igor postman, no source publication/merge/deploy or direct WSL patch inspection. PAB #64 comment 6602839141."
     - "2026-11-03 no-postman source milestone: PR #80 squash-merged as 82e3093cf3c1144c8a2e485f22de2fa6099945bb, GitHub Actions tests run 41626250530 success, branch source code read back. Existing private personal-ai-brain plugin updated to v0.3.1 and read back, with conditional `operator-pinned` source mode; Windows host not accessed, no Codex task acceptance, provider or WhatsApp runtime. Owner #64 handles remaining milestones."
