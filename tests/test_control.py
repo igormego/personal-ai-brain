@@ -180,17 +180,17 @@ def test_exception_sanitized_worker_continues_and_correlates(tmp_path):
     assert "private-secret" not in json.dumps(transport.comments)
 
 
-def test_discovery_reports_only_active_granted_capabilities(tmp_path):
+def test_available_capability_contracts_from_registry_without_new_grants(tmp_path):
+    from personal_ai_brain.capability_discovery import discover_registered
+
     registry = build_registry(tmp_path, lambda: None, Redactor())
-    cap, arguments = registry.resolve("capabilities.discover", {})
-    output = cap.handler(arguments)
+    output = discover_registered(registry)
     assert output["schema_version"] == "0.1"
     items = output["capabilities"]
     names = [item["id"] for item in items]
     assert names == sorted(names)
-    assert "capabilities.discover" in names
+    assert "runtime.health" in names
     assert "project_os.status" in names
-    # Optional host/media/work tools are absent until their trusted providers exist.
     assert "homelab.audit" not in names
     assert "media.resource_read" not in names
     assert "work.submit" not in names
@@ -198,21 +198,15 @@ def test_discovery_reports_only_active_granted_capabilities(tmp_path):
     assert all(item["side_effect_class"] == "none" for item in items)
     assert all(set(item) == {"id", "description", "risk_level",
                              "side_effect_class", "argument_schema"} for item in items)
-    with pytest.raises(Rejected):
-        registry.resolve("capabilities.discover", {"command": "docker ps"})
 
+    class FakeWorkClient:
+        pass
 
-def test_discovery_through_existing_worker_is_read_only_and_correlated(tmp_path):
-    entries = [json.dumps(request(capability="capabilities.discover")),
-               json.dumps(request(capability="capabilities.discover",
-                                  arguments={"resource_id": "host/root"}))]
-    transport = FakeTransport(entries)
-    registry = build_registry(tmp_path, lambda: None, Redactor())
-    Worker(tmp_path, transport, registry, Redactor()).tick()
-    assert [item[1]["status"] for item in transport.comments] == [
-        "capability_completed", "request_rejected"]
-    assert "capabilities" in transport.comments[0][1]["result"]
-    assert transport.comments[1][1]["error"] == "invalid_arguments"
+    with_work = discover_registered(build_registry(
+        tmp_path, lambda: None, Redactor(), work_client=FakeWorkClient()))
+    names_with_work = {item["id"] for item in with_work["capabilities"]}
+    assert {"work.submit", "work.status", "work.cancel"} <= names_with_work
+    assert names_with_work - set(names) == {"work.submit", "work.status", "work.cancel"}
 
 
 def test_registry_policy_and_duplicate_ids():
