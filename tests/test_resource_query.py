@@ -150,6 +150,10 @@ def test_fixed_snapshot_provider_rejects_symlink_and_unsafe_mode(tmp_path, monke
     path.chmod(0o600)
     monkeypatch.setattr(media_snapshot, "MOUNTED_WATCHLIST_SNAPSHOT_PATH", path)
     assert media_snapshot.read_mounted_watchlist_items()["resource_id"] == "movies/watchlist"
+    tmp_path.chmod(0o755)
+    with pytest.raises(MediaResourceUnavailable):
+        media_snapshot.read_mounted_watchlist_items()
+    tmp_path.chmod(0o700)
     path.chmod(0o644)
     with pytest.raises(MediaResourceUnavailable):
         media_snapshot.read_mounted_watchlist_items()
