@@ -50,7 +50,7 @@ authentication.
    operator is:
 
    ```sh
-   ngrok http http://127.0.0.1:<APPROVED_GATEWAY_PORT> \
+   ngrok http "http://127.0.0.1:${APPROVED_GATEWAY_PORT:?set-reviewed-port}" \
      --url https://disperser-greedless-shifty.ngrok-free.dev \
      --traffic-policy-file /absolute/approved/path/ngrok-whatsapp-traffic-policy.yml
    ```
