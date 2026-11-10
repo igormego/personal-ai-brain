@@ -11,7 +11,7 @@ import sys
 import time
 import multiprocessing
 
-from .work_contract import Rejected, REPOSITORY, parse, timestamp, Abort
+from .work_contract import Rejected, REPOSITORY, RESOURCE_TYPE, GENERIC_TYPE, parse, timestamp, Abort
 from .work_store import Store, TERMINAL, atomic_json, locked
 from .work_sandbox import execute, kill_tree
 
@@ -20,9 +20,10 @@ PROFILE = Path('/etc/personal-ai-brain/builder/profile.json')
 
 def profile(path=PROFILE):
     value = json.loads(path.read_bytes())
-    if (set(value) - {'coding_enabled', 'generic_enabled'} != {'schema_version', 'repository', 'base_ref', 'seed', 'min_free_bytes'}
+    if (set(value) - {'coding_enabled', 'generic_enabled', 'resource_enabled'} != {'schema_version', 'repository', 'base_ref', 'seed', 'min_free_bytes'}
             or type(value.get('coding_enabled', False)) is not bool
             or type(value.get('generic_enabled', False)) is not bool
+            or type(value.get('resource_enabled', False)) is not bool
             or value['schema_version'] != '0.1' or value['repository'] != REPOSITORY
             or not re.fullmatch('[0-9a-f]{40}', value['base_ref'])
             or value['seed'] != '/opt/personal-ai-brain/builder/repository.git'
@@ -31,8 +32,10 @@ def profile(path=PROFILE):
     return value
 
 class Runner:
-    def __init__(self, store, policy, stopping=lambda: False, executor=execute):
+    def __init__(self, store, policy, stopping=lambda: False, executor=execute,
+                 resource_loader=None):
         self.store, self.policy, self.stopping, self.executor = store, policy, stopping, executor
+        self.resource_loader = resource_loader
 
     def recovery(self):
         # systemd KillMode=control-group clears children before restarting us.
@@ -75,7 +78,7 @@ class Runner:
         identifier = record['task_id']
         parent = self.store.workspaces / identifier
         parent.mkdir(mode=0o700)
-        if record['request']['task_type'] == 'workspace.python.v1':
+        if record['request']['task_type'] in (GENERIC_TYPE, RESOURCE_TYPE):
             scratch = parent / 'scratch'
             scratch.mkdir(mode=0o700)
             return scratch
@@ -103,7 +106,8 @@ class Runner:
         artifacts = self.store.audit / identifier
         deadline = time.monotonic() + record['request']['deadline_seconds']
         try:
-            generic = record['request']['task_type'] == 'workspace.python.v1'
+            resource = record['request']['task_type'] == RESOURCE_TYPE
+            generic = record['request']['task_type'] in (GENERIC_TYPE, RESOURCE_TYPE)
             reserved = {'attempts': 1, 'base_sha': record['request']['base_ref']}
             if not generic:
                 reserved['branch'] = 'builder/' + identifier
@@ -118,10 +122,22 @@ class Runner:
             if generic and not self.policy.get('generic_enabled', False):
                 self.store.transition(identifier, 'blocked', 'generic_not_enabled')
                 return True
+            if resource and not self.policy.get('resource_enabled', False):
+                self.store.transition(identifier, 'blocked', 'resource_not_enabled')
+                return True
             if shutil.disk_usage(self.store.root).free < self.policy['min_free_bytes']:
                 self.store.transition(identifier, 'blocked', 'insufficient_storage')
                 return True
             workspace = self.prepare(record, deadline)
+            grants, receipt = None, None
+            if resource:
+                from .work_resource_grants import ResourceGrantUnavailable, load_host_resource
+                try:
+                    grants, receipt = (self.resource_loader or load_host_resource)(
+                        record['request']['resource_id'])
+                except ResourceGrantUnavailable:
+                    self.store.transition(identifier, 'blocked', 'resource_unavailable')
+                    return True
             self.guard(identifier, deadline)
             record = self.store.transition(identifier, 'running', 'sandbox_starting', started_at=timestamp())
             if record['status'] in TERMINAL:
@@ -129,9 +145,15 @@ class Runner:
             output_artifacts = ()
             if generic:
                 from .work_generic import execute as generic_execute
-                status, code, output_artifacts = generic_execute(
-                    record['request'], workspace, artifacts,
-                    lambda: self.guard(identifier, deadline))
+                if resource:
+                    status, code, output_artifacts = generic_execute(
+                        record['request'], workspace, artifacts,
+                        lambda: self.guard(identifier, deadline),
+                        trusted_grants=grants)
+                else:
+                    status, code, output_artifacts = generic_execute(
+                        record['request'], workspace, artifacts,
+                        lambda: self.guard(identifier, deadline))
             elif coding:
                 from .coding_execute import execute as coding_execute
                 status, code = coding_execute(record['request'], workspace, artifacts,
@@ -143,8 +165,11 @@ class Runner:
             if self.stopping():
                 status, code = 'interrupted', 'service_stopping'
             if generic and status == 'succeeded':
-                self.store.transition(identifier, status, code, output_artifacts=list(output_artifacts),
-                                      goal_semantics_verified=False)
+                extra = {'output_artifacts': list(output_artifacts),
+                         'goal_semantics_verified': False}
+                if resource:
+                    extra['resource_receipt'] = receipt
+                self.store.transition(identifier, status, code, **extra)
             else:
                 self.store.transition(identifier, status, code)
         except Abort as error:
