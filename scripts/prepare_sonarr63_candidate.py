@@ -24,6 +24,36 @@ def replace_once(text, old, new):
     return text.replace(old, new, 1)
 
 
+def without_arr_worker(text):
+    """Exclude the newer independent ARR read lane from the pinned Sonarr63 image.
+
+    This restores the *exact* previously accepted worker source before the
+    Sonarr63-only synthesis. The original immutable BASE_HASHES gate stays
+    authoritative; no ARR code/credentials/owner guard enters that candidate.
+    """
+    authorization = """                # Title-level ARR inventory is persistently disclosed in private
+                # Issues + the durable ledger. requested_by is user-controlled
+                # metadata, never proof of owner identity. Bind to GitHub's
+                # authenticated issue author on every newly admitted request.
+                if (capability.id == "media.resource_read"
+                        and arguments.get("resource_id") in ("arr/radarr", "arr/sonarr")):
+                    author = issue.get("user")
+                    if (type(author) is not dict
+                            or type(author.get("id")) is not int
+                            or author["id"] != 55916200
+                            or author.get("login") != "igormego"):
+                        raise Rejected("owner_auth_required")
+"""
+    arr_injection_start = "        # ARR item/title disclosure is an independent, OFF-by-default"
+    arr_injection_end = "\n    registry = build_registry("
+    if text.count(authorization) != 1 or text.count(arr_injection_start) != 1:
+        raise ValueError("candidate_baseline_mismatch")
+    text = text.replace(authorization, "", 1)
+    start = text.index(arr_injection_start)
+    end = text.index(arr_injection_end, start)
+    return text[:start] + text[end:]
+
+
 def sources(baseline, current):
     result = {}
     for name, expected in BASE_HASHES.items():
@@ -40,7 +70,7 @@ def sources(baseline, current):
         "*, host_audit_snapshot: Path | None = None, media_resource_provider=None):")
     result["control.py"] = replace_once(result["control.py"],
         "    if work_client is not None:\n", control[start:end] + "    if work_client is not None:\n")
-    worker = (current / "control_worker.py").read_text()
+    worker = without_arr_worker((current / "control_worker.py").read_text())
     start = worker.index("    # Explicitly opted-in, fixed, read-only mount.")
     end = worker.index("    def pulse():", start)
     result["control_worker.py"] = replace_once(result["control_worker.py"],
