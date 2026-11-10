@@ -194,3 +194,79 @@ normal-ChatGPT `work.submit` with the new contract and a correlated
 `work.status` showing an actual task-local resource receipt *without* copying
 snapshot bytes into private GitHub Issues. A merged PR or fixture tests alone
 do not constitute live source-to-sandbox acceptance.
+
+
+## Deployment blocker #77: private collector UID → builder read-only bridge
+
+The 2026-11-10 live preflight found that the existing collector atomically
+publishes `snapshot.json` (private collector UID, 0700 directory / 0600 file)
+while the builder runs under a different UID. `host_audit.read_snapshot` accepts
+only root or the reader's own UID. Opening the collector directory via ACL
+or bind mount alone does not safely cross this identity boundary. **Do not
+loosen the reader validator or give the builder access to the collector
+account's directory.**
+
+The reviewed `work_snapshot_publish` is a **single-shot, root-only**
+publisher; it is not a new agent, sandbox, queue or ledger. An operator-owned,
+0600 configuration at
+`/etc/personal-ai-brain/builder/snapshot-publisher.json`
+must contain exactly:
+
+```json
+{
+  "collector_source_path": "<ACTUAL_HOST_COLLECTOR_DIR>/snapshot.json",
+  "collector_uid": 1001,
+  "reader_gid": 1002
+}
+```
+
+These example IDs are **illustrative placeholders only**; the actual trusted
+host UID/GID and host-side path must be checked privately from the running
+systemd unit and its BindPaths. Never commit them, infer a host pathname from
+the collector container path, or make the file/model request choose a path.
+The publisher's target is hardcoded to
+`/opt/personal-ai-brain/worker-resources/host-snapshot.json`.
+
+**One-time operator installation after source review:** create the fixed target
+directory as **root-owned, builder-group, mode 0750** and verify all its
+parents permit appropriate traversal without allowing builder-group writes.
+Install only the trusted pinned code and root-owned config; create a minimal
+root `Type=oneshot` systemd service invoking
+`python -m personal_ai_brain.work_snapshot_publish` **with the exact trusted
+Python environment**. For repeat refresh, use a bounded systemd timer
+(e.g. every 2 minutes) or an equivalently operator-controlled one-shot
+trigger. Only this service may read the collector's private source. Constrain
+the unit with `NoNewPrivileges`, `ProtectSystem=strict`,
+`ReadWritePaths` limited to the fixed target directory, no network, and
+minimum capabilities required for reading collector-owned input and setting
+the target group. Do **not** make the entire builder or sandbox root and do not
+move any collector credentials.
+
+Each invocation securely opens all path components without following links,
+checks the input directory/file owner and private modes, validates the
+complete bounded `host_audit` schema and 30-minute freshness, then publishes
+a compact verified copy using temp-write → `fsync` → **atomic replace** →
+directory `fsync`. The output is **root-owned, builder-group, mode 0640**,
+so the builder can read it but cannot modify it. Publication never follows
+a model-supplied path/URL or creates the directory. A bad, missing or stale
+source produces a fixed failure; the previous generation is left in place
+to expire and will be rejected by the existing reader.
+
+**Activation sequence (same owner-approved limited #77 gate):** first run
+the privileged publisher once with fresh source and verify the builder can
+read the result through the existing `host_audit.read_snapshot` **without**
+access to the collector source. Verify a second source generation becomes
+visible and stale/bad input stops safely. Only then pin and update the minimal
+required builder and Control contracts from PR #99, with rollback images and
+the existing ledger intact; enable only `resource_enabled=true` on the
+trusted builder profile. Run real Bubblewrap isolation, one new correlated
+ChatGPT `work.submit`/separate `work.status` with source receipt, one
+denied forged input, and compatibility for `workspace.python.v1`. If any
+precondition fails, leave the grant disabled; do not retry an uncertain task.
+
+No disk/backup/NTFS, generic host privileges, network exposure, ARR title
+disclosure, model-paid API calls or side effects are included. This is
+only the **transport for one sanitized resource class**. Subsequent resource
+families should reuse a typed operator-owned registry and this same
+provenance-bound path, rather than expanding source ownership trust or adding
+a new agent per natural-language question.
