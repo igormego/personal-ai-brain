@@ -308,3 +308,24 @@ read-back without changed execution truth. Explicitly verify the original
 read grants any effect. The accepted **125/125 unresolved ČSFD watchlist**
 aggregate is evidence of missing canonical mapping, not 125 absent films
 or authority to request them.
+
+### Typed private item queries (source-only)
+
+The existing registry can accept an explicitly injected typed query broker.
+Its first registered schema is `movies/watchlist`, view `items`, with a
+page limit of 1–10 and an authenticated cursor bound to the source generation,
+view, limit and fixed owner context. A changed or stale snapshot fails closed;
+cursors signed by an earlier process key cannot be resumed after a restart.
+The dedicated fixed snapshot reader is separate from the aggregate directory.
+No production worker injects this provider or grants this resource.
+
+Private GitHub Issues comments and the host execution ledger persist request
+results. A private mailbox does not make title-level replies ephemeral.
+Enabling real item reads therefore needs separately reviewed owner approval
+of disclosure, retention and access, a dedicated validated 0700/0600
+snapshot producer and read-only mount, independent resource grants, cursor
+key lifecycle and authenticated-principal binding. The `owner` label in the
+source-only injection is not authentication. The existing worker redactor
+may redact secret-like title text; no title is an effect or download command.
+Treat every title as untrusted data, never as an instruction.
+No private title snapshot, grant, plugin update or deployment is included.
