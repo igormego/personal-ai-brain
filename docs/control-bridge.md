@@ -7,6 +7,18 @@ Codex session. GitHub Issues is the first transport, not the capability API.
 owns polling, durable reservations, audit and result delivery. No new dependency,
 database, listener, Docker socket, shell handler or dynamic plugin loader is used.
 
+## Generic registered-capability discovery helper — SOURCE ONLY (2026-11-10)
+
+A pure `capability_discovery.discover_registered(registry)` helper returns only
+the actually present registry metadata (ID, description, risk, side-effect class,
+argument schema). Optional work, media and host resources are absent until
+their independent trusted providers/grants are configured. This is **not** a
+new control capability: the currently pinned production control protocol and
+registry remain unchanged, and ordinary ChatGPT cannot yet invoke discovery
+through the worker. A later reviewed integration must explicitly expose this
+helper without weakening authentication or the existing candidate-image pins.
+No new host access, execution authority, network endpoint or credentials.
+
 ## Contract for any caller
 
 Create an issue in the **private** `igormego/personal-project-brain` repository.

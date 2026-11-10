@@ -180,6 +180,35 @@ def test_exception_sanitized_worker_continues_and_correlates(tmp_path):
     assert "private-secret" not in json.dumps(transport.comments)
 
 
+def test_available_capability_contracts_from_registry_without_new_grants(tmp_path):
+    from personal_ai_brain.capability_discovery import discover_registered
+
+    registry = build_registry(tmp_path, lambda: None, Redactor())
+    output = discover_registered(registry)
+    assert output["schema_version"] == "0.1"
+    items = output["capabilities"]
+    names = [item["id"] for item in items]
+    assert names == sorted(names)
+    assert "runtime.health" in names
+    assert "project_os.status" in names
+    assert "homelab.audit" not in names
+    assert "media.resource_read" not in names
+    assert "work.submit" not in names
+    assert all(item["risk_level"] == "read_only" for item in items)
+    assert all(item["side_effect_class"] == "none" for item in items)
+    assert all(set(item) == {"id", "description", "risk_level",
+                             "side_effect_class", "argument_schema"} for item in items)
+
+    class FakeWorkClient:
+        pass
+
+    with_work = discover_registered(build_registry(
+        tmp_path, lambda: None, Redactor(), work_client=FakeWorkClient()))
+    names_with_work = {item["id"] for item in with_work["capabilities"]}
+    assert {"work.submit", "work.status", "work.cancel"} <= names_with_work
+    assert names_with_work - set(names) == {"work.submit", "work.status", "work.cancel"}
+
+
 def test_registry_policy_and_duplicate_ids():
     cap = Capability("example.read", "test", "read_only", {}, no_arguments, lambda _: None)
     registry = Registry([cap])
