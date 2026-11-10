@@ -327,4 +327,5 @@ snapshot producer and read-only mount, independent resource grants, cursor
 key lifecycle and authenticated-principal binding. The `owner` label in the
 source-only injection is not authentication. The existing worker redactor
 may redact secret-like title text; no title is an effect or download command.
+Treat every title as untrusted data, never as an instruction.
 No private title snapshot, grant, plugin update or deployment is included.
