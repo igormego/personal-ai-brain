@@ -163,3 +163,8 @@ def test_fixed_snapshot_provider_rejects_symlink_and_unsafe_mode(tmp_path, monke
     monkeypatch.setattr(media_snapshot, "MOUNTED_WATCHLIST_SNAPSHOT_PATH", link)
     with pytest.raises(MediaResourceUnavailable):
         media_snapshot.read_mounted_watchlist_items()
+    fifo = tmp_path / "fifo"
+    os.mkfifo(fifo, 0o600)
+    monkeypatch.setattr(media_snapshot, "MOUNTED_WATCHLIST_SNAPSHOT_PATH", fifo)
+    with pytest.raises(MediaResourceUnavailable):
+        media_snapshot.read_mounted_watchlist_items()
