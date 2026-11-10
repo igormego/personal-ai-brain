@@ -338,3 +338,101 @@ request can invoke it yet; it does not authorize the user, persist a durable
 reservation, apply an API mutation, provide read-back, contact a host or spend
 OpenAI API credit. Those follow-on requirements belong to Issue #83, with
 separate reviewed operator grants and exact user authorization.
+
+
+## ARR read-only host snapshot integration — source-only activation candidate
+
+This is the **same** `media.resource_read` capability and `ResourceQueryBroker`
+introduced in PR #95, not a second worker or a per-question handler. With
+source-only `arr_snapshot_bridge.py`, an **independent trusted host one-shot**
+fetches GET-only `items` and `profiles` from one fixed operator-pinned
+Sonarr or Radarr instance using its locally managed key. It independently
+validates each sanitized schema, then atomically publishes a fixed
+`{sonarr,radarr}-{items,profiles}.json` in a dedicated root-owned directory.
+The existing unprivileged Control process receives **only that directory as a
+read-only mount at `/arr-audit`**. The Control app has **no** ARR network path,
+ARR API secret or Docker/SSH access. This is a bounded READ resource, not an
+Effect Broker or a Sonarr library repair.
+
+### Host-only operator configuration (example; illustrative IDs)
+
+The operator installs a private **root-owned mode 0600** file at
+`/etc/personal-ai-brain/arr-read/sonarr.json` (or `radarr.json`;
+not in a repository):
+
+```json
+{
+  "service": "sonarr",
+  "origin": "http://<TRUSTED_ARR_SERVICE>:8989",
+  "api_key_file": "/<OPERATOR-APPROVED-PRIVATE-PATH>/sonarr-key",
+  "reader_gid": 1000
+}
+```
+
+The service is one host-only, non-interactive command:
+`python -m personal_ai_brain.arr_snapshot_bridge --service sonarr`
+(or `--service radarr` with its independent private config). Restrict its network to
+the exact approved ARR address/port, its filesystem writes to the fixed
+`/opt/personal-ai-brain/arr-audit` directory, and its credential read to the
+approved host-only secret. It must **not** be invoked with user/model-selected
+origin/key/path. Root-only publisher unit plus a bounded timer are deployment
+choices requiring a separate operator review; do not grant root to a model.
+A second independently configured service can publish Radarr using the same
+module, with its own operator-managed key; never combine arbitrary endpoints.
+
+**Destination requirements**: owner root, group the Control reader, directory
+mode 0750, files owner root/group Control reader mode 0640, atomic replace,
+no symlinks, all named paths fixed, directory read-only inside Control. The
+Control reader independently checks schema and at most two-minute freshness;
+stale/absent/malformed sources are denied. Run a real second-generation
+publication test and check file visibility across the read-only mount (a
+single-file bind can pin a stale inode). Do not copy the full raw ARR response:
+the published snapshot contains only the preapproved bounded fields.
+
+### Explicit Control runtime gates (all OFF by default)
+
+The existing `PAB_MEDIA_RESOURCE_ENABLED=1` master must remain set for media
+resources. Then **per-service independent grants**:
+`PAB_ARR_SONARR_ENABLED=1` and/or `PAB_ARR_RADARR_ENABLED=1` attach
+only the fixed mounted-snapshot providers. Additionally
+`PAB_ARR_DISCLOSURE_APPROVED=1` must be set by the operator only after the
+owner explicitly consents to **names, IDs, monitored/profile flags and titles**
+appearing in *persistent private GitHub Issues/results* and the host's durable
+Control audit/ledger, where authorized repository collaborators may have
+read access. The HMAC cursor secret is a separately operator-mounted
+`/run/secrets/pab_arr_cursor_key` (32–64 bytes; **never** use the GitHub
+token as the HMAC key). An absent/invalid secret or disclosure grant fails
+startup closed. The operator must check that the previous Control image,
+mounts, credentials, Docker security parameters and ledger are preserved
+before turning on any flag.
+
+The existing private GitHub transport binds ARR title reads to the
+**authenticated issue author** `id=55916200/login=igormego`; the
+user-controlled `requested_by` field cannot substitute for it. This check
+applies to both `arr/sonarr` and `arr/radarr` before durable execution.
+All other existing media reads retain their prior behavior. The same
+`resource_id/view/limit/cursor` query contract and content-bound HMAC
+pagination works across both service families, and it is always read-only.
+
+### Exact external acceptance gate
+
+Before claiming `LIVE_ACCEPTED`, inspect privately the actual ARR host API
+credentials, originating provider user, secret owner/ACLs, service origin and
+network policy; install only the reviewed fixed collector, Control module and
+read-only directory mount. Start with the `profiles` view (name/profile ID),
+then one authorized `items` page (max 10) through a **normal ChatGPT** private
+`media.resource_read` request and one separately correlated result. Verify
+the real title-disclosure grant, source freshness, output redaction, signed
+pagination, owner-author check, denial for a forged collaborator and missing
+grant, and the old `sonarr/overview`, `work.submit/status` and
+`homelab.audit` capabilities. Roll back only the added collector/flags/mounts
+on failure, preserve all prior durable ledgers; never claim CI alone deployed
+a live adapter. **No monitored toggle, download, quality change or API write**
+is permitted by this activation. #83 Effect Broker remains separate.
+
+**User-visible limit:** `items` + `profiles` supports audits of monitored
+status and profile assignment; it does **not yet** expose episode-level missing
+counts, logs or queue failure details. An unverified statement like
+“Sonarr is broken because X” cannot be inferred from these two views alone.
+Additional diagnostic resources should be added by their resource class and
+explicit grant, not with a new tool for every natural-language question.

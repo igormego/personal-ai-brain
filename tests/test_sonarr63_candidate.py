@@ -29,7 +29,7 @@ def baseline(tmp_path):
                       '                   media_plan_provider=None, host_audit_snapshot: Path | None = None,\n'
                       '                   *, media_resource_provider=None):',
                       'def build_registry(core_state: Path, reader_factory, redactor, work_client=None, *, host_audit_snapshot: Path | None = None):')
-    worker = (SOURCE / 'control_worker.py').read_text()
+    worker = builder.without_arr_worker((SOURCE / 'control_worker.py').read_text())
     start = worker.index('    # Explicitly opted-in, fixed, read-only mount.')
     end = worker.index('    def pulse():', start)
     worker = worker[:start] + ('    registry = build_registry(Path("/core-state"), lambda: RunReader(core_token),\n'
@@ -46,6 +46,10 @@ def test_candidate_includes_only_approved_control_delta(tmp_path):
     assert set(manifest['files']) == set(builder.MODULES) | {'Dockerfile'}
     assert 'sonarr_overview' not in (out / 'Dockerfile').read_text()
     assert 'sonarr_snapshot_runner' not in (out / 'Dockerfile').read_text()
+    # ARR opt-in/auth code belongs to a separate reviewed deployment, not
+    # the exact accepted Sonarr63 candidate baseline.
+    assert 'PAB_ARR_SONARR_ENABLED' not in (out / 'control_worker.py').read_text()
+    assert 'owner_auth_required' not in (out / 'control_worker.py').read_text()
     spec = importlib.util.spec_from_file_location('personal_ai_brain._candidate_control', out / 'control.py')
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
