@@ -12,7 +12,11 @@ import hmac
 import json
 import re
 
-RESOURCE_SCHEMAS = {"movies/watchlist": {"views": frozenset({"items"}), "max_page": 10}}
+RESOURCE_SCHEMAS = {
+    "movies/watchlist": {"views": frozenset({"items"}), "max_page": 10},
+    "arr/radarr": {"views": frozenset({"items", "profiles"}), "max_page": 10},
+    "arr/sonarr": {"views": frozenset({"items", "profiles"}), "max_page": 10},
+}
 
 
 class QueryUnavailable(ValueError):
@@ -116,6 +120,81 @@ def _snapshot(source, now):
     return hashlib.sha256(raw).hexdigest()
 
 
+def _arr_snapshot(source, now, *, view):
+    """Fail closed on incomplete live ARR GET results; pin cursors to content.
+
+    The live GET timestamp changes for each page. Its generation therefore hashes
+    the resource, view and verified item data, NOT the collection timestamp.
+    A changed library invalidates the old cursor rather than mixing pages.
+    """
+    if (type(source) is not dict or set(source) != {
+            "schema_version", "resource_id", "view", "collected_at",
+            "complete", "source_status", "items"}):
+        _deny()
+    rid = source["resource_id"]
+    if (rid not in ("arr/radarr", "arr/sonarr") or source["view"] != view
+            or source["schema_version"] != "0.1" or source["complete"] is not True):
+        _deny()
+    service = rid.split("/")[1]
+    if source["source_status"] != {service: "ok"}:
+        _deny()
+    timestamp = source["collected_at"]
+    if type(timestamp) is not str or not re.fullmatch(
+            r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", timestamp):
+        _deny()
+    try:
+        age = now - datetime.strptime(
+            timestamp, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    except (ValueError, TypeError, OverflowError):
+        _deny()
+    if not -timedelta(minutes=2) <= age <= timedelta(minutes=2):
+        _deny()
+    items = source["items"]
+    if type(items) is not list or len(items) > 4096:
+        _deny()
+    seen = set()
+    for row in items:
+        keys = ({"id", "name"} if view == "profiles"
+                else {"id", "title", "year", "monitored", "quality_profile_id",
+                      "external_id", "has_file"})
+        if type(row) is not dict or set(row) != keys:
+            _deny()
+        rid_value = row["id"]
+        if type(rid_value) is not int or not 1 <= rid_value <= 2147483647 or rid_value in seen:
+            _deny()
+        seen.add(rid_value)
+        name = row["name"] if view == "profiles" else row["title"]
+        if type(name) is not str or not 1 <= len(name) <= 200 or any(
+                ord(ch) < 32 or ord(ch) == 127 for ch in name):
+            _deny()
+        if view == "profiles":
+            continue
+        if (type(row["year"]) is not int or not 1880 <= row["year"] <= 2200
+                or type(row["monitored"]) is not bool
+                or type(row["quality_profile_id"]) is not int
+                or not 1 <= row["quality_profile_id"] <= 2147483647):
+            _deny()
+        ext = row["external_id"]
+        if ext is not None and (type(ext) is not int or not 1 <= ext <= 2147483647):
+            _deny()
+        if service == "radarr":
+            if type(row["has_file"]) is not bool:
+                _deny()
+        elif row["has_file"] is not None:
+            _deny()
+    if [r["id"] for r in items] != sorted(seen):
+        _deny()
+    generation_input = {"resource_id": source["resource_id"], "view": view, "items": items}
+    canonical = _canonical(generation_input)
+    if len(canonical) > 2_000_000:
+        _deny()
+    return hashlib.sha256(canonical).hexdigest()
+
+
+RESOURCE_SCHEMAS["arr/radarr"]["validate_snapshot"] = _arr_snapshot
+RESOURCE_SCHEMAS["arr/sonarr"]["validate_snapshot"] = _arr_snapshot
+
+
 # New resources require a reviewed, registered validator and bounded views.
 RESOURCE_SCHEMAS["movies/watchlist"]["validate_snapshot"] = _snapshot
 
@@ -140,9 +219,12 @@ class ResourceQueryBroker:
         if not callable(provider):
             _deny()
         try:
-            source = provider()
+            is_arr = selected["resource_id"] in ("arr/radarr", "arr/sonarr")
+            source = provider(selected["view"]) if is_arr else provider()
             validate_snapshot = RESOURCE_SCHEMAS[selected["resource_id"]]["validate_snapshot"]
-            generation = validate_snapshot(source, now or datetime.now(timezone.utc))
+            generation = (validate_snapshot(source, now or datetime.now(timezone.utc),
+                                            view=selected["view"]) if is_arr
+                          else validate_snapshot(source, now or datetime.now(timezone.utc)))
             offset = 0
             if "cursor" in selected:
                 token = _decode(selected["cursor"])
