@@ -225,12 +225,13 @@ def build_registry(core_state: Path, reader_factory, redactor, work_client=None,
             MediaResourceUnavailable, read_media_resource, validate_media_selector,
         )
         media_query_broker = getattr(media_resource_provider, "query_broker", None)
+        if media_query_broker is not None:
+            from .resource_query import RESOURCE_SCHEMAS, validate_query
 
         def media_selector(value):
             try:
                 if (media_query_broker is not None and type(value) is dict
-                        and value.get("resource_id") == "movies/watchlist"):
-                    from .resource_query import validate_query
+                        and value.get("resource_id") in RESOURCE_SCHEMAS):
                     return validate_query(value)
                 return validate_media_selector(value)
             except (MediaResourceUnavailable, ValueError):
@@ -238,9 +239,8 @@ def build_registry(core_state: Path, reader_factory, redactor, work_client=None,
 
         def media_read(arguments):
             try:
-                if arguments["resource_id"] == "movies/watchlist":
-                    if media_query_broker is None:
-                        raise MediaResourceUnavailable("media_resource_unavailable")
+                if (media_query_broker is not None
+                        and arguments["resource_id"] in RESOURCE_SCHEMAS):
                     return media_query_broker.read(arguments, principal="owner")
                 return read_media_resource(arguments, media_resource_provider)
             except (MediaResourceUnavailable, ValueError):
@@ -254,8 +254,8 @@ def build_registry(core_state: Path, reader_factory, redactor, work_client=None,
              "required": ["resource_id"],
              "properties": {"resource_id": {"type": "string",
                                             "enum": ["sonarr/overview", "movies/watchlist-overview"] +
-                                                    (["movies/watchlist"] if media_query_broker is not None else [])},
-                            "view": {"type": "string", "enum": ["items"]},
+                                                    (sorted(RESOURCE_SCHEMAS) if media_query_broker is not None else [])},
+                            "view": {"type": "string", "enum": ["items", "profiles"]},
                             "limit": {"type": "integer", "minimum": 1, "maximum": 10},
                             "cursor": {"type": "string", "maxLength": 512}}},
             media_selector, media_read,
