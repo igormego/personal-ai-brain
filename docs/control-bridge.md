@@ -7,6 +7,17 @@ Codex session. GitHub Issues is the first transport, not the capability API.
 owns polling, durable reservations, audit and result delivery. No new dependency,
 database, listener, Docker socket, shell handler or dynamic plugin loader is used.
 
+## Registered capability discovery — SOURCE ONLY (2026-11-10)
+
+The opt-in caller can request `capabilities.discover` with `{}` through the
+same private authenticated control transport. It returns only the capabilities
+actually registered in that specific worker process, with fixed description,
+risk class, side-effect class and argument schema. Optional media, Homelab and
+Work Runner capabilities are absent unless their trusted providers are wired.
+The discovery result grants **nothing**: the existing independent registry
+validation, authenticated source access and side-effect policy remain unchanged.
+A merged source change is not proof this has been deployed or accepted live.
+
 ## Contract for any caller
 
 Create an issue in the **private** `igormego/personal-project-brain` repository.
