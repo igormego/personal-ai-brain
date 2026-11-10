@@ -7,7 +7,7 @@ import json
 import pytest
 
 from personal_ai_brain.arr_read import ARRReadProvider, ARRSourceUnavailable
-from personal_ai_brain.control import Redactor, Rejected, build_registry
+from personal_ai_brain.control import CapabilityFailed, Redactor, Rejected, build_registry
 from personal_ai_brain.resource_query import QueryUnavailable, ResourceQueryBroker, validate_query
 
 
@@ -199,5 +199,8 @@ def test_existing_registry_is_off_by_default_and_opt_in_is_shared():
                               media_resource_provider=Injected())
     cap, args = registry.resolve("media.resource_read", typed("radarr"))
     assert cap.handler(args)["items"][0]["title"] == "Film A"
-    with pytest.raises(Rejected):
-        registry.resolve("media.resource_read", typed("sonarr"))
+    # The selector is registered for the typed broker, but the Sonarr provider
+    # and independent resource grant are absent: fail closed before any API call.
+    cap, args = registry.resolve("media.resource_read", typed("sonarr"))
+    with pytest.raises(CapabilityFailed):
+        cap.handler(args)
