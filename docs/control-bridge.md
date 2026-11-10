@@ -7,16 +7,17 @@ Codex session. GitHub Issues is the first transport, not the capability API.
 owns polling, durable reservations, audit and result delivery. No new dependency,
 database, listener, Docker socket, shell handler or dynamic plugin loader is used.
 
-## Registered capability discovery — SOURCE ONLY (2026-11-10)
+## Generic registered-capability discovery helper — SOURCE ONLY (2026-11-10)
 
-The opt-in caller can request `capabilities.discover` with `{}` through the
-same private authenticated control transport. It returns only the capabilities
-actually registered in that specific worker process, with fixed description,
-risk class, side-effect class and argument schema. Optional media, Homelab and
-Work Runner capabilities are absent unless their trusted providers are wired.
-The discovery result grants **nothing**: the existing independent registry
-validation, authenticated source access and side-effect policy remain unchanged.
-A merged source change is not proof this has been deployed or accepted live.
+A pure `capability_discovery.discover_registered(registry)` helper returns only
+the actually present registry metadata (ID, description, risk, side-effect class,
+argument schema). Optional work, media and host resources are absent until
+their independent trusted providers/grants are configured. This is **not** a
+new control capability: the currently pinned production control protocol and
+registry remain unchanged, and ordinary ChatGPT cannot yet invoke discovery
+through the worker. A later reviewed integration must explicitly expose this
+helper without weakening authentication or the existing candidate-image pins.
+No new host access, execution authority, network endpoint or credentials.
 
 ## Contract for any caller
 
