@@ -103,6 +103,18 @@ class Worker:
                 record.update(request_id=correlation, capability=request["capability"],
                               requested_by=request["requested_by"], requested_at=request["requested_at"])
                 capability, arguments = self.registry.resolve(request["capability"], request["arguments"])
+                # Title-level ARR inventory is persistently disclosed in private
+                # Issues + the durable ledger. requested_by is user-controlled
+                # metadata, never proof of owner identity. Bind to GitHub's
+                # authenticated issue author on every newly admitted request.
+                if (capability.id == "media.resource_read"
+                        and arguments.get("resource_id") in ("arr/radarr", "arr/sonarr")):
+                    author = issue.get("user")
+                    if (type(author) is not dict
+                            or type(author.get("id")) is not int
+                            or author["id"] != 55916200
+                            or author.get("login") != "igormego"):
+                        raise Rejected("owner_auth_required")
                 record.update(arguments=arguments, validation="accepted")
                 request_path = self.state / "requests" / (correlation + ".json")
                 existing = load_json(request_path)
@@ -225,6 +237,32 @@ def serve(state=STATE, heartbeat=BEAT):
         def media_provider(resource_id):
             return read_mounted_media_snapshot(
                 resource_id, movies_enabled=movies_enabled
+            )
+
+        # ARR item/title disclosure is an independent, OFF-by-default
+        # configuration gate; existing Sonarr overview remains unchanged.
+        services = frozenset(
+            "arr/" + service for service in ("sonarr", "radarr")
+            if os.environ.get("PAB_ARR_" + service.upper() + "_ENABLED") == "1"
+        )
+        if services:
+            if os.environ.get("PAB_ARR_DISCLOSURE_APPROVED") != "1":
+                raise ValueError("arr_title_disclosure_not_approved")
+            from .arr_snapshot_bridge import read_mounted_arr
+            from .resource_query import ResourceQueryBroker
+
+            # Separate exact, operator-installed private Docker secret. Never
+            # re-use the GitHub token as a cursor-signing key.
+            with Path("/run/secrets/pab_arr_cursor_key").open("rb") as key_file:
+                cursor_key = key_file.read(65)
+            if not 32 <= len(cursor_key) <= 64:
+                raise ValueError("invalid_arr_cursor_secret")
+            providers = {
+                rid: (lambda view, rid=rid: read_mounted_arr(rid, view))
+                for rid in services
+            }
+            media_provider.query_broker = ResourceQueryBroker(
+                providers, services, cursor_key, disclosure_approved=True
             )
 
     registry = build_registry(
