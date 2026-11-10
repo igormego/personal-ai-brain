@@ -129,7 +129,7 @@ class Registry:
 
 def build_registry(core_state: Path, reader_factory, redactor, work_client=None,
                    media_plan_provider=None, host_audit_snapshot: Path | None = None,
-                   *, media_resource_provider=None):
+                   *, media_resource_provider=None, media_query_broker=None):
     def runtime_health(_):
         health, code = runtime.health(core_state, core_state / "heartbeat.json")
         last = health.get("last_run", {})
@@ -220,21 +220,28 @@ def build_registry(core_state: Path, reader_factory, redactor, work_client=None,
         ))
     # Source-only opt-in: an explicitly trusted Media operator must supply the
     # sanitized, complete, timestamped read provider. Production does not wire it.
-    if media_resource_provider is not None:
+    if media_resource_provider is not None or media_query_broker is not None:
         from .assistant_media_resources import (
             MediaResourceUnavailable, read_media_resource, validate_media_selector,
         )
 
         def media_selector(value):
             try:
+                if type(value) is dict and value.get("resource_id") == "movies/watchlist":
+                    from .resource_query import validate_query
+                    return validate_query(value)
                 return validate_media_selector(value)
-            except MediaResourceUnavailable:
+            except (MediaResourceUnavailable, ValueError):
                 raise Rejected("invalid_media_resource") from None
 
         def media_read(arguments):
             try:
+                if arguments["resource_id"] == "movies/watchlist":
+                    if media_query_broker is None:
+                        raise MediaResourceUnavailable("media_resource_unavailable")
+                    return media_query_broker.read(arguments, principal="owner")
                 return read_media_resource(arguments, media_resource_provider)
-            except MediaResourceUnavailable:
+            except (MediaResourceUnavailable, ValueError):
                 raise CapabilityFailed("media_resource_unavailable") from None
 
         caps.append(Capability(
@@ -244,7 +251,10 @@ def build_registry(core_state: Path, reader_factory, redactor, work_client=None,
             {"type": "object", "additionalProperties": False,
              "required": ["resource_id"],
              "properties": {"resource_id": {"type": "string",
-                                            "enum": ["sonarr/overview", "movies/watchlist-overview"]}}},
+                                            "enum": ["sonarr/overview", "movies/watchlist-overview", "movies/watchlist"]},
+                            "view": {"type": "string", "enum": ["items"]},
+                            "limit": {"type": "integer", "minimum": 1, "maximum": 10},
+                            "cursor": {"type": "string", "maxLength": 512}}},
             media_selector, media_read,
         ))
     if media_plan_provider is not None:
