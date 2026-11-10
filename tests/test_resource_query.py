@@ -5,7 +5,7 @@ import os
 
 import pytest
 
-from personal_ai_brain.control import CapabilityFailed, Redactor, build_registry
+from personal_ai_brain.control import Redactor, Rejected, build_registry
 from personal_ai_brain.resource_query import QueryUnavailable, ResourceQueryBroker, validate_query
 
 NOW = datetime(2026, 11, 10, 12, 0, tzinfo=timezone.utc)
@@ -101,13 +101,15 @@ def test_registry_has_default_deny_and_explicit_injected_query():
     from pathlib import Path
     provider = lambda _: {}
     default = build_registry(Path("."), lambda: None, Redactor(), media_resource_provider=provider)
-    cap, args = default.resolve("media.resource_read", query())
-    with pytest.raises(CapabilityFailed):
-        cap.handler(args)
+    with pytest.raises(Rejected):
+        default.resolve("media.resource_read", query())
     source = snapshot()
     source["collected_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    reg = build_registry(Path("."), lambda: None, Redactor(), media_resource_provider=provider,
-                         media_query_broker=broker(source))
+    class InjectedProvider:
+        query_broker = broker(source)
+        def __call__(self, _):
+            return {}
+    reg = build_registry(Path("."), lambda: None, Redactor(), media_resource_provider=InjectedProvider())
     cap, args = reg.resolve("media.resource_read", query())
     assert len(cap.handler(args)["items"]) == 2
 
