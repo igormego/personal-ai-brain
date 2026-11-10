@@ -18,6 +18,32 @@ from .assistant_media_resources import (
 MAX_SNAPSHOT_BYTES = 4096
 MOUNTED_SNAPSHOT_PATH = Path("/media-audit/snapshot.json")  # Existing Sonarr contract.
 MOUNTED_MOVIES_SNAPSHOT_PATH = Path("/media-audit/movies-watchlist-overview.json")
+MOUNTED_WATCHLIST_SNAPSHOT_PATH = Path("/watchlist-audit/snapshot.json")
+
+
+def read_mounted_watchlist_items():
+    """Fixed operator-published snapshot; no provider is wired by the worker."""
+    descriptor = None
+    try:
+        descriptor = os.open(MOUNTED_WATCHLIST_SNAPSHOT_PATH,
+                             os.O_RDONLY | os.O_CLOEXEC | getattr(os, "O_NOFOLLOW", 0))
+        info = os.fstat(descriptor)
+        if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1
+                or info.st_size <= 0 or info.st_size > 2_000_000
+                or info.st_mode & 0o077 or info.st_uid not in (0, os.geteuid())):
+            raise ValueError("snapshot_access_denied")
+        with os.fdopen(descriptor, "rb") as stream:
+            descriptor = None
+            raw = stream.read(2_000_001)
+        if len(raw) > 2_000_000:
+            raise ValueError("snapshot_too_large")
+        return json.loads(raw.decode("utf-8"), object_pairs_hook=_unique,
+                          parse_constant=lambda _: (_ for _ in ()).throw(ValueError("constant")))
+    except (OSError, UnicodeError, ValueError, TypeError, RecursionError):
+        raise MediaResourceUnavailable("media_resource_unavailable") from None
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
 
 
 def _unique(pairs):
