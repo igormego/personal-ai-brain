@@ -273,3 +273,39 @@ The control image layers only the corrected module onto the prior image;
 The normal `personal-ai-brain:control` tag points to the corrected image. Core was
 recreated for credential refresh; unrelated services were not restarted. Updating
 the preserved runtime baseline to current main is outside this maintenance scope.
+
+## Typed ARR API reads — source-only (2026-11-10)
+
+The existing \`media.resource_read\` registry may now route independent, explicitly
+granted \`arr/radarr\` and \`arr/sonarr\` resources through the same typed
+\`ResourceQueryBroker\` as \`movies/watchlist\`. The allowlisted views are
+\`items\` (movie/series identity, monitored status, current quality profile,
+and Radarr \`hasFile\`) and \`profiles\` (profile ID/name). Limit is 1–10 per
+page; signed, principal/view/limit/content-generation-bound cursors reject
+changing inventories. No caller-controlled API path, URL, method, server,
+command, config value, write flag or arbitrary field is accepted.
+
+The new \`ARRReadProvider\` performs bounded **GET only** against operator-pinned
+Radarr/Sonarr \`/api/v3/movie\`, \`/api/v3/series\`, and \`/api/v3/qualityprofile\`.
+It refuses redirects, partial/malformed/oversize responses, and strips raw
+upstream fields including media paths, secrets, download commands and config
+details. A live GET is **not** a 30-minute static host snapshot; cursors pin the
+validated content digest rather than the per-request collection clock.
+
+**No production activation or API credentials are included in this source PR.**
+The existing Control Worker still does **not** inject an ARR provider or any
+additional API secret, so all ARR selectors remain unavailable. Before a
+separately authorized deployment, the operator must review private owner
+authentication, an independent read grant per service, sustained network access,
+secret isolation (preferably outside the broad Control worker), and **explicit
+title/profile retention in private GitHub Issues and durable host ledger**.
+Do not treat a hardcoded \`principal="owner"\` in a source-only injected query
+as sufficient authentication for a production title-disclosure grant.
+
+The following **effect** phase is still separate: a typed, exact-ID change plan
+with current-state readback, explicit scoped user approval, durable reservation,
+one bounded ARR update and independent read-after-write verification. Even
+\`monitored=true\` may cause automatic downloading. No ARR PUT/POST/DELETE,
+settings mutation, bulk operation or movie acquisition is authorized by this
+GET-only implementation. This source milestone does not replace domain-owner
+review of Radarr/Sonarr API semantics or the existing PAB #38 Seerr workflow.
