@@ -51,7 +51,9 @@ def without_arr_worker(text):
     text = text.replace(authorization, "", 1)
     start = text.index(arr_injection_start)
     end = text.index(arr_injection_end, start)
-    return text[:start] + text[end:]
+    # The ARR splice was inserted after an existing blank line; remove
+    # its trailing newline too so the accepted baseline is byte-identical.
+    return text[:start] + text[end + 1:]
 
 
 def sources(baseline, current):
