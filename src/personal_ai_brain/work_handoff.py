@@ -122,7 +122,8 @@ def summary(record):
                 r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})', date)):
             raise ValueError('invalid_state_timestamp')
     result = {'status': status, 'artifacts_retained': True} if status in TERMINAL else None
-    if status == 'succeeded' and record['request']['task_type'] == contract.GENERIC_TYPE:
+    if status == 'succeeded' and record['request']['task_type'] in (
+            contract.GENERIC_TYPE, contract.RESOURCE_TYPE):
         # Metadata only: no script/input/output body or private filesystem path
         # crosses the existing control transport. Never claim semantic success.
         artifacts = record.get('output_artifacts')
@@ -138,6 +139,19 @@ def summary(record):
                        for a in artifacts)):
             raise ValueError('invalid_generic_result')
         result.update(artifact_manifest=artifacts, goal_semantics_verified=False)
+        if record['request']['task_type'] == contract.RESOURCE_TYPE:
+            receipt = record.get('resource_receipt')
+            if (type(receipt) is not dict
+                    or set(receipt) != {'resource_id', 'collected_at', 'source', 'sha256', 'size'}
+                    or receipt['resource_id'] != contract.HOST_RESOURCE
+                    or receipt['source'] != 'host_collector_snapshot_not_live_probe'
+                    or type(receipt['collected_at']) is not str
+                    or not re.fullmatch(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z', receipt['collected_at'])
+                    or type(receipt['sha256']) is not str
+                    or not re.fullmatch('[0-9a-f]{64}', receipt['sha256'])
+                    or type(receipt['size']) is not int or not 1 <= receipt['size'] <= 4096):
+                raise ValueError('invalid_resource_receipt')
+            result['resource_receipt'] = receipt
     return {'task_id': contract.task_id(record['task_id']), 'status': status,
             'payload_hash': record['payload_hash'], 'attempts': record['attempts'],
             'cancel_requested': record['cancel_requested'],

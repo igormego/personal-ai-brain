@@ -155,3 +155,42 @@ those bytes. The first external acceptance must use non-sensitive fixtures.
   and real domain writes are **not implemented** by this milestone.
 - Failure, cancellation and crash preserve durable attempts; never silently
   rerun an uncertain generic task.
+
+## SOURCE-ONLY: trusted registered host resource into existing workspace (#77/#64)
+
+A separate optional contract `workspace.resource-python.v1` lets the caller
+request **one exact registered logical input**, `homelab/host-snapshot`, while
+supplying its sandbox script. It cannot provide replacement input bytes, a path,
+network endpoint, credentials or claim its own provenance. Existing
+`workspace.python.v1` caller-inline tasks remain unchanged.
+
+The *trusted builder*, after a durable single-attempt task reservation and only
+when **both** `generic_enabled` and **separate** `resource_enabled` are true in
+the **operator-owned profile**, reads a fixed private, read-only host snapshot
+from `/opt/personal-ai-brain/worker-resources/host-snapshot.json` (not from
+the request). It reuses `host_audit.read_snapshot` ownership/no-symlink/
+schema/freshness validation. It stages the complete bounded sanitized snapshot
+under `/workspace/inputs/host-snapshot.json` through existing `InputGrant`
+and Bubblewrap read-only mount. A durable, non-sensitive receipt with source,
+collection time, bytes and SHA-256 is saved **before script execution** and
+appears alongside any successful artifact manifest. Existing one-attempt,
+idempotency, collision-safe staging and preview bounds remain in effect.
+
+**No new approval is implied by source merge.** Default is off, no profile
+change, host mount, credential, container or network action has been performed.
+The existing trust model of the private GitHub mailbox grants read access to
+its allowed owners/collaborators; this host summary contains only fields already
+exposed by the separately accepted `homelab.audit`. Never generalize the same
+egress behavior to personal media titles, sensitive sources or logs without a
+separately approved authenticated owner grant, retention/redaction design and
+further tests.
+
+Before any host rollout, the trusted operator must verify the exact installed
+builder binary/source pin, user/group/ACL and immutable fixed mount provenance,
+the fresh snapshot schema and confidentiality class, the existing ledger, the
+pin-preserving rollback, and Bubblewrap's **real** isolation. Existing builder
+profile remains off for this resource type. Acceptance needs one fresh
+normal-ChatGPT `work.submit` with the new contract and a correlated
+`work.status` showing an actual task-local resource receipt *without* copying
+snapshot bytes into private GitHub Issues. A merged PR or fixture tests alone
+do not constitute live source-to-sandbox acceptance.

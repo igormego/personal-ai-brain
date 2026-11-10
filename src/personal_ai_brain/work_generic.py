@@ -21,6 +21,7 @@ import subprocess
 
 from .work_sandbox import command, kill_tree, limits
 from .work_store import atomic_bytes, atomic_json
+from .work_contract import RESOURCE_TYPE
 from .workspace_artifacts import InputGrant, inspect_outputs, stage_inputs, WorkspaceArtifactDenied
 
 MAX_STDOUT = 16384
@@ -66,7 +67,8 @@ def _output_grants(raw: bytes):
         raise WorkspaceArtifactDenied("invalid_generic_output") from None
 
 
-def execute(request: dict, workspace: Path, artifacts: Path, guard):
+def execute(request: dict, workspace: Path, artifacts: Path, guard, *,
+            trusted_grants: tuple[InputGrant, ...] | None = None):
     """Return (terminal state, fixed failure/success code, safe artifact summary).
 
     Must be invoked only after durable reservation and operator opt-in.
@@ -74,9 +76,22 @@ def execute(request: dict, workspace: Path, artifacts: Path, guard):
     metadata can pass through Work Runner status. No blind retry after failure.
     """
     try:
-        inputs = tuple(InputGrant("user-inline", item["path"],
-                      base64.b64decode(item["content_b64"], validate=True))
-                       for item in request["inputs"])
+        if request["task_type"] == RESOURCE_TYPE:
+            # Only a trusted Work Runner supplies these bytes after host-only
+            # source validation. No input from the GitHub contract can become
+            # a privileged resource merely by claiming a resource ID.
+            if (type(trusted_grants) is not tuple or len(trusted_grants) != 1
+                    or request["inputs"] != []
+                    or trusted_grants[0].resource_id != request["resource_id"]
+                    or trusted_grants[0].path != "host-snapshot.json"):
+                raise WorkspaceArtifactDenied("resource_grant_unavailable")
+            inputs = trusted_grants
+        else:
+            if trusted_grants is not None:
+                raise WorkspaceArtifactDenied("untrusted_resource_input")
+            inputs = tuple(InputGrant("user-inline", item["path"],
+                          base64.b64decode(item["content_b64"], validate=True))
+                           for item in request["inputs"])
         if inputs:
             staged = stage_inputs(workspace / "inputs", inputs)
         else:

@@ -11,6 +11,8 @@ from . import coding_policy
 REPOSITORY = 'Az1mutt/personal-ai-brain'
 TASK_TYPE = 'fixture.patch-test.v1'
 GENERIC_TYPE = 'workspace.python.v1'
+RESOURCE_TYPE = 'workspace.resource-python.v1'
+HOST_RESOURCE = 'homelab/host-snapshot'
 GENERIC_FIELDS = {'script', 'inputs'}
 GOAL = 'Create the deterministic Work Runner fixture artifact.'
 CRITERIA = ['fixture content matches', 'isolation checks pass']
@@ -52,12 +54,15 @@ def parse(raw):
                            parse_constant=lambda _: (_ for _ in ()).throw(Rejected('nonfinite_json')))
         if not isinstance(value, dict):
             raise Rejected('invalid_fields')
-        generic = value.get('task_type') == GENERIC_TYPE
-        if set(value) != (FIELDS | GENERIC_FIELDS if generic else FIELDS):
+        resource = value.get('task_type') == RESOURCE_TYPE
+        generic = value.get('task_type') in (GENERIC_TYPE, RESOURCE_TYPE)
+        expected_fields = (FIELDS | GENERIC_FIELDS | ({'resource_id'} if resource else set())
+                           if generic else FIELDS)
+        if set(value) != expected_fields:
             raise Rejected('invalid_fields')
         task_id(value['task_id'])
         coding = value['task_type'] == coding_policy.TYPE
-        if (value['schema_version'] != '0.1' or value['task_type'] not in (TASK_TYPE, coding_policy.TYPE, GENERIC_TYPE)
+        if (value['schema_version'] != '0.1' or value['task_type'] not in (TASK_TYPE, coding_policy.TYPE, GENERIC_TYPE, RESOURCE_TYPE)
                 or value['repository'] != REPOSITORY):
             raise Rejected('unsupported_contract')
         if coding:
@@ -90,6 +95,9 @@ def parse(raw):
                     or any(ord(ch) == 0 for ch in script)):
                 raise Rejected('invalid_generic_script')
             inputs = value['inputs']
+            if resource and (value['resource_id'] != HOST_RESOURCE or inputs != []):
+                # A brokered input must never be caller-provided or impersonated.
+                raise Rejected('resource_grant_required')
             if type(inputs) is not list or len(inputs) > 8:
                 raise Rejected('invalid_generic_inputs')
             from .workspace_artifacts import _safe_path
