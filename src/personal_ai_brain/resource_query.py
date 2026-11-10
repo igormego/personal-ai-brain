@@ -116,6 +116,10 @@ def _snapshot(source, now):
     return hashlib.sha256(raw).hexdigest()
 
 
+# New resources require a reviewed, registered validator and bounded views.
+RESOURCE_SCHEMAS["movies/watchlist"]["validate_snapshot"] = _snapshot
+
+
 class ResourceQueryBroker:
     """Fixed schema registry with independently granted item disclosure."""
     def __init__(self, providers, grants, cursor_key, *, disclosure_approved=False):
@@ -137,7 +141,8 @@ class ResourceQueryBroker:
             _deny()
         try:
             source = provider()
-            generation = _snapshot(source, now or datetime.now(timezone.utc))
+            validate_snapshot = RESOURCE_SCHEMAS[selected["resource_id"]]["validate_snapshot"]
+            generation = validate_snapshot(source, now or datetime.now(timezone.utc))
             offset = 0
             if "cursor" in selected:
                 token = _decode(selected["cursor"])
