@@ -9,6 +9,7 @@ and explicitly enables the independent service + disclosure grants.
 """
 from __future__ import annotations
 
+import argparse
 from datetime import datetime, timezone
 import json
 import os
@@ -25,7 +26,10 @@ ARR_FILES = {
 }
 HOST_OUTPUT = Path("/opt/personal-ai-brain/arr-audit")
 CONTROL_MOUNT = Path("/arr-audit")
-COLLECTOR_CONFIG = Path("/etc/personal-ai-brain/arr-read/collector.json")
+COLLECTOR_CONFIGS = {
+    "sonarr": Path("/etc/personal-ai-brain/arr-read/sonarr.json"),
+    "radarr": Path("/etc/personal-ai-brain/arr-read/radarr.json"),
+}
 MAX_SNAPSHOT = 2_000_000
 DIR_FLAGS = os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW
 READ_FLAGS = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_NONBLOCK
@@ -191,14 +195,16 @@ def publish_arr(provider, resource_id, view, *, directory=HOST_OUTPUT,
             os.close(fd)
 
 
-def _trusted_config():
-    """The private operator config cannot come from GitHub/ChatGPT requests."""
+def _trusted_config(service):
+    """Fixed service selector only from the operator-owned systemd unit."""
+    if type(service) is not str or service not in COLLECTOR_CONFIGS:
+        _deny()
     try:
-        spec = _source_json(_read_file(COLLECTOR_CONFIG, max_bytes=2048,
+        spec = _source_json(_read_file(COLLECTOR_CONFIGS[service], max_bytes=2048,
                                       expected_uid=0, private=True))
         if (type(spec) is not dict or set(spec) !=
                 {"service", "origin", "api_key_file", "reader_gid"}
-                or spec["service"] not in ("sonarr", "radarr")
+                or spec["service"] != service
                 or type(spec["origin"]) is not str
                 or type(spec["api_key_file"]) is not str
                 or type(spec["reader_gid"]) is not int
@@ -217,13 +223,16 @@ def _trusted_config():
         _deny()
 
 
-def main():
+def main(argv=None):
     """Operator-owned one-shot per service, scheduled outside the Control app."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--service", required=True, choices=("sonarr", "radarr"))
+    args = parser.parse_args(argv)
     if os.geteuid() != 0:
         print("arr_bridge_unavailable")
         return 1
     try:
-        service, gid, provider = _trusted_config()
+        service, gid, provider = _trusted_config(args.service)
         # Fetch/validate BOTH source views before publishing either. Each write
         # is atomic; any later failure leaves older files to expire in 2 min.
         snapshots = {}
