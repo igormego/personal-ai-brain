@@ -33,7 +33,8 @@ def read_mounted_watchlist_items():
                 or stat.S_IMODE(parent.st_mode) != 0o700):
             raise ValueError("snapshot_directory_unsafe")
         descriptor = os.open(MOUNTED_WATCHLIST_SNAPSHOT_PATH.name,
-                             os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW, dir_fd=directory)
+                             os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_NONBLOCK,
+                             dir_fd=directory)
         info = os.fstat(descriptor)
         if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1
                 or info.st_size <= 0 or info.st_size > 2_000_000
