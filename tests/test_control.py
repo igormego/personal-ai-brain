@@ -180,6 +180,41 @@ def test_exception_sanitized_worker_continues_and_correlates(tmp_path):
     assert "private-secret" not in json.dumps(transport.comments)
 
 
+def test_discovery_reports_only_active_granted_capabilities(tmp_path):
+    registry = build_registry(tmp_path, lambda: None, Redactor())
+    cap, arguments = registry.resolve("capabilities.discover", {})
+    output = cap.handler(arguments)
+    assert output["schema_version"] == "0.1"
+    items = output["capabilities"]
+    names = [item["id"] for item in items]
+    assert names == sorted(names)
+    assert "capabilities.discover" in names
+    assert "project_os.status" in names
+    # Optional host/media/work tools are absent until their trusted providers exist.
+    assert "homelab.audit" not in names
+    assert "media.resource_read" not in names
+    assert "work.submit" not in names
+    assert all(item["risk_level"] == "read_only" for item in items)
+    assert all(item["side_effect_class"] == "none" for item in items)
+    assert all(set(item) == {"id", "description", "risk_level",
+                             "side_effect_class", "argument_schema"} for item in items)
+    with pytest.raises(Rejected):
+        registry.resolve("capabilities.discover", {"command": "docker ps"})
+
+
+def test_discovery_through_existing_worker_is_read_only_and_correlated(tmp_path):
+    entries = [json.dumps(request(capability="capabilities.discover")),
+               json.dumps(request(capability="capabilities.discover",
+                                  arguments={"resource_id": "host/root"}))]
+    transport = FakeTransport(entries)
+    registry = build_registry(tmp_path, lambda: None, Redactor())
+    Worker(tmp_path, transport, registry, Redactor()).tick()
+    assert [item[1]["status"] for item in transport.comments] == [
+        "capability_completed", "request_rejected"]
+    assert "capabilities" in transport.comments[0][1]["result"]
+    assert transport.comments[1][1]["error"] == "invalid_arguments"
+
+
 def test_registry_policy_and_duplicate_ids():
     cap = Capability("example.read", "test", "read_only", {}, no_arguments, lambda _: None)
     registry = Registry([cap])
