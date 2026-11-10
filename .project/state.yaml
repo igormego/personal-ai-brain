@@ -131,23 +131,21 @@ current_state: >
   Sanitized operator evidence: Issue #64 comment 6602708707.
 
 exact_next_action: >
-  Issue #77: the owner-approved trusted snapshot publisher and pinned builder
-  and Control components are deployed, and the operator-only checks passed:
-  READY_FOR_EXTERNAL_CHATGPT_ACCEPTANCE. From ordinary ChatGPT submit one
-  benign workspace.resource-python.v1 request for the exact registered
-  homelab/host-snapshot resource, then separately query work.status and verify
-  the correlated source receipt, freshness, bounded artifact and one attempt.
-  Check the separately authorized negative request without fabricating source
-  bytes. External transport acceptance remains pending.
-  Next verified goal-level gate in #64: solve two truly different user goals
-  end-to-end through the existing tools (read-only Homelab diagnosis and
-  unrelated coding/data task), then one specifically approved reversible
-  effect with prestate/plan hash/reservation/readback. Zero per-goal bespoke
-  handlers, no manual Codex prompt relay. Current Core source-read failure
-  must be diagnosed without fabricated freshness or extra blanket grants.
-  WhatsApp #81 belongs to the Gateway lane; backup #33 stays paused.
+  #77 TRUSTED HOST RESOURCE -> WORKSPACE is LIVE_ACCEPTED in ordinary ChatGPT:
+  control #119 new workspace.resource-python.v1 task read broker-owned fresh
+  homelab/host-snapshot without inline bytes, #120 independently confirmed
+  terminal succeeded with source SHA256 receipt, 187-byte verified artifact and
+  exactly 1 attempt; #121 rejected an unregistered resource before execution.
+  Do not repeat the accepted transport/mount/publisher test. Next goal-level
+  #64 milestone: apply the existing registered-resource and isolated execution
+  path to a genuinely new user-provided read-only Homelab diagnostic goal and
+  an unrelated coding/data goal, with zero bespoke per-task platform edits.
+  Resolve Core project_os.status shared source_read_failure as a bounded
+  independent incident without granting the model broader host permissions.
+  Then advance separately approved #83 typed-effect execution with exact
+  prestate, approval, reservation and authoritative readback. WhatsApp #81
+  remains Gateway-owned and backup #33 remains paused.
 blockers:
-  - "PAB #77 trusted host snapshot resource is READY_FOR_EXTERNAL_CHATGPT_ACCEPTANCE; actual externally correlated source-granted task, receipt and negative request remain unverified."
   - "PAB Core project_os.status/current core.health direct read is failing at shared source-read gate: private Core request #115 and prior #114 failed on 2026-11-10; original homelab selector worked in #97 on 2026-11-01. Connector can read the full current project map plus 12 mapped states, but this does not establish on-host Core credential/access; precise on-host failure reason remains unknown."
   - "G2 no durable cross-turn goal/delivery acceptance into arbitrary new ChatGPT sessions; the existing GitHub Issue/task handle allows foreground resume."
   - "G3 WhatsApp adapter, trusted sender, provider compliance/credentials, and outbound reply are not implemented or externally accepted."
@@ -199,6 +197,7 @@ portfolio:
 verification:
   last_verified: "2026-11-10"
   sources:
+    - "2026-11-10 #77 LIVE_ACCEPTED external ChatGPT trusted host input: private #119 submitted a new resource-python task with inputs empty and exact resource_id; private #120 independently confirmed succeeded attempts=1 and host-collected 22:13:38Z source receipt SHA d8f9702ffee577506f9eb1ebe010ff38735da06073e0876294eb63abca08d3db; homelab-health.json 187 bytes, SHA e57e15ead4c7d4ecd7aa10c0d54ca5aed006f48a5544d4c277e63404262fc028; preview hash recomputed and semantic fields checked. Private #121 unknown homelab/private selector returned request_rejected/invalid_work_arguments with execution_start null; no broad new permissions. Issue #77 checkpoint 6780799368. This is NOT full general autonomous goal solver or effect execution."
     - "2026-11-10 #77 owner-approved runtime activation: constrained root publisher and timer active, two source generations verified, builder and Control reviewed module pins deployed, resource_enabled=true, generic_enabled=true, coding_enabled=false. Existing worker active and Control healthy; actual builder-identity Bubblewrap synthetic legacy generic and snapshot-read checks passed, prior ledger records preserved. External ChatGPT work.submit/status acceptance remains pending."
     - "2026-11-10 ordinary ChatGPT read-only incident diagnosis: PAB private Core #115 returned source_read_failure on core.health, #116 returned runtime available with stale last manual job, #117 only lifecycle service logs; #114 project_os.status same failure despite accepted selector in #97. Connected GitHub verified mapped source files present; Core on-host token/API failure cause unknown. Product owner acceptance is a real cross-domain goal-to-verified-result flow, not merely a source merged component; PAB #64 comment 6778433151."
     - "Historical pre-activation checkpoint: 2026-11-10 PAB #77 activation preflight BLOCKED with no host modifications: private collector UID 0700/0600 snapshot and different builder UID; strict read_snapshot owner rule prevents simple ACL/bind. Follow-up source-only PR #100 merged commit 33e02d84cf05130efdd3efaf53897dfc82e906db; GitHub CI 42890254290 SUCCESS (1346 passed / 1 skipped). Tested root-controlled one-shot publisher validates source ownership/schema/freshness and atomically writes root-owned builder-group 0640 sanitized output; installed root unit, timed refresh, Control and builder deployment and live resource grant remain UNVERIFIED/NOT DEPLOYED. Issue #77 authoritative checkpoint comment 6777814141."
