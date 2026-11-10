@@ -357,7 +357,8 @@ Effect Broker or a Sonarr library repair.
 ### Host-only operator configuration (example; illustrative IDs)
 
 The operator installs a private **root-owned mode 0600** file at
-`/etc/personal-ai-brain/arr-read/collector.json` (not in a repository):
+`/etc/personal-ai-brain/arr-read/sonarr.json` (or `radarr.json`;
+not in a repository):
 
 ```json
 {
@@ -369,7 +370,8 @@ The operator installs a private **root-owned mode 0600** file at
 ```
 
 The service is one host-only, non-interactive command:
-`python -m personal_ai_brain.arr_snapshot_bridge`. Restrict its network to
+`python -m personal_ai_brain.arr_snapshot_bridge --service sonarr`
+(or `--service radarr` with its independent private config). Restrict its network to
 the exact approved ARR address/port, its filesystem writes to the fixed
 `/opt/personal-ai-brain/arr-audit` directory, and its credential read to the
 approved host-only secret. It must **not** be invoked with user/model-selected
