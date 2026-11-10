@@ -139,7 +139,9 @@ class Runner:
                     self.store.transition(identifier, 'blocked', 'resource_unavailable')
                     return True
             self.guard(identifier, deadline)
-            record = self.store.transition(identifier, 'running', 'sandbox_starting', started_at=timestamp())
+            record = self.store.transition(identifier, 'running', 'sandbox_starting',
+                                           started_at=timestamp(),
+                                           **({'resource_receipt': receipt} if resource else {}))
             if record['status'] in TERMINAL:
                 return True
             output_artifacts = ()
