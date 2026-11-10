@@ -310,4 +310,22 @@ def build_registry(core_state: Path, reader_factory, redactor, work_client=None,
                 {'type': 'object', 'additionalProperties': False, 'required': [field],
                  'properties': {field: {'type': 'object' if field == 'contract' else 'string'}}},
                 validate, handle, 'none' if operation == 'work.status' else 'local_work_handoff'))
-    return Registry(caps)
+    # This is a view of the *actually registered* tools, not a requested grant.
+    # The model cannot manufacture capabilities by requesting this metadata.
+    registry = Registry(caps)
+
+    def discover_capabilities(_):
+        return {"schema_version": "0.1", "capabilities": [
+            {"id": item.id, "description": item.description,
+             "risk_level": item.risk_level,
+             "side_effect_class": item.side_effect_class,
+             "argument_schema": item.argument_schema}
+            for item in sorted(registry.capabilities.values(), key=lambda item: item.id)
+        ]}
+
+    registry.register(Capability(
+        "capabilities.discover",
+        "Discover only currently registered capability contracts; grants unchanged",
+        "read_only", empty_schema, no_arguments, discover_capabilities,
+    ))
+    return registry
