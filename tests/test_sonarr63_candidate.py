@@ -25,9 +25,9 @@ def baseline(tmp_path):
     # Remove only the separately reviewed default-off effect registration
     # before comparing to the immutable Sonarr63 baseline.
     approved_registration = (
-        "        approved_effect = (capability.id == 'effect.execute'\\n"
-        "                           and capability.risk_level == 'approved_effect'\\n"
-        "                           and capability.side_effect_class == 'trusted_host_effect')\\n"
+        "        approved_effect = (capability.id == 'effect.execute'\n"
+        "                           and capability.risk_level == 'approved_effect'\n"
+        "                           and capability.side_effect_class == 'trusted_host_effect')\n"
     )
     assert ctl.count(approved_registration) == 1
     ctl = ctl.replace(approved_registration, "", 1)
