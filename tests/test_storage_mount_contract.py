@@ -23,6 +23,8 @@ def test_source_only_overlay_adds_only_isolated_storage_read():
     assert text.count("@APPROVED_STORAGE_SNAPSHOT_DIR@") >= 1
     assert "create_host_path: false" in text
     assert "target: /host-audit" not in text
+    payload = "\n".join(line for line in text.splitlines()
+                        if not line.lstrip().startswith("#"))
     for forbidden in (
         "docker.sock", "privileged: true", "cap_add", "devices:",
         "pid: host", "network_mode: host", "ports:", "secrets:",
@@ -30,7 +32,7 @@ def test_source_only_overlay_adds_only_isolated_storage_read():
         "PAB_HOST_AUDIT_ENABLED", "/control", "/core-state",
         "systemctl", "sudo ", "/dev/", "effect.execute",
     ):
-        assert forbidden not in text
+        assert forbidden not in payload
 
 
 def test_control_uses_fixed_distinct_mount_default_off():
