@@ -70,7 +70,7 @@ def without_arr_worker(text):
     if text.count(effect_errors) != 1:
         raise ValueError("candidate_baseline_mismatch")
     text = text.replace(effect_errors, "", 1)
-    storage = ('    storage_file = (Path("/host-audit/storage.json")\n'
+    storage = ('    storage_file = (Path("/storage-audit/storage.json")\n'
                '                    if os.environ.get("PAB_HOST_STORAGE_ENABLED") == "1" else None)\n')
     if text.count(storage) != 1:
         raise ValueError("candidate_baseline_mismatch")
