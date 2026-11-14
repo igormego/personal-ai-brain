@@ -1,0 +1,21 @@
+# SOURCE TEMPLATE ONLY: DO NOT APPLY WITHOUT THE TRUSTED LOCAL OPERATOR.
+# Add only this read-only storage source to the existing pinned Control Compose.
+# Keep existing /host-audit, /control, secrets, image pin and all other mounts.
+# The operator must first inspect the fully resolved Compose config and verify
+# that the dedicated storage publisher directory is collector-owned mode 2750,
+# files are 0640, and Control receives only the independent reader group.
+# @APPROVED_STORAGE_SNAPSHOT_DIR@ must be a pre-existing absolute host directory.
+# @APPROVED_STORAGE_READER_GID@ must be a verified host reader GID.
+services:
+  control:
+    environment:
+      PAB_HOST_STORAGE_ENABLED: "1"
+    group_add:
+      - "@APPROVED_STORAGE_READER_GID@"
+    volumes:
+      - type: bind
+        source: "@APPROVED_STORAGE_SNAPSHOT_DIR@"
+        target: /storage-audit
+        read_only: true
+        bind:
+          create_host_path: false
