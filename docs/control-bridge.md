@@ -30,29 +30,45 @@ worker and its response/replay boundary. The worker checks the **actual GitHub
 Issue author ID and login** before accepting a storage read; the
 `requested_by` text is not authorization.
 
-The trusted Ubuntu operator-side `host_storage.py` collector performs **one
-fixed read-only `/usr/bin/lsblk` invocation** and fixed root/data
-`statvfs` reads. It publishes only a bounded, schema-validated, timestamped
-snapshot with physical disk sizes/bus type, partition and logical-volume
-sizes/filesystem families, root/data mount-role membership, approximate
-unpartitioned space where calculable, and root/data available space. The disk
-indexes are **ephemeral display ordinals**, never usable target identities for
-effects. It does **not** publish device names, serials, filesystem UUIDs,
-volume labels, arbitrary mount paths, directory names, contents, credentials or
-raw command output. For an unmounted NTFS USB volume, used/free space and
-contents remain **unknown**; this read path neither mounts nor repairs it.
+The trusted Ubuntu operator-side `host_storage.py` collector performs
+**fixed read-only `/usr/bin/lsblk`, optional `/usr/sbin/vgs --readonly`** and
+root/data `statvfs` reads. Snapshot schema `0.2` reports physical disk
+sizes/bus type, partition and logical-volume size/filesystem families,
+root/data mount-role membership and filesystem available space. It now
+reports **anonymous** LVM volume-group size/free GiB when the fixed read-only
+probe succeeds, otherwise explicitly `lvm.status=unavailable`; it never
+guesses free extents. Groups are deliberately **unmapped** to physical devices
+in this version, so these numbers alone do not authorize destination
+selection, partition/LV changes, or automatic backup. Disk indexes are
+**ephemeral display ordinals**, never executable target identities. It
+publishes no VG/device names, serials, filesystem UUIDs, arbitrary mount
+paths, directory names, contents, credentials or raw subprocess output.
+For an unmounted NTFS USB volume, used/free space and contents remain
+**unknown**; this path neither mounts nor repairs it.
 
-Host deployment is **NOT** included or accepted by the source PR. The operator
-must independently review and pin the publisher, reuse the existing trusted
-host-audit refresh schedule if suitable, publish a private owner-controlled
-`storage.json` snapshot alongside the existing host-audit snapshot, verify
-atomic mode/ownership + host collector arguments, and ensure Control receives
-only that snapshot through the **already approved fixed read-only host-audit
-directory** (or separately review any required mount). Opt in to
-`PAB_HOST_STORAGE_ENABLED=1` *only after* checking the exact image, fixed
-mount, author authentication, expiry, no secret leakage, and regression of the
-existing `homelab.audit` and media routes. A source-only merge or a
-`homelab.audit` reply does not prove storage visibility is deployed.
+Host deployment is **NOT** included or accepted by source. A source-only
+rootless one-shot unit/timer template lives in
+`ops/systemd/pab-storage-refresh.{service.in,timer}` and must be rendered
+and installed by the existing **independent** trusted host operator only
+after inspecting actual UID/GID, current immutable Control image/ledger and
+rollback. The template never self-installs, enables systemd or changes
+Compose. If a dedicated unprivileged collector UID differs from the Control
+UID, the operator provisions a collector-owned setgid snapshot directory
+(mode `2750`), dedicated read-only group and publishes `0640` snapshot files;
+Control receives only an **operator-approved read-only directory bind**.
+The source reader independently refuses world-readable/group-writable files,
+untrusted owner/group, malformed and >30-minute-old snapshots.
+The operator must also verify that `PrivateDevices=yes` permits the
+required non-mutating block and LVM visibility on the actual Ubuntu host;
+if not, STOP for a narrowly reviewed exception, not a blanket privilege
+increase. Exact physical ID and any effect are intentionally outside
+this read-only path. Opt in to `PAB_HOST_STORAGE_ENABLED=1` **only after**
+checking the exact pinned Control image, author authentication and mount,
+two genuinely fresh snapshot generations, unaffected
+`homelab.audit`/Media/Work Runner, and successful correlated
+ordinary-ChatGPT read; this flag is **not currently deployed**.
+A source-only merge or normal `homelab.audit` reply does not prove
+storage visibility.
 
 **No host backup or disk effect** is authorized by this resource. NTFS repairs,
 partition changes, writable destinations, service quiescence and backup
