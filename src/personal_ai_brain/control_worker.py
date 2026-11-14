@@ -107,8 +107,9 @@ class Worker:
                 # Issues + the durable ledger. requested_by is user-controlled
                 # metadata, never proof of owner identity. Bind to GitHub's
                 # authenticated issue author on every newly admitted request.
-                if (capability.id == "media.resource_read"
-                        and arguments.get("resource_id") in ("arr/radarr", "arr/sonarr")):
+                if ((capability.id == "media.resource_read"
+                        and arguments.get("resource_id") in ("arr/radarr", "arr/sonarr"))
+                        or capability.id == "homelab.resource_read"):
                     author = issue.get("user")
                     if (type(author) is not dict
                             or type(author.get("id")) is not int
@@ -224,6 +225,8 @@ def serve(state=STATE, heartbeat=BEAT):
     # Ignore every other environment value; do not accept a caller path.
     audit_file = (Path("/host-audit/snapshot.json")
                   if os.environ.get("PAB_HOST_AUDIT_ENABLED") == "1" else None)
+    storage_file = (Path("/host-audit/storage.json")
+                    if os.environ.get("PAB_HOST_STORAGE_ENABLED") == "1" else None)
     # Explicitly opted-in, fixed, read-only mount.
     # The existing master read grant is OFF by default. Legacy Sonarr is the
     # only resource at master enablement; Movies requires its own explicit grant
@@ -268,7 +271,7 @@ def serve(state=STATE, heartbeat=BEAT):
     registry = build_registry(
         Path("/core-state"), lambda: RunReader(core_token),
         redactor, Client(), host_audit_snapshot=audit_file,
-        media_resource_provider=media_provider,
+        media_resource_provider=media_provider, host_storage_snapshot=storage_file,
     )
     def pulse():
         atomic_json(heartbeat, {"time": time.time()})
