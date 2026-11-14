@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 import json
 import os
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 import re
 import stat
@@ -19,6 +20,9 @@ RESOURCE_ID = "storage/topology"
 DEFAULT_HOST_PATH = Path("/var/lib/personal-ai-brain/host-audit/storage.json")
 CONTROL_SNAPSHOT_PATH = Path("/host-audit/storage.json")
 LSBLK = "/usr/bin/lsblk"
+VGS = "/usr/sbin/vgs"
+VG_FLAGS = [VGS, "--readonly", "--reportformat", "json", "--units", "b",
+            "--nosuffix", "-o", "vg_size,vg_free"]
 GIB = 1024 ** 3
 MAX_BYTES = 8192
 MAX_AGE = timedelta(minutes=30)
@@ -54,6 +58,51 @@ def _size(value):
 
 def _gib(value):
     return _size(value) // GIB
+
+
+def _vg_bytes(value):
+    if (type(value) is not str or len(value) > 40
+            or not re.fullmatch(r"\s*\d+(?:\.\d{1,3})?\s*", value)):
+        _deny()
+    try:
+        amount = Decimal(value.strip())
+        if amount < 0 or amount > 10 ** 15:
+            _deny()
+        return int(amount)
+    except (InvalidOperation, OverflowError):
+        _deny()
+
+
+def _vg_inventory(runner):
+    """Optional fixed LVM capacity probe. No VG names or device IDs published."""
+    try:
+        raw = runner(VG_FLAGS)
+        if type(raw) is not bytes or not 0 < len(raw) <= 8192:
+            _deny()
+        doc = json.loads(raw, object_pairs_hook=_pairs_unique)
+        if (type(doc) is not dict or set(doc) != {"report"}
+                or type(doc["report"]) is not list or len(doc["report"]) != 1):
+            _deny()
+        vg = doc["report"][0]
+        if type(vg) is not dict or set(vg) != {"vg"} or type(vg["vg"]) is not list:
+            _deny()
+        if len(vg["vg"]) > 16:
+            _deny()
+        groups = []
+        for item in vg["vg"]:
+            if type(item) is not dict or set(item) != {"vg_size", "vg_free"}:
+                _deny()
+            size = _vg_bytes(item["vg_size"])
+            free = _vg_bytes(item["vg_free"])
+            if not 0 <= free <= size:
+                _deny()
+            groups.append({"size_gib": size // GIB, "free_gib": free // GIB})
+        return {"status": "available", "volume_groups": groups,
+                "mapping": "unmapped"}
+    except (OSError, ValueError, TypeError, KeyError, RecursionError,
+            OverflowError, UnicodeError, subprocess.TimeoutExpired):
+        return {"status": "unavailable", "volume_groups": [],
+                "mapping": "unmapped"}
 
 
 def _fs(value):
@@ -185,11 +234,12 @@ def collect_snapshot(*, now=None, runner=None, free_gib=None, data_mounted=None)
             _deny()
         free = free_gib or _free_gib
         packet = {
-            "schema_version": "0.1", "resource_id": RESOURCE_ID,
+            "schema_version": "0.2", "resource_id": RESOURCE_ID,
             "collected_at": clock.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "source_status": "ok", "devices": devices,
             "root_free_gib": free("/"),
             "data_free_gib": free("/data") if mounted else None,
+            "lvm": _vg_inventory(runner or default_runner),
             "contents_inspected": False,
         }
         validate_snapshot(packet, now=clock)
@@ -203,8 +253,8 @@ def validate_snapshot(value, *, now=None):
     try:
         if (type(value) is not dict or set(value) != {
             "schema_version", "resource_id", "collected_at", "source_status",
-            "devices", "root_free_gib", "data_free_gib", "contents_inspected",
-        } or value["schema_version"] != "0.1"
+            "devices", "root_free_gib", "data_free_gib", "lvm", "contents_inspected",
+        } or value["schema_version"] != "0.2"
             or value["resource_id"] != RESOURCE_ID
             or value["source_status"] != "ok"
             or value["contents_inspected"] is not False):
@@ -224,6 +274,19 @@ def validate_snapshot(value, *, now=None):
                  (type(value["data_free_gib"]) is not int or
                   not 0 <= value["data_free_gib"] <= 10**9))):
             _deny()
+        lvm = value["lvm"]
+        if (type(lvm) is not dict or set(lvm) != {"status", "volume_groups", "mapping"}
+                or lvm["status"] not in ("available", "unavailable")
+                or lvm["mapping"] != "unmapped"
+                or type(lvm["volume_groups"]) is not list or len(lvm["volume_groups"]) > 16
+                or (lvm["status"] == "unavailable" and lvm["volume_groups"])):
+            _deny()
+        for vg in lvm["volume_groups"]:
+            if (type(vg) is not dict or set(vg) != {"size_gib", "free_gib"}
+                    or type(vg["size_gib"]) is not int
+                    or type(vg["free_gib"]) is not int
+                    or not 0 <= vg["free_gib"] <= vg["size_gib"] <= 10**8):
+                _deny()
         disks = value["devices"]
         if type(disks) is not list or not 1 <= len(disks) <= 16:
             _deny()
@@ -273,7 +336,10 @@ def read_snapshot(path: Path, *, now=None):
                              getattr(os, "O_NOFOLLOW", 0))
         info = os.fstat(descriptor)
         if (not stat.S_ISREG(info.st_mode) or not 0 < info.st_size <= MAX_BYTES
-                or info.st_mode & 0o022 or info.st_uid not in (0, os.geteuid())):
+                or info.st_mode & 0o027
+                or not (info.st_uid in (0, os.geteuid())
+                        or (info.st_mode & stat.S_IRGRP and
+                            info.st_gid in (os.getegid(), *os.getgroups())))):
             _deny()
         with os.fdopen(descriptor, "rb") as stream:
             descriptor = None
@@ -289,14 +355,17 @@ def read_snapshot(path: Path, *, now=None):
             os.close(descriptor)
 
 
-def publish_snapshot(path: Path, packet):
+def publish_snapshot(path: Path, packet, *, group_readable=False):
     pending = None
     try:
         validate_snapshot(packet)
         parent = path.parent
         info = parent.lstat()
         if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid()
-                or info.st_mode & 0o022 or path.is_symlink()):
+                or info.st_mode & 0o022 or path.is_symlink()
+                or (group_readable and
+                    (not info.st_mode & stat.S_ISGID
+                     or not info.st_mode & stat.S_IXGRP))):
             _deny()
         raw = (json.dumps(packet, sort_keys=True, separators=(",", ":")) + "\n").encode()
         if len(raw) > MAX_BYTES:
@@ -304,7 +373,9 @@ def publish_snapshot(path: Path, packet):
         with tempfile.NamedTemporaryFile(dir=parent, prefix=".storage-audit-",
                                          delete=False) as stream:
             pending = Path(stream.name)
-            os.fchmod(stream.fileno(), 0o600)
+            os.fchmod(stream.fileno(), 0o640 if group_readable else 0o600)
+            if group_readable and os.fstat(stream.fileno()).st_gid != info.st_gid:
+                _deny()
             stream.write(raw)
             stream.flush()
             os.fsync(stream.fileno())
@@ -323,10 +394,19 @@ def publish_snapshot(path: Path, packet):
 
 
 def main():
-    """Trusted host entrypoint with fixed output, not an LLM-callable command."""
-    if os.geteuid() != 0:
-        _deny()
-    publish_snapshot(DEFAULT_HOST_PATH, collect_snapshot())
+    """Operator-invoked rootless read-only collector; no model input route."""
+    import argparse
+    parser = argparse.ArgumentParser(description="Fixed storage read-only collector")
+    parser.add_argument("action", choices=("collect",))
+    parser.add_argument("--output", type=Path, default=DEFAULT_HOST_PATH)
+    parser.add_argument("--reader-group", action="store_true")
+    args = parser.parse_args()
+    try:
+        publish_snapshot(args.output, collect_snapshot(),
+                         group_readable=args.reader_group)
+    except StorageUnavailable:
+        print("storage_unavailable")
+        return 1
     print("storage_collected")
     return 0
 

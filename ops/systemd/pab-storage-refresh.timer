@@ -1,0 +1,13 @@
+# SOURCE TEMPLATE ONLY; operator reviews and enables separately.
+# Previous snapshot automatically becomes stale after 30 minutes if collector fails.
+[Unit]
+Description=Refresh private PAB storage topology snapshot
+
+[Timer]
+Unit=pab-storage-refresh.service
+OnBootSec=2min
+OnUnitInactiveSec=10min
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target
