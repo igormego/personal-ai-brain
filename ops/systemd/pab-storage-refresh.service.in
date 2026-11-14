@@ -1,0 +1,39 @@
+# SOURCE TEMPLATE ONLY; NOT INSTALLED OR ENABLED.
+# Rootless read-only inventory uses a pinned, separately reviewed copy of
+# host_storage.py. No Docker/SSH access, filesystem repair or disk mutation.
+# For group-readable output, operator must prepare an existing owner-controlled
+# setgid directory (mode 2750) whose group can be read by Control but not written.
+[Unit]
+Description=Personal AI Brain sanitized storage inventory (rootless operator)
+After=local-fs.target
+ConditionPathExists=@PINNED_STORAGE_COLLECTOR@
+ConditionPathIsDirectory=@OPERATOR_STORAGE_SNAPSHOT_DIR@
+
+[Service]
+Type=oneshot
+User=@APPROVED_STORAGE_COLLECTOR_USER@
+Group=@APPROVED_STORAGE_READER_GROUP@
+ExecStart=@APPROVED_PYTHON@ -I -B /run/pab-storage-collector.py collect --output /run/pab-storage-output/storage.json --reader-group
+WorkingDirectory=/
+UMask=0027
+TimeoutStartSec=25s
+Environment=PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+BindReadOnlyPaths=@PINNED_STORAGE_COLLECTOR@:/run/pab-storage-collector.py
+BindPaths=@OPERATOR_STORAGE_SNAPSHOT_DIR@:/run/pab-storage-output
+ReadWritePaths=/run/pab-storage-output
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
