@@ -12,6 +12,7 @@ import time
 import uuid
 
 from personal_ai_brain.control import CapabilityFailed, Redactor, Rejected, build_registry, parse_request
+from personal_ai_brain.approved_effect import EffectDenied, EffectUncertain
 from personal_ai_brain.github_issues import GitHubIssues, REPOSITORY, TITLE, TransportError
 from personal_ai_brain.runtime import RunReader, atomic_json, timestamp
 
@@ -109,7 +110,7 @@ class Worker:
                 # authenticated issue author on every newly admitted request.
                 if ((capability.id == "media.resource_read"
                         and arguments.get("resource_id") in ("arr/radarr", "arr/sonarr"))
-                        or capability.id == "homelab.resource_read"):
+                        or capability.id in ("homelab.resource_read", "effect.execute")):
                     author = issue.get("user")
                     if (type(author) is not dict
                             or type(author.get("id")) is not int
@@ -140,9 +141,15 @@ class Worker:
                         with deadline():
                             if capability.id in {'work.submit', 'work.status', 'work.cancel'}:
                                 result = capability.handler(arguments, request_id=correlation)
+                            elif capability.id == "effect.execute":
+                                result = capability.handler(arguments, request_id=correlation)
                             else:
                                 result = capability.handler(arguments)
                         record.update(status="capability_completed", result=self.redactor.clean(result))
+                    except EffectDenied:
+                        record.update(status="capability_execution_failed", error="effect_denied")
+                    except EffectUncertain:
+                        record.update(status="capability_execution_failed", error="effect_outcome_uncertain_needs_review")
                     except CapabilityFailed:
                         record.update(status="capability_execution_failed", error="source_read_failure")
                     except ExecutionTimeout:
