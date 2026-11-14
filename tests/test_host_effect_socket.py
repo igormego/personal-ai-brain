@@ -224,3 +224,49 @@ def test_split_uid_socket_requires_operator_owned_setgid_group_directory(tmp_pat
         serve_call(server, lambda: HostEffectClient(path).execute(args, request_id=rid))
         assert adapter.attempts == 1
     assert not path.exists()
+
+
+def test_existing_control_worker_can_reach_separate_host_broker_without_approval_key(tmp_path):
+    from personal_ai_brain.control import Redactor, build_registry
+    from personal_ai_brain.control_worker import Worker
+    from personal_ai_brain.github_issues import TITLE
+
+    class Transport:
+        def __init__(self, body):
+            self.issue = {"number": 1, "state": "open", "title": TITLE,
+                          "body": body, "user": {"id": 55916200, "login": "igormego"}}
+            self.comments = []
+
+        def list_page(self, page):
+            return [self.issue] if self.issue["state"] == "open" else []
+
+        def get_issue(self, number):
+            return self.issue
+
+        def post_result(self, number, result):
+            self.comments.append(result)
+
+        def close_issue(self, number):
+            self.issue["state"] = "closed"
+
+    path = tmp_path / "effect.sock"
+    rid, args = signed()
+    envelope = {"schema_version": "0.1", "request_id": rid,
+                "capability": "effect.execute", "arguments": args,
+                "requested_by": "chatgpt", "requested_at": NOW.isoformat()}
+    transport = Transport(json.dumps(envelope))
+    adapter = FakeCAS()
+    registry = build_registry(
+        tmp_path, None, Redactor(),
+        approved_effect_provider=HostEffectClient(path),
+    )
+    assert "effect.execute" in registry.capabilities
+    with HostEffectSocketServer(path, allowed_uid=os.geteuid(), broker=host(adapter)) as server:
+        serve_call(server, lambda: Worker(
+            tmp_path / "control-ledger", transport, registry, Redactor()).tick())
+    assert transport.comments[0]["status"] == "capability_completed"
+    assert transport.comments[0]["result"]["verified_by"] == "trusted_adapter_readback"
+    assert adapter.value is True and adapter.attempts == 1
+    assert "signature" not in str(transport.comments[0]["result"])
+    # The normal runtime never injects HostEffectClient by itself.
+    assert "effect.execute" not in build_registry(tmp_path, None, Redactor()).capabilities
