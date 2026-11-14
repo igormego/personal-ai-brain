@@ -22,6 +22,17 @@ def baseline(tmp_path):
     directory = tmp_path / 'baseline'
     directory.mkdir()
     ctl = (SOURCE / 'control.py').read_text()
+    # Remove only the separately reviewed default-off effect registration
+    # before comparing to the immutable Sonarr63 baseline.
+    approved_registration = (
+        "        approved_effect = (capability.id == 'effect.execute'\n"
+        "                           and capability.risk_level == 'approved_effect'\n"
+        "                           and capability.side_effect_class == 'trusted_host_effect')\n"
+    )
+    assert ctl.count(approved_registration) == 1
+    ctl = ctl.replace(approved_registration, "", 1)
+    assert ctl.count("not (bounded_work or approved_effect)") == 1
+    ctl = ctl.replace("not (bounded_work or approved_effect)", "not bounded_work", 1)
     storage_start = ctl.index('    # Opt-in generic host resource read.')
     storage_end = ctl.index('    # Source-only opt-in:', storage_start)
     ctl = ctl[:storage_start] + ctl[storage_end:]
@@ -30,7 +41,8 @@ def baseline(tmp_path):
     ctl = ctl[:start] + ctl[end:]
     ctl = ctl.replace('def build_registry(core_state: Path, reader_factory, redactor, work_client=None,\n'
                       '                   media_plan_provider=None, host_audit_snapshot: Path | None = None,\n'
-                      '                   *, media_resource_provider=None, host_storage_snapshot: Path | None = None):',
+                      '                   *, media_resource_provider=None, host_storage_snapshot: Path | None = None,\n'
+                      '                   approved_effect_provider=None):',
                       'def build_registry(core_state: Path, reader_factory, redactor, work_client=None, *, host_audit_snapshot: Path | None = None):')
     worker = builder.without_arr_worker((SOURCE / 'control_worker.py').read_text())
     start = worker.index('    # Explicitly opted-in, fixed, read-only mount.')
@@ -56,6 +68,8 @@ def test_candidate_includes_only_approved_control_delta(tmp_path):
     assert 'PAB_HOST_STORAGE_ENABLED' not in (out / 'control_worker.py').read_text()
     assert 'host_storage_snapshot' not in (out / 'control_worker.py').read_text()
     assert 'homelab.resource_read' not in (out / 'control.py').read_text()
+    assert 'effect.execute' not in (out / 'control.py').read_text()
+    assert 'approved_effect' not in (out / 'control_worker.py').read_text()
     spec = importlib.util.spec_from_file_location('personal_ai_brain._candidate_control', out / 'control.py')
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
