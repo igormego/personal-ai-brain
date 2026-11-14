@@ -37,7 +37,7 @@ def without_arr_worker(text):
                 # authenticated issue author on every newly admitted request.
                 if ((capability.id == "media.resource_read"
                         and arguments.get("resource_id") in ("arr/radarr", "arr/sonarr"))
-                        or capability.id == "homelab.resource_read"):
+                        or capability.id in ("homelab.resource_read", "effect.execute")):
                     author = issue.get("user")
                     if (type(author) is not dict
                             or type(author.get("id")) is not int
@@ -50,6 +50,26 @@ def without_arr_worker(text):
     if text.count(authorization) != 1 or text.count(arr_injection_start) != 1:
         raise ValueError("candidate_baseline_mismatch")
     text = text.replace(authorization, "", 1)
+    # The source-only effect lane is absent from the immutable Sonarr63
+    # candidate. Never weaken its previously accepted BASE_HASHES.
+    effect_import = "from personal_ai_brain.approved_effect import EffectDenied, EffectUncertain\\n"
+    if text.count(effect_import) != 1:
+        raise ValueError("candidate_baseline_mismatch")
+    text = text.replace(effect_import, "", 1)
+    effect_call = '''                            elif capability.id == "effect.execute":
+                                result = capability.handler(arguments, request_id=correlation)
+'''
+    if text.count(effect_call) != 1:
+        raise ValueError("candidate_baseline_mismatch")
+    text = text.replace(effect_call, "", 1)
+    effect_errors = '''                    except EffectDenied:
+                        record.update(status="capability_execution_failed", error="effect_denied")
+                    except EffectUncertain:
+                        record.update(status="capability_execution_failed", error="effect_outcome_uncertain_needs_review")
+'''
+    if text.count(effect_errors) != 1:
+        raise ValueError("candidate_baseline_mismatch")
+    text = text.replace(effect_errors, "", 1)
     storage = ('    storage_file = (Path("/host-audit/storage.json")\n'
                '                    if os.environ.get("PAB_HOST_STORAGE_ENABLED") == "1" else None)\n')
     if text.count(storage) != 1:
