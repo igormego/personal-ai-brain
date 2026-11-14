@@ -55,7 +55,7 @@ rollback. The template never self-installs, enables systemd or changes
 Compose. If a dedicated unprivileged collector UID differs from the Control
 UID, the operator provisions a collector-owned setgid snapshot directory
 (mode `2750`), dedicated read-only group and publishes `0640` snapshot files;
-Control receives only an **operator-approved read-only directory bind**.
+Control receives only an **operator-approved read-only directory bind at `/storage-audit`**, separate from the already LIVE `/host-audit` mount. Do not replace or overlap the existing host-audit bind.
 The source reader independently refuses world-readable/group-writable files,
 untrusted owner/group, malformed and >30-minute-old snapshots.
 The operator must also verify that `PrivateDevices=yes` permits the
