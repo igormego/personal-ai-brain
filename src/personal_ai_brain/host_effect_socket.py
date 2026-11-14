@@ -171,6 +171,7 @@ class HostEffectSocketServer:
         listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         try:
             listener.bind(str(self._path))
+            self._inode = self._path.lstat().st_ino
             os.chmod(self._path, self._mode)
             if self._mode == 0o660 and self._path.lstat().st_gid != parent.st_gid:
                 _deny()
