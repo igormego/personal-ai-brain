@@ -17,8 +17,8 @@ import subprocess
 import tempfile
 
 RESOURCE_ID = "storage/topology"
-DEFAULT_HOST_PATH = Path("/var/lib/personal-ai-brain/host-audit/storage.json")
-CONTROL_SNAPSHOT_PATH = Path("/host-audit/storage.json")
+DEFAULT_HOST_PATH = Path("/var/lib/personal-ai-brain/storage-audit/storage.json")
+CONTROL_SNAPSHOT_PATH = Path("/storage-audit/storage.json")
 LSBLK = "/usr/bin/lsblk"
 VGS = "/usr/sbin/vgs"
 VG_FLAGS = [VGS, "--readonly", "--reportformat", "json", "--units", "b",

@@ -55,7 +55,7 @@ rollback. The template never self-installs, enables systemd or changes
 Compose. If a dedicated unprivileged collector UID differs from the Control
 UID, the operator provisions a collector-owned setgid snapshot directory
 (mode `2750`), dedicated read-only group and publishes `0640` snapshot files;
-Control receives only an **operator-approved read-only directory bind**.
+Control receives only an **operator-approved read-only directory bind at `/storage-audit`**, separate from the already LIVE `/host-audit` mount. Do not replace or overlap the existing host-audit bind. The additive, **disabled-by-default** source-only Compose overlay lives at `ops/storage/compose.control-storage.override.yaml.in`: it preserves the existing image, secrets, ledger, host audit and Work Runner mounts, adds one verified reader GID and mounts only the independently owned storage snapshot directory as read-only with `create_host_path: false`. Do not render/install this template without an authenticated local operator checking the existing fully resolved Compose layers; never apply it over an unexamined image or a conflicting mount.
 The source reader independently refuses world-readable/group-writable files,
 untrusted owner/group, malformed and >30-minute-old snapshots.
 The operator must also verify that `PrivateDevices=yes` permits the
