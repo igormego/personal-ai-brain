@@ -52,7 +52,7 @@ def without_arr_worker(text):
     text = text.replace(authorization, "", 1)
     # The source-only effect lane is absent from the immutable Sonarr63
     # candidate. Never weaken its previously accepted BASE_HASHES.
-    effect_import = "from personal_ai_brain.approved_effect import EffectDenied, EffectUncertain\\n"
+    effect_import = "from personal_ai_brain.approved_effect import EffectDenied, EffectUncertain\n"
     if text.count(effect_import) != 1:
         raise ValueError("candidate_baseline_mismatch")
     text = text.replace(effect_import, "", 1)
