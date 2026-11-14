@@ -294,9 +294,9 @@ def test_unprivileged_cli_collects_with_fixed_operator_output(monkeypatch, tmp_p
                         ["storage-collector", "collect", "--output", str(path),
                          "--reader-group"])
     monkeypatch.setattr(storage.os, "geteuid", lambda: 10001)
-    # Publish refuses because this test process does not own the directory as 10001.
-    with pytest.raises(StorageUnavailable):
-        storage.main()
+    # The CLI translates the refused publisher into a fixed safe return code.
+    assert storage.main() == 1
+    assert not path.exists()
     monkeypatch.setattr(storage.os, "geteuid", lambda: tmp_path.stat().st_uid)
     assert storage.main() == 0
     assert read_snapshot(path, now=NOW)["resource_id"] == RESOURCE_ID
