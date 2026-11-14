@@ -164,7 +164,7 @@ def collect_snapshot(*, now=None, runner=None, free_gib=None, data_mounted=None)
             parts = [child for child in children if type(child) is dict
                      and child.get("type") == "part"]
             allocated = sum(_size(p.get("size")) for p in parts)
-            if allocated > disk_size + GIB:
+            if allocated > disk_size:
                 _deny()
             roles = _roles(disk)
             devices.append({
@@ -256,6 +256,8 @@ def validate_snapshot(value, *, now=None):
                     or layer["roles"] != sorted(set(layer["roles"]))
                     or set(layer["roles"]) - ROLES):
                     _deny()
+            if set(disk["roles"]) != set().union(*(set(layer["roles"]) for layer in volumes)):
+                _deny()
         if len(json.dumps(value, separators=(",", ":")).encode()) > MAX_BYTES:
             _deny()
         return {**value, "freshness": "current",
