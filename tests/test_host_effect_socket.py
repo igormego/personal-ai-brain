@@ -205,3 +205,22 @@ def test_parent_permission_and_existing_path_fail_closed(tmp_path):
         with HostEffectSocketServer(path, allowed_uid=os.geteuid(), broker=b):
             pass
     assert not path.exists()
+
+
+def test_split_uid_socket_requires_operator_owned_setgid_group_directory(tmp_path):
+    path = tmp_path / "effect.sock"
+    adapter = FakeCAS()
+    # Never make a cross-UID socket visible in an unreviewed directory.
+    with pytest.raises(EffectDenied):
+        with HostEffectSocketServer(path, allowed_uid=os.geteuid(),
+                                    broker=host(adapter), socket_mode=0o660):
+            pass
+    tmp_path.chmod(0o2750)
+    rid, args = signed()
+    with HostEffectSocketServer(path, allowed_uid=os.geteuid(),
+                                broker=host(adapter), socket_mode=0o660) as server:
+        assert path.stat().st_mode & 0o777 == 0o660
+        assert path.stat().st_gid == tmp_path.stat().st_gid
+        serve_call(server, lambda: HostEffectClient(path).execute(args, request_id=rid))
+        assert adapter.attempts == 1
+    assert not path.exists()
