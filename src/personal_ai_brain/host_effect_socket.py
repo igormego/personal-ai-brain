@@ -143,14 +143,16 @@ class HostEffectSocketServer:
     no untrusted config or model parameters. The listener itself has no root
     features, no shell, no Docker socket and no network listener.
     """
-    def __init__(self, path: Path, *, allowed_uid: int, broker):
+    def __init__(self, path: Path, *, allowed_uid: int, broker, socket_mode: int = 0o600):
         if (not isinstance(path, Path) or not path.is_absolute()
                 or type(allowed_uid) is not int or allowed_uid < 0
+                or type(socket_mode) is not int or socket_mode not in (0o600, 0o660)
                 or not callable(getattr(broker, "execute", None))):
             _deny()
         self._path = path
         self._uid = allowed_uid
         self._broker = broker
+        self._mode = socket_mode
         self._listener = None
         self._inode = None
 
@@ -158,13 +160,20 @@ class HostEffectSocketServer:
         # No insecure parent directory, pre-existing socket or symlink reuse.
         parent = self._path.parent.lstat()
         if (not stat.S_ISDIR(parent.st_mode) or parent.st_uid != os.geteuid()
-                or parent.st_mode & 0o022 or self._path.exists()
+                or parent.st_mode & 0o022
+                or (self._mode == 0o660 and
+                    (not parent.st_mode & stat.S_ISGID
+                     or not parent.st_mode & stat.S_IXGRP
+                     or parent.st_gid not in (os.getegid(), *os.getgroups())))
+                or self._path.exists()
                 or self._path.is_symlink()):
             _deny()
         listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         try:
             listener.bind(str(self._path))
-            os.chmod(self._path, 0o600)
+            os.chmod(self._path, self._mode)
+            if self._mode == 0o660 and self._path.lstat().st_gid != parent.st_gid:
+                _deny()
             listener.listen(4)
             self._inode = self._path.lstat().st_ino
             self._listener = listener
