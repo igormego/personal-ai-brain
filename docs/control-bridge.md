@@ -19,6 +19,49 @@ through the worker. A later reviewed integration must explicitly expose this
 helper without weakening authentication or the existing candidate-image pins.
 No new host access, execution authority, network endpoint or credentials.
 
+## Source-only generic Homelab storage resource (2026-11-14)
+
+The existing `pab-control/v0.1` Issues transport and durable ledger now have a
+**source-only, default-deny** `homelab.resource_read` registration with the
+single reviewed logical resource `{"resource_id":"storage/topology"}`.
+This is a general typed *resource* route, not a `backup(homelab)` command or
+an open-ended shell/filesystem interface. It reuses the existing authenticated
+worker and its response/replay boundary. The worker checks the **actual GitHub
+Issue author ID and login** before accepting a storage read; the
+`requested_by` text is not authorization.
+
+The trusted Ubuntu operator-side `host_storage.py` collector performs **one
+fixed read-only `/usr/bin/lsblk` invocation** and fixed root/data
+`statvfs` reads. It publishes only a bounded, schema-validated, timestamped
+snapshot with physical disk sizes/bus type, partition and logical-volume
+sizes/filesystem families, root/data mount-role membership, approximate
+unpartitioned space where calculable, and root/data available space. The disk
+indexes are **ephemeral display ordinals**, never usable target identities for
+effects. It does **not** publish device names, serials, filesystem UUIDs,
+volume labels, arbitrary mount paths, directory names, contents, credentials or
+raw command output. For an unmounted NTFS USB volume, used/free space and
+contents remain **unknown**; this read path neither mounts nor repairs it.
+
+Host deployment is **NOT** included or accepted by the source PR. The operator
+must independently review and pin the publisher, reuse the existing trusted
+host-audit refresh schedule if suitable, publish a private owner-controlled
+`storage.json` snapshot alongside the existing host-audit snapshot, verify
+atomic mode/ownership + host collector arguments, and ensure Control receives
+only that snapshot through the **already approved fixed read-only host-audit
+directory** (or separately review any required mount). Opt in to
+`PAB_HOST_STORAGE_ENABLED=1` *only after* checking the exact image, fixed
+mount, author authentication, expiry, no secret leakage, and regression of the
+existing `homelab.audit` and media routes. A source-only merge or a
+`homelab.audit` reply does not prove storage visibility is deployed.
+
+**No host backup or disk effect** is authorized by this resource. NTFS repairs,
+partition changes, writable destinations, service quiescence and backup
+execution remain independent user-approved, target-bound actions under
+Infrastructure Issue #33 and the future general PAB #83 Effect Broker.
+An actual list of files on an unmounted or inconsistent USB disk needs a
+separately reviewed safe **read-only** host-inspection mechanism and explicit
+private-transport disclosure scope; topology alone cannot answer that question.
+
 ## Contract for any caller
 
 Create an issue in the **private** `igormego/personal-project-brain` repository.

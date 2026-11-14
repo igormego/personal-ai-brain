@@ -35,8 +35,9 @@ def without_arr_worker(text):
                 # Issues + the durable ledger. requested_by is user-controlled
                 # metadata, never proof of owner identity. Bind to GitHub's
                 # authenticated issue author on every newly admitted request.
-                if (capability.id == "media.resource_read"
-                        and arguments.get("resource_id") in ("arr/radarr", "arr/sonarr")):
+                if ((capability.id == "media.resource_read"
+                        and arguments.get("resource_id") in ("arr/radarr", "arr/sonarr"))
+                        or capability.id == "homelab.resource_read"):
                     author = issue.get("user")
                     if (type(author) is not dict
                             or type(author.get("id")) is not int
@@ -49,6 +50,15 @@ def without_arr_worker(text):
     if text.count(authorization) != 1 or text.count(arr_injection_start) != 1:
         raise ValueError("candidate_baseline_mismatch")
     text = text.replace(authorization, "", 1)
+    storage = ('    storage_file = (Path("/host-audit/storage.json")\n'
+               '                    if os.environ.get("PAB_HOST_STORAGE_ENABLED") == "1" else None)\n')
+    if text.count(storage) != 1:
+        raise ValueError("candidate_baseline_mismatch")
+    text = text.replace(storage, "", 1)
+    storage_arg = '        media_resource_provider=media_provider, host_storage_snapshot=storage_file,\n'
+    if text.count(storage_arg) != 1:
+        raise ValueError("candidate_baseline_mismatch")
+    text = text.replace(storage_arg, '        media_resource_provider=media_provider,\n', 1)
     start = text.index(arr_injection_start)
     end = text.index(arr_injection_end, start)
     # The ARR splice was inserted after an existing blank line; remove

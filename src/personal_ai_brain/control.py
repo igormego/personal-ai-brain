@@ -129,7 +129,7 @@ class Registry:
 
 def build_registry(core_state: Path, reader_factory, redactor, work_client=None,
                    media_plan_provider=None, host_audit_snapshot: Path | None = None,
-                   *, media_resource_provider=None):
+                   *, media_resource_provider=None, host_storage_snapshot: Path | None = None):
     def runtime_health(_):
         health, code = runtime.health(core_state, core_state / "heartbeat.json")
         last = health.get("last_run", {})
@@ -217,6 +217,32 @@ def build_registry(core_state: Path, reader_factory, redactor, work_client=None,
         caps.append(Capability(
             "homelab.audit", "Read recent sanitized Ubuntu inventory snapshot",
             "read_only", empty_schema, no_arguments, homelab_audit,
+        ))
+    # Opt-in generic host resource read. Only one registered storage resource
+    # exists in this version; future host resources reuse this same broker
+    # contract. No arbitrary device, filesystem path or command is accepted.
+    if host_storage_snapshot is not None:
+        from .host_storage import RESOURCE_ID, StorageUnavailable, read_snapshot as read_storage
+
+        def host_resource_selector(arguments):
+            if (type(arguments) is not dict or set(arguments) != {"resource_id"}
+                    or arguments["resource_id"] != RESOURCE_ID):
+                raise Rejected("invalid_host_resource")
+            return {"resource_id": RESOURCE_ID}
+
+        def host_resource_read(_):
+            try:
+                return read_storage(host_storage_snapshot)
+            except StorageUnavailable:
+                raise CapabilityFailed("host_resource_unavailable") from None
+
+        caps.append(Capability(
+            "homelab.resource_read", "Read an approved sanitized host resource",
+            "read_only", {"type": "object", "additionalProperties": False,
+                          "required": ["resource_id"],
+                          "properties": {"resource_id": {"type": "string",
+                                                       "enum": [RESOURCE_ID]}}},
+            host_resource_selector, host_resource_read,
         ))
     # Source-only opt-in: an explicitly trusted Media operator must supply the
     # sanitized, complete, timestamped read provider. Production does not wire it.
