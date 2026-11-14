@@ -116,7 +116,10 @@ class Registry:
         bounded_work = (capability.id in {'work.submit', 'work.cancel'}
                         and capability.risk_level == 'bounded_work'
                         and capability.side_effect_class == 'local_work_handoff')
-        if not bounded_work and (capability.risk_level != "read_only" or capability.side_effect_class != "none"):
+        approved_effect = (capability.id == 'effect.execute'
+                           and capability.risk_level == 'approved_effect'
+                           and capability.side_effect_class == 'trusted_host_effect')
+        if not (bounded_work or approved_effect) and (capability.risk_level != "read_only" or capability.side_effect_class != "none"):
             raise Rejected("capability_policy_denied")
         self.capabilities[capability.id] = capability
 
@@ -129,7 +132,8 @@ class Registry:
 
 def build_registry(core_state: Path, reader_factory, redactor, work_client=None,
                    media_plan_provider=None, host_audit_snapshot: Path | None = None,
-                   *, media_resource_provider=None, host_storage_snapshot: Path | None = None):
+                   *, media_resource_provider=None, host_storage_snapshot: Path | None = None,
+                   approved_effect_provider=None):
     def runtime_health(_):
         health, code = runtime.health(core_state, core_state / "heartbeat.json")
         last = health.get("last_run", {})
@@ -318,6 +322,32 @@ def build_registry(core_state: Path, reader_factory, redactor, work_client=None,
                      "title": {"type": "string"}, "year": {"type": "integer"}}},
             ]},
             validate_media_selector, media_plan,
+        ))
+    # This source-only lane cannot be activated by model-supplied arguments,
+    # environment variables or a private Issue. Only a separately deployed,
+    # operator-wired trusted adapter provides any effect authority.
+    if approved_effect_provider is not None:
+        from .approved_effect import EffectDenied, validate_arguments as effect_arguments
+
+        if not callable(getattr(approved_effect_provider, "execute", None)):
+            raise Rejected("effect_provider_invalid")
+
+        def effect_selector(value):
+            try:
+                return effect_arguments(value)
+            except EffectDenied:
+                raise Rejected("invalid_effect_arguments") from None
+
+        def effect_execute(value, request_id):
+            return approved_effect_provider.execute(value, request_id=request_id)
+
+        caps.append(Capability(
+            "effect.execute", "Execute one separately approved, registered effect",
+            "approved_effect",
+            {"type": "object", "additionalProperties": False,
+             "required": ["plan", "approval"],
+             "properties": {"plan": {"type": "object"}, "approval": {"type": "object"}}},
+            effect_selector, effect_execute, "trusted_host_effect",
         ))
     if work_client is not None:
         from .work_handoff import arguments as work_arguments
