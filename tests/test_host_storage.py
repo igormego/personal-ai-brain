@@ -9,7 +9,7 @@ import pytest
 from personal_ai_brain.control import Redactor, Rejected, build_registry
 from personal_ai_brain.control_worker import Worker
 from personal_ai_brain.host_storage import (
-    GIB, LSBLK, RESOURCE_ID, StorageUnavailable, collect_snapshot,
+    GIB, LSBLK, VG_FLAGS, RESOURCE_ID, StorageUnavailable, collect_snapshot,
     publish_snapshot, read_snapshot, validate_snapshot,
 )
 from personal_ai_brain.github_issues import TITLE
@@ -54,13 +54,17 @@ def test_fixed_lsblk_read_and_sanitized_both_physical_drives():
 
     def run(argv):
         calls.append(argv)
+        if argv == VG_FLAGS:
+            return json.dumps({"report": [{"vg": [{
+                "vg_size": str(900 * GIB), "vg_free": str(800 * GIB),
+            }]}]}).encode()
         return json.dumps(_sample()).encode()
 
     value = collect_snapshot(now=NOW, runner=run,
                              free_gib=lambda path: 72 if path == "/" else 11762,
                              data_mounted=True)
     assert calls == [[LSBLK, "-J", "-b", "-o",
-                      "NAME,TYPE,SIZE,TRAN,FSTYPE,MOUNTPOINTS"]]
+                      "NAME,TYPE,SIZE,TRAN,FSTYPE,MOUNTPOINTS"], VG_FLAGS]
     assert len(value["devices"]) == 3
     assert value["devices"][0]["roles"] == ["root"]
     assert value["devices"][1]["roles"] == ["data"]
@@ -68,6 +72,12 @@ def test_fixed_lsblk_read_and_sanitized_both_physical_drives():
     assert value["devices"][2]["transport"] == "usb"
     assert value["devices"][2]["volumes"][0]["filesystem"] == "ntfs"
     assert value["root_free_gib"] == 72
+    assert value["schema_version"] == "0.2"
+    assert value["lvm"] == {
+        "status": "available", "volume_groups": [
+            {"size_gib": 900, "free_gib": 800},
+        ], "mapping": "unmapped",
+    }
     assert value["data_free_gib"] == 11762
     assert value["devices"][0]["unpartitioned_gib_estimate"] > 600
     assert value["contents_inspected"] is False
@@ -203,3 +213,90 @@ def test_persistent_private_resource_requires_actual_issue_author(tmp_path):
     assert transport.comments[1][1]["status"] == "request_rejected"
     assert transport.comments[2][1]["status"] == "capability_completed"
     assert transport.comments[2][1]["result"]["contents_inspected"] is False
+
+
+def test_lvm_unavailable_is_unknown_never_guessed():
+    commands = []
+    def run(argv):
+        commands.append(argv)
+        if argv == VG_FLAGS:
+            raise OSError("not permitted")
+        return json.dumps(_sample()).encode()
+    packet = collect_snapshot(now=NOW, runner=run,
+                              free_gib=lambda _: 72, data_mounted=False)
+    assert packet["lvm"] == {
+        "status": "unavailable", "volume_groups": [], "mapping": "unmapped",
+    }
+    assert commands[-1] == VG_FLAGS
+
+
+@pytest.mark.parametrize("vg_doc", [
+    {"report": [{"vg": [{"vg_size": "123.00", "vg_free": "999.00"}]}]},
+    {"report": [{"vg": [{"vg_size": "123", "vg_free": "12",
+                          "vg_name": "PRIVATE_VG_NAME"}]}]},
+    {"report": [{"vg": [{"vg_size": "-123", "vg_free": "0"}]}]},
+    {"report": [{"vg": [{"vg_size": True, "vg_free": "0"}]}]},
+    {"report": [{"vg": [{"vg_size": "0", "vg_free": "nan"}]}]},
+    {"report": [{"vg": [{"vg_size": "1e12", "vg_free": "100"}]}]},
+    {"report": [{"vg": [{"vg_size": "123.0TB", "vg_free": "0"}]}]},
+    {"report": [{"vg": []}, {"vg": []}]},
+])
+def test_invalid_lvm_source_never_leaks_and_never_estimates(vg_doc):
+    def run(argv):
+        if argv == VG_FLAGS:
+            return json.dumps(vg_doc).encode()
+        return json.dumps(_sample()).encode()
+    packet = collect_snapshot(now=NOW, runner=run,
+                              free_gib=lambda _: 72, data_mounted=False)
+    assert packet["lvm"]["status"] == "unavailable"
+    assert "PRIVATE_VG_NAME" not in json.dumps(packet)
+
+
+def test_group_readable_snapshot_needs_setgid_parent(tmp_path):
+    packet = _packet()
+    path = tmp_path / "storage.json"
+    with pytest.raises(StorageUnavailable):
+        publish_snapshot(path, packet, group_readable=True)
+    tmp_path.chmod(0o2750)
+    publish_snapshot(path, packet, group_readable=True)
+    assert path.stat().st_mode & 0o777 == 0o640
+    assert path.stat().st_gid == tmp_path.stat().st_gid
+    assert read_snapshot(path, now=NOW)["lvm"]["status"] == "unavailable"
+
+
+def test_group_read_authorization_and_world_read_denied(monkeypatch, tmp_path):
+    import personal_ai_brain.host_storage as storage
+    tmp_path.chmod(0o2750)
+    path = tmp_path / "storage.json"
+    publish_snapshot(path, _packet(), group_readable=True)
+    owner = path.stat().st_uid
+    wrong_uid = owner + 9230
+    monkeypatch.setattr(storage.os, "geteuid", lambda: wrong_uid)
+    monkeypatch.setattr(storage.os, "getegid", lambda: path.stat().st_gid)
+    monkeypatch.setattr(storage.os, "getgroups", lambda: [])
+    assert read_snapshot(path, now=NOW)["schema_version"] == "0.2"
+    monkeypatch.setattr(storage.os, "getegid", lambda: path.stat().st_gid + 9230)
+    with pytest.raises(StorageUnavailable):
+        read_snapshot(path, now=NOW)
+    path.chmod(0o644)
+    monkeypatch.setattr(storage.os, "geteuid", lambda: owner)
+    with pytest.raises(StorageUnavailable):
+        read_snapshot(path, now=NOW)
+
+
+def test_unprivileged_cli_collects_with_fixed_operator_output(monkeypatch, tmp_path):
+    import sys
+    import personal_ai_brain.host_storage as storage
+    path = tmp_path / "storage.json"
+    tmp_path.chmod(0o2750)
+    monkeypatch.setattr(storage, "collect_snapshot", _packet)
+    monkeypatch.setattr(sys, "argv",
+                        ["storage-collector", "collect", "--output", str(path),
+                         "--reader-group"])
+    monkeypatch.setattr(storage.os, "geteuid", lambda: 10001)
+    # Publish refuses because this test process does not own the directory as 10001.
+    with pytest.raises(StorageUnavailable):
+        storage.main()
+    monkeypatch.setattr(storage.os, "geteuid", lambda: tmp_path.stat().st_uid)
+    assert storage.main() == 0
+    assert read_snapshot(path, now=NOW)["resource_id"] == RESOURCE_ID
