@@ -122,6 +122,58 @@ Follow [PAB #83](https://github.com/igormego/personal-ai-brain/issues/83)
 for the next operator-reviewed deployment gate and Infrastructure #33
 for the eventual protected-backup use case.
 
+## Trusted host-side effect socket — source-only transport slice (2026-11-14)
+
+This extends **the existing PAB #83 approved-effect lane**, not the Work
+Runner or Project OS. The new `host_effect_socket.py` implements a bounded
+Linux Unix-domain socket with a single `effect.execute` message shape.
+The ordinary unprivileged Control worker can **only** submit an already
+approved plan through an operator-injected `HostEffectClient`. All grant,
+approval-signature and trusted compare-and-set checks remain in the separate
+host-side `ApprovedEffectBroker` behind a `HostEffectSocketServer`.
+The client knows only the operator-fixed socket path, not an approval key,
+shell command, container socket, URL or host admin credentials.
+
+Security and deployment boundaries:
+
+- The host listener binds a pre-created operator-owned, non-group-writable
+  directory and **refuses** a pre-existing socket, file or symlink. A
+  rootless, dedicated host operator UID should own the listener and its private
+  signing-verifier key. The unprivileged Control UID must be **distinct**.
+- For that split-UID layout, the operator must deliberately create an
+  owner-controlled **setgid** socket directory, grant only the necessary
+  traverse permission, and opt in to socket mode `0660` with a dedicated
+  shared group. The listener independently verifies `SO_PEERCRED` against
+  the *exact* configured Control UID, regardless of group membership.
+  Default `0600` is useful for isolated same-UID testing only.
+- No TCP listener, no container Docker socket, no root, no arbitrary
+  filesystem path or command. A distinct, out-of-band owner approval issuer
+  is **still required**; allowing ChatGPT to create an authenticated owner
+  GitHub Issue is not independent approval for consequential writes.
+- Source-only `HostEffectSocketServer.serve_one` provides a tested
+  one-request transport building block, **not** an installed supervisor,
+  background daemon, approval signer, production adapter or deploy recipe.
+  The ordinary `control_worker.serve()` still never injects a
+  `HostEffectClient` and `effect.execute` remains absent by default.
+- A transport disconnection after the request was sent is **uncertain**,
+  never a success or permission to retry. Prior PAB Control request
+  reservations, exact UUID, signed plan hash and readback remain authoritative.
+  No new broker, task queue or application-specific operation is created.
+  Before privileged operations, the trusted host-side adapter will need an
+  additional durable replay/recovery policy and a separately tested
+  verification-only approval authority.
+- Test acceptance is limited to Linux AF_UNIX, UID-denied peers, exact
+  synthetic boolean compare-and-set, unknown operations/paths, stale plans,
+  uncertain result and socket ownership/mode. Neither disk contents nor
+  the Ubuntu deployment were touched.
+
+**Next external gate:** existing human-operated
+`local-homelab-admin` Codex Desktop Local operator reviews the current host
+UID/group/network/Control-image boundaries and only then chooses a minimal
+rootless service with rollback. The source milestone alone is **not**
+`LIVE_ACCEPTED`; do not activate an effect issuer or host write on the
+existing homelab by changing a flag.
+
 ## Contract for any caller
 
 Create an issue in the **private** `igormego/personal-project-brain` repository.
