@@ -62,6 +62,66 @@ An actual list of files on an unmounted or inconsistent USB disk needs a
 separately reviewed safe **read-only** host-inspection mechanism and explicit
 private-transport disclosure scope; topology alone cannot answer that question.
 
+## Guarded general Effect Broker admission — source-only (2026-11-14)
+
+The existing private Issues Control protocol and its durable fsynced
+request-ID ledger now have a **default-absent** `effect.execute` entry.
+It is registered only when a trusted operator injects an
+`approved_effect_provider` into `build_registry`; the ordinary production
+`control_worker.serve()` constructs **no such provider**, sets no effect grant,
+and has no host executor. This adds neither a new queue nor a parallel
+decision authority.
+
+**One logical operation, no model-selected shell:** request arguments consist
+only of an exact immutable `plan` and an `approval` receipt. Existing
+`effect_plan.plan_effect` proposes a typed (bool or positive-integer) change
+for a registered resource, exact numeric target, expected/desired value,
+policy version, owner principal and five-minute expiration. The plan hash
+binds all these fields. The separate trusted approval authority must sign
+the plan hash **and one exact request UUID** after explicit authenticated
+owner review; arbitrary ChatGPT text is not an approval. Only a verified
+GitHub Issue **author ID/login** is admitted. An approved capability can
+never be claimed by setting `requested_by` or inserting a purported
+approval into an untrusted plan.
+
+The synthetic `ApprovedEffectBroker` verifies the typed operator grant,
+expiration, plan hash and HMAC receipt before any adapter invocation.
+The trusted adapter has two fixed methods: `read_current(resource, target)`
+and `apply_cas(plan)`. The latter **must enforce compare-and-set**, not a
+blind write; unsupported backends are ineligible. Exact preflight observation
+is required; after one attempt a matching authoritative read-back is
+required. Errors *after a write might have begun* are reported as
+`effect_outcome_uncertain_needs_review` and never automatically retried.
+Existing Control crash/replay/conflict ledger remains the single transport
+authority and reserves the UUID before attempting the handler.
+
+**Trust boundary for future activation:** the demonstration HMAC verifier
+lives entirely in the synthetic trusted adapter fixture. A real signing
+authority and verification key must live behind a host-operator-only
+boundary; **do not place HMAC keys, signing code, admin credentials or the
+effect adapter inside the ordinary Control container or model workspace**.
+The authenticated GitHub author alone is not enough, because ChatGPT
+may create owner-authored Issues with the connected account. The operator
+must deploy a locked-down local adapter reachable only by the configured
+Control principal; it authenticates its caller, independently enforces the
+grant/approval and returns a bounded evidence receipt, without exposing
+arbitrary Unix commands, Docker, endpoints or device paths. The verifier
+key must never enter private Issues or their durable audit. An asymmetric
+offline signer / verifier-only public key is preferable for the actual
+host activation; the source-only HMAC proof is **not production approval
+infrastructure**. Physical-disk identity needs a stronger independently
+verified opaque target binding than the current numeric application ID
+planner; this version cannot authorize disk operations.
+
+**Not yet built or deployed:** the trusted host-side service/adapter,
+owner-authenticated approval UX/signing, production credential/permission
+isolation, and external end-to-end effect acceptance. No existing
+permissions, Compose, networking, systemd, services, storage or backup
+changed. A source PR passing offline tests is not runtime authority.
+Follow [PAB #83](https://github.com/igormego/personal-ai-brain/issues/83)
+for the next operator-reviewed deployment gate and Infrastructure #33
+for the eventual protected-backup use case.
+
 ## Contract for any caller
 
 Create an issue in the **private** `igormego/personal-project-brain` repository.
