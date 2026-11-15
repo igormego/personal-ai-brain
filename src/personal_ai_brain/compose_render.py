@@ -127,13 +127,45 @@ def _identity(root_fd, path, uid):
         os.close(fd)
 
 
+def _trusted_bwrap_path(fd):
+    """Use a root-owned non-writable path so Linux LSM executable policy applies.
+
+    Root and the host loader are trusted. The caller must run unprivileged; each
+    component is independently opened without following symlinks and checked.
+    """
+    if os.geteuid() == 0:
+        deny()
+    try:
+        path = os.readlink(f"/proc/self/fd/{fd}")
+        parts = path_parts(path, absolute=True)
+        current = os.open("/", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            for index, part in enumerate(parts):
+                parent = os.fstat(current)
+                if parent.st_uid != 0 or parent.st_mode & 0o022:
+                    deny()
+                flags = os.O_RDONLY | os.O_NOFOLLOW | (os.O_DIRECTORY if index < len(parts) - 1 else 0)
+                child = os.open(part, flags, dir_fd=current)
+                os.close(current); current = child
+            s = os.fstat(current)
+            pinned = os.fstat(fd)
+            if (not stat.S_ISREG(s.st_mode) or s.st_uid != 0 or s.st_mode & 0o022
+                    or (s.st_dev, s.st_ino) != (pinned.st_dev, pinned.st_ino)):
+                deny()
+            return path, (s.st_dev, s.st_ino, s.st_size, s.st_mtime_ns, s.st_ctime_ns, s.st_mode, s.st_uid)
+        finally:
+            os.close(current)
+    except (OSError, ValueError):
+        deny()
+
+
 def _run(args, fds, executable, timeout):
     """Bound output and wall clock, kill the process group on any ambiguity."""
     p = None
     success = False
     sel = None
     try:
-        p = subprocess.Popen(args, executable=f"/proc/self/fd/{executable}", pass_fds=tuple(fds),
+        p = subprocess.Popen(args, executable=executable, pass_fds=tuple(fds),
                              stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                              close_fds=True, start_new_session=True, env={})
         sel = selectors.DefaultSelector()
@@ -221,7 +253,9 @@ def render_preflight(root_fd, manifest_path, *, owner_uid, expected_layer_order,
                 key, sep, _ = line.partition("=")
                 if not sep or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key) or key.startswith(("COMPOSE_", "DOCKER_")):
                     deny()
+        bwrap_path, bwrap_identity = _trusted_bwrap_path(bwrap_fd)
         bw = _tool(bwrap_fd, bwrap_sha256, owner_uid); opened.append(bw)
+        if _trusted_bwrap_path(bwrap_fd) != (bwrap_path, bwrap_identity): deny()
         compose = _tool(compose_fd, compose_sha256, owner_uid); opened.append(compose)
         inputs = []
         for data in snapshots:
@@ -239,14 +273,17 @@ def render_preflight(root_fd, manifest_path, *, owner_uid, expected_layer_order,
         for fd, path in zip(inputs, paths): base += ["--perms", "0444", "--ro-bind-data", str(fd), path]
         base += ["--setenv", "HOME", "/tmp", "--setenv", "DOCKER_CONFIG", "/tmp/empty", "--setenv", "DOCKER_HOST", "unix:///nonexistent/docker.sock", "--chdir", project, "--", "/tools/compose"]
         for fd in [compose, *inputs]: os.lseek(fd, 0, os.SEEK_SET)
-        version = _run(base + ["version", "--short"], opened, bw, timeout).decode("utf-8").strip()
+        version = _run(base + ["version", "--short"], opened, bwrap_path, timeout).decode("utf-8").strip()
+        if _trusted_bwrap_path(bwrap_fd) != (bwrap_path, bwrap_identity): deny()
         if version != compose_version: deny()
         configs = []
         for count in (4, 5):
             for fd in [compose, *inputs]: os.lseek(fd, 0, os.SEEK_SET)
             args = base + ["-p", project_name, "--project-directory", project, "--env-file", envpath]
             for path in paths[:count]: args += ["-f", path]
-            output = _run(args + ["config", "--format", "json"], opened, bw, timeout)
+            if _trusted_bwrap_path(bwrap_fd) != (bwrap_path, bwrap_identity): deny()
+            output = _run(args + ["config", "--format", "json"], opened, bwrap_path, timeout)
+            if _trusted_bwrap_path(bwrap_fd) != (bwrap_path, bwrap_identity): deny()
             configs.append(json.loads(output, object_pairs_hook=_unique, parse_constant=lambda _: deny()))
         if read_file(root_fd, manifest_path, owner_uid) != raw:
             deny()

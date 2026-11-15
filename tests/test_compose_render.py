@@ -88,6 +88,9 @@ def test_wrong_version_tool_pin_and_timeout_fail_closed(render_inputs):
     with pytest.raises(PreflightDenied): run(render_inputs, compose_version="0.0.0")
     with pytest.raises(PreflightDenied): run(render_inputs, compose_sha256="0" * 64)
     with pytest.raises(PreflightDenied): run(render_inputs, timeout=0.000001)
+    # A caller-owned executable in a writable ancestor cannot act as Bubblewrap.
+    with pytest.raises(PreflightDenied):
+        run(render_inputs, bwrap_fd=render_inputs[3]["compose_fd"], bwrap_sha256=render_inputs[3]["compose_sha256"])
 
 
 def test_changed_layer_during_render_is_rejected(render_inputs, monkeypatch):
