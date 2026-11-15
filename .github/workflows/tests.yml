@@ -19,6 +19,8 @@ jobs:
           cache: pip
       - run: python -m pip install --upgrade pip
       - run: pip install -e ".[dev]"
+      - name: Install Bubblewrap for isolated render tests
+        run: command -v bwrap >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y bubblewrap)
       - run: pytest -q
 
       - name: Offline Codex environment checks

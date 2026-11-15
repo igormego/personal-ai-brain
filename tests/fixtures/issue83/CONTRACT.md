@@ -52,3 +52,30 @@ includes, `env_file` and other unsupported references are denied. Only a single
 UID and private 0600 file / non-group-writable directory layout is supported;
 mixed-owner live installations require independently reviewed future work.
 These limits prevent treating a passing result as a live/deployment preflight.
+
+The source-only `compose_render.render_preflight` adds a narrow normalization
+path: the caller independently pins descriptors and SHA-256 values for Bubblewrap
+and a standalone Compose executable, an exact Compose version and project name.
+It copies Compose and verified ordered layer/env bytes into sealed Linux memfds.
+Bubblewrap is hash-pinned and executed by a root-owned, non-writable, no-symlink
+path whose identity is checked before and after each call, so Linux pathname LSM
+policy remains effective; the caller must be unprivileged. It launches Compose
+inside a no-network, no-host-mount Bubblewrap namespace;
+and renders layers 1–4 as original and 1–5 as candidate with explicit project
+directory, project name and env file. It rechecks inputs and invokes the existing
+image-only preflight. The returned receipt names the input-manifest and tool pins;
+normalized data and protected environment values are not returned.
+
+This deliberately supports only the limited fixture service/secret keys and
+rejects Compose includes, extends, service env files, custom YAML tags/aliases,
+external references and unrecognized keys. The input tree must remain protected
+against same-UID mutation after this check and throughout any future action.
+Caller-pinned tool descriptors, their trusted digests, Linux kernel/Bubblewrap,
+the executable's host dynamic loader (for Bubblewrap), and the independent
+layer-order/project-name/version policy and host root are trusted boundaries, not established
+by this function. The standalone Compose must run in the minimal isolated root.
+The narrow preflight only validates supported in-project bind/secret references;
+it does not snapshot secret content or validate image/module identity or profile
+freshness. Mixed ownership remains unsupported. A passing receipt is not
+deployment authorization, evidence of the actual host configuration, or proof
+that subsequent inputs remain unchanged.

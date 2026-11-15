@@ -184,7 +184,8 @@ def check_references(root_fd, config, project, uid):
             fd = open_beneath(root_fd, within_project(volume["source"]), uid, directory=True)
             os.close(fd)
     for secret in (config.get("secrets") or {}).values():
-        if type(secret) is not dict or set(secret) != {"file"}:
+        if (type(secret) is not dict or "file" not in secret or not set(secret) <= {"file", "name"}
+                or ("name" in secret and (type(secret["name"]) is not str or not re.fullmatch(r"[a-zA-Z0-9_.-]{1,128}", secret["name"])) )):
             deny()
         # A reference is validated, but contents are deliberately not retained.
         fd = open_beneath(root_fd, within_project(secret["file"]), uid)
