@@ -1,0 +1,4 @@
+services:
+  control:
+    read_only: true
+    cap_drop: [ALL]
