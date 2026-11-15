@@ -1,0 +1,59 @@
+{
+  "schema_version": "fixture-1",
+  "source_image": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "target_image": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "project_directory": "/fixture/project",
+  "environment": {
+    "reference": "/fixture/private/deploy.env",
+    "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "layers": [
+    {
+      "path": "base.yaml",
+      "sha256": "ba3d11073557e52bcd91508ae8f0d66c450e81044b46ced040c4a491ee442e6f"
+    },
+    {
+      "path": "security.yaml",
+      "sha256": "55305091445c3e87c92ae85a932e2a30c0ac0dfa579d70410d2fe2c8dcd7f795"
+    },
+    {
+      "path": "work.yaml",
+      "sha256": "1958e096dd9e1ca547c1ce8c3127a1325cb8606346ca7485460cb2978fa3748e"
+    },
+    {
+      "path": "media.yaml",
+      "sha256": "52b7d0e520c493b6a0c0b43e5afa1d32c9dfa3b2c28d00a071d7ac228a923895"
+    },
+    {
+      "path": "candidate.json",
+      "sha256": "ffa84cd71a67a0d4f12874c12658e60cf22a1e55379bfc108e1a103a49664a4c"
+    }
+  ],
+  "modules": [
+    {
+      "name": "module.py",
+      "before_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "after_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
+  ],
+  "profile": {
+    "reference": "/fixture/private/profile.json",
+    "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "fresh_baseline": true
+  },
+  "supervisor_actions": [
+    "stop_control",
+    "stop_builder",
+    "start_builder",
+    "start_control"
+  ],
+  "ledger": {
+    "preserve_current": true,
+    "restore_historical": false
+  },
+  "recovery": {
+    "retry_uncertain": false,
+    "rollback_uncertain": false,
+    "require_review_on_failed_rollback": true
+  }
+}

@@ -1,0 +1,10 @@
+services:
+  control:
+    image: synthetic/control:baseline
+    volumes:
+      - ./state:/state:ro
+    secrets:
+      - fixture_secret
+secrets:
+  fixture_secret:
+    file: ./private/fixture-secret
