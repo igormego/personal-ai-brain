@@ -31,3 +31,24 @@ ledger/uncertainty invariants. It is not an authorization or actual host manifes
 Its lexical checks are a test contract only: ownership, no-follow file opens,
 durability, Compose rendering, path identity and actual secret access must be
 implemented and independently validated by a future operator.
+
+The source-only `deployment_preflight` accepts the same `fixture-1` shape. A
+trusted caller supplies a pinned Linux directory descriptor, its expected UID,
+the independently reviewed exact layer order and two already-normalized JSON
+configurations. It opens inputs below that descriptor with `O_NOFOLLOW`, rejects
+unsafe owner/mode/link/type, verifies layer/env/profile hashes, validates the
+supported in-project bind and secret paths, and permits only the exact image
+change across the supplied normalized configurations. It never runs Compose,
+changes host state, reads ledger contents or grants deployment permission.
+
+The caller must protect the pinned tree and descriptor from concurrent changes;
+the validator cannot freeze the filesystem or verify the ancestry of a descriptor
+it did not open. In particular, **normalization provenance is unverified**: the
+function cannot prove that the supplied configurations were rendered from the
+checked layers. Image IDs and module hashes are shape-checked, not verified
+against Docker or module files; the `fresh_baseline` flag is self-attestation,
+not independent evidence. External/named volumes, external secrets, configs,
+includes, `env_file` and other unsupported references are denied. Only a single
+UID and private 0600 file / non-group-writable directory layout is supported;
+mixed-owner live installations require independently reviewed future work.
+These limits prevent treating a passing result as a live/deployment preflight.
