@@ -21,6 +21,20 @@ jobs:
       - run: pip install -e ".[dev]"
       - name: Install Bubblewrap for isolated render tests
         run: command -v bwrap >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y bubblewrap)
+      - name: Diagnose CI sandbox capability
+        run: |
+          python - <<'PY'
+          import fcntl, os, subprocess
+          bwrap = '/usr/bin/bwrap'
+          fd = os.memfd_create('bwrap-probe', os.MFD_ALLOW_SEALING)
+          with open(bwrap, 'rb') as source:
+              os.write(fd, source.read())
+          fcntl.fcntl(fd, fcntl.F_ADD_SEALS, fcntl.F_SEAL_WRITE | fcntl.F_SEAL_GROW | fcntl.F_SEAL_SHRINK | fcntl.F_SEAL_SEAL)
+          args = ['bwrap', '--unshare-all', '--unshare-user', '--die-with-parent', '--new-session', '--disable-userns', '--assert-userns-disabled', '--cap-drop', 'ALL', '--ro-bind', '/usr', '/usr', '--ro-bind', '/lib', '/lib', '--ro-bind', '/lib64', '/lib64', '--proc', '/proc', '--dev', '/dev', '/usr/bin/true']
+          for name, executable, fds in [('direct', bwrap, ()), ('sealed', f'/proc/self/fd/{fd}', (fd,))]:
+              p = subprocess.run(args, executable=executable, pass_fds=fds, capture_output=True, timeout=10)
+              print(name, 'status', p.returncode, 'diagnostic', p.stderr.decode(errors='replace')[:300])
+          PY
       - run: pytest -q
 
       - name: Offline Codex environment checks
