@@ -30,6 +30,76 @@ noninteractively. Gateway retains the definitive Meta token/HMAC and trusted
 sender/recipient checks. Edge policy is defense in depth, **not** provider
 authentication.
 
+### Optional official ngrok MCP for Codex operator diagnostics (reviewed 2026-11-18)
+
+Use ngrok's hosted **account-management** MCP server
+[`https://mcp.ngrok.com/mcp`](https://ngrok.com/docs/mcp-server)
+as an **optional Codex operator tool**, not a dependency of the PAB or WhatsApp
+Gateway runtime and not a replacement for the native ngrok agent on Ubuntu.
+It is available on ngrok Free; the account's allocated dev domain and the
+repository-owned policy from PR #96 remain unchanged. The ngrok MCP server is
+not presently connected or authenticated in the operator environment; no live
+account inspection has been performed.
+
+- **First connection, operator-only:** ngrok documents Codex CLI **0.157.0+**.
+  In the existing Codex Desktop Local operator context, first check the CLI
+  version and only if supported use:
+  ```sh
+  codex mcp add ngrok --url https://mcp.ngrok.com/mcp
+  codex mcp login ngrok
+  codex mcp list
+  ```
+  Complete browser-based ngrok OAuth interactively. Do **not** commit Codex
+  MCP config or OAuth material to the repository, copy ngrok credentials into
+  prompts, or install an ngrok MCP server on Homelab. ngrok API keys and
+  agent authtokens are **not** valid MCP authentication. The OAuth connection
+  does not provision the separate, locally protected agent authtoken.
+  If Codex OAuth cannot be constrained to required read scopes, defer
+  connection or use a separately protected **read-only scoped** ngrok personal
+  access token in an operator-approved local secret store.
+- **Initial permitted tasks are read-only:** confirm signed-in account/plan,
+  assigned dev domain, whether an endpoint or tunnel agent is online,
+  usage/quotas, and the Traffic Inspector's status, method, path, timing and
+  ngrok error codes. Ask the MCP to *validate*, not apply or rewrite,
+  `config/ngrok-whatsapp-traffic-policy.yml` against current ngrok policy
+  capabilities/plan. The repository file stays authoritative; an MCP
+  validation result is not live agent-policy activation or proof that the
+  on-host CLI accepts the file. No Cloud Endpoint or alternate public route
+  should be created for this development Agent Endpoint.
+- **Explicit permission boundary:** the hosted MCP can also **write and
+  delete** ngrok Cloud Endpoints, domains, IP policies, vaults and credentials
+  when OAuth scopes permit. Select minimal **read** scopes on the consent
+  screen for inspection, disable automatic approvals for mutating tools,
+  and require separate operator approval for any modification (including
+  endpoint creation, changing policy, enabling capture/replay, revoking
+  credentials or changing account settings). ChatGPT does not currently
+  connect directly to this hosted MCP; supported Codex is the intended client.
+- **Webhook diagnostics after separately authorized activation:** use the
+  account MCP to distinguish no active tunnel, edge-policy 404, invalid
+  Gateway HMAC rejection, upstream timeout/5xx and ngrok errors; correlate
+  only sanitized request timestamps/statuses with Gateway's private
+  request-ID/status evidence. ngrok MCP cannot check the Gateway's internal
+  durable state, local process, Meta delivery, WhatsApp authentication or
+  the Homelab's health by itself. Do not assume all desired data is present:
+  an inactive endpoint has no HTTP traffic, and the Free plan retains
+  Traffic Inspector data for **24 hours**.
+- **Privacy:** keep Traffic Inspector **Full Capture OFF**. Default inspection
+  stores request/response metadata without webhook POST bodies, signature
+  header values or verification token values. Full Capture stores the raw
+  payload/header/query content and enables replay; these can expose private
+  WhatsApp data and can repeat a previously authenticated request, so they
+  are **not** authorized for our initial acceptance. Use generated, nonsecret
+  synthetic requests for controlled edge tests; never enable full capture
+  simply to obtain a missing ngrok error code.
+
+References: [ngrok MCP and supported clients](https://ngrok.com/docs/mcp-server),
+[ngrok MCP announcement and agent-vs-MCP boundary](https://ngrok.com/blog/mcp),
+[Traffic Inspector metadata and capture](https://ngrok.com/docs/obs/traffic-inspection/http-requests),
+[ngrok Free limits](https://ngrok.com/docs/pricing-limits).
+**Status: documented as an optional operator integration, NOT CONNECTED;
+no OAuth grant, on-host installation, public endpoint, policy application
+or Meta webhook activation.**
+
 **Required checks before activation (not completed):**
 
 1. Operator separately authorizes the new public HTTPS endpoint and a narrowly
