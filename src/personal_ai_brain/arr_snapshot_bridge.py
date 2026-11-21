@@ -19,17 +19,20 @@ import uuid
 
 from .resource_query import _arr_snapshot
 from .arr_read import ARRReadProvider
+from .arr_request_status import REQUEST_STATUS_VIEWS
 from .sonarr_diagnostics import SONARR_DIAGNOSTIC_VIEWS
 
 ARR_FILES = {
     "arr/sonarr": {view: f"sonarr-{view}.json" for view in {"items", "profiles"} | SONARR_DIAGNOSTIC_VIEWS},
-    "arr/radarr": {"items": "radarr-items.json", "profiles": "radarr-profiles.json"},
+    "arr/radarr": {view: f"radarr-{view}.json" for view in {"items", "profiles"} | REQUEST_STATUS_VIEWS["arr/radarr"]},
+    "arr/seerr": {view: f"seerr-{view}.json" for view in REQUEST_STATUS_VIEWS["arr/seerr"]},
 }
 HOST_OUTPUT = Path("/opt/personal-ai-brain/arr-audit")
 CONTROL_MOUNT = Path("/arr-audit")
 COLLECTOR_CONFIGS = {
     "sonarr": Path("/etc/personal-ai-brain/arr-read/sonarr.json"),
     "radarr": Path("/etc/personal-ai-brain/arr-read/radarr.json"),
+    "seerr": Path("/etc/personal-ai-brain/arr-read/seerr.json"),
 }
 MAX_SNAPSHOT = 2_000_000
 DIR_FLAGS = os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW
@@ -246,18 +249,42 @@ def publish_arr_views(service, provider, *, reader_gid, sonarr_diagnostics=False
     return unavailable
 
 
+def publish_request_status_views(service, provider, *, reader_gid):
+    """Publish metadata-only views without collecting the title-level inventory."""
+    resource = "arr/" + service
+    if resource not in REQUEST_STATUS_VIEWS:
+        _deny()
+    if service == "seerr":
+        captured = provider("requests")
+        snapshots = {"requests": captured, "request": {**captured, "view": "request"}}
+    else:
+        snapshots = {view: provider(view) for view in sorted(REQUEST_STATUS_VIEWS[resource])}
+    for view, source in snapshots.items():
+        _arr_snapshot(source, datetime.now(timezone.utc), view=view)
+    for view in snapshots:
+        publish_arr(snapshots.__getitem__, resource, view, reader_gid=reader_gid)
+
+
 def main(argv=None):
     """Operator-owned one-shot per service, scheduled outside the Control app."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--service", required=True, choices=("sonarr", "radarr"))
-    parser.add_argument("--sonarr-diagnostics", action="store_true")
+    parser.add_argument("--service", required=True, choices=("sonarr", "radarr", "seerr"))
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--sonarr-diagnostics", action="store_true")
+    mode.add_argument("--request-status", action="store_true")
     args = parser.parse_args(argv)
     if os.geteuid() != 0:
         print("arr_bridge_unavailable")
         return 1
     try:
         service, gid, provider = _trusted_config(args.service)
-        unavailable = publish_arr_views(service, provider, reader_gid=gid, sonarr_diagnostics=args.sonarr_diagnostics)
+        if args.request_status:
+            publish_request_status_views(service, provider, reader_gid=gid)
+            unavailable = []
+        elif service == "seerr":
+            _deny()
+        else:
+            unavailable = publish_arr_views(service, provider, reader_gid=gid, sonarr_diagnostics=args.sonarr_diagnostics)
     except (ARRBridgeUnavailable, OSError, ValueError, TypeError):
         print("arr_bridge_unavailable")
         return 1

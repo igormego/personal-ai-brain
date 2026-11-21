@@ -12,15 +12,19 @@ import re
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
+from .arr_request_status import MAX_REQUEST_ITEMS, REQUEST_STATUS_VIEWS, project_request_status
 from .sonarr_diagnostics import MAX_QUEUE_ITEMS, SONARR_DIAGNOSTIC_VIEWS, project_sonarr_diagnostics
 
 MAX_BODY = 4_194_304
 MAX_ITEMS = 4096
 ENDPOINTS = {
-    "radarr": {"items": "/api/v3/movie", "profiles": "/api/v3/qualityprofile"},
+    "radarr": {"items": "/api/v3/movie", "profiles": "/api/v3/qualityprofile", "movie": "/api/v3/movie",
+               "queue": f"/api/v3/queue?page=1&pageSize={MAX_QUEUE_ITEMS}&includeUnknownMovieItems=true"},
     "sonarr": {"items": "/api/v3/series", "profiles": "/api/v3/qualityprofile",
                "series": "/api/v3/series", "health": "/api/v3/health",
                "queue": f"/api/v3/queue?page=1&pageSize={MAX_QUEUE_ITEMS}&includeUnknownSeriesItems=true"},
+    "seerr": {view: f"/api/v1/request?take={MAX_REQUEST_ITEMS}&skip=0&sort=added"
+              for view in REQUEST_STATUS_VIEWS["arr/seerr"]},
 }
 
 
@@ -108,7 +112,10 @@ class ARRReadProvider:
                 _deny()
             records = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique,
                                  parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
-            if view in SONARR_DIAGNOSTIC_VIEWS:
+            resource = "arr/" + self.service
+            if view in REQUEST_STATUS_VIEWS.get(resource, ()):
+                return self._snapshot(view, project_request_status(resource, view, records))
+            if self.service == "sonarr" and view in SONARR_DIAGNOSTIC_VIEWS:
                 return self._snapshot(view, project_sonarr_diagnostics(view, records))
             if type(records) is not list or len(records) > MAX_ITEMS:
                 _deny()

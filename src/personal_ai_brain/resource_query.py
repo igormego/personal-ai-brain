@@ -12,11 +12,13 @@ import hmac
 import json
 import re
 
+from .arr_request_status import EXACT_VIEWS, MAX_REQUEST_ITEMS, REQUEST_STATUS_VIEWS, valid_request_status_row
 from .sonarr_diagnostics import MAX_QUEUE_ITEMS, SONARR_DIAGNOSTIC_VIEWS, valid_sonarr_diagnostic_row
 
 RESOURCE_SCHEMAS = {
     "movies/watchlist": {"views": frozenset({"items"}), "max_page": 10},
-    "arr/radarr": {"views": frozenset({"items", "profiles"}), "max_page": 10},
+    "arr/radarr": {"views": frozenset({"items", "profiles"}) | REQUEST_STATUS_VIEWS["arr/radarr"], "max_page": 10},
+    "arr/seerr": {"views": REQUEST_STATUS_VIEWS["arr/seerr"], "max_page": 10},
     "arr/sonarr": {"views": frozenset({"items", "profiles"}) | SONARR_DIAGNOSTIC_VIEWS, "max_page": 10},
 }
 
@@ -40,7 +42,7 @@ def validate_query(value):
         _deny()
     if type(value["limit"]) is not int or not 1 <= value["limit"] <= spec["max_page"]:
         _deny()
-    if value["view"] == "series":
+    if value["view"] in EXACT_VIEWS:
         target = value.get("target_id")
         if (set(value) != required | {"target_id"} or value["limit"] != 1
                 or type(target) is not int or not 1 <= target <= 2147483647):
@@ -140,7 +142,7 @@ def _arr_snapshot(source, now, *, view):
             "complete", "source_status", "items"}):
         _deny()
     rid = source["resource_id"]
-    if (type(rid) is not str or rid not in ("arr/radarr", "arr/sonarr") or source["view"] != view
+    if (type(rid) is not str or rid not in ("arr/radarr", "arr/sonarr", "arr/seerr") or source["view"] != view
             or view not in RESOURCE_SCHEMAS[rid]["views"]
             or source["schema_version"] != "0.1" or source["complete"] is not True):
         _deny()
@@ -159,12 +161,15 @@ def _arr_snapshot(source, now, *, view):
     if not -timedelta(minutes=2) <= age <= timedelta(minutes=2):
         _deny()
     items = source["items"]
-    if type(items) is not list or len(items) > (MAX_QUEUE_ITEMS if view == "queue" else 4096):
+    maximum = {"queue": MAX_QUEUE_ITEMS, "requests": MAX_REQUEST_ITEMS, "request": MAX_REQUEST_ITEMS}.get(view, 4096)
+    if type(items) is not list or len(items) > maximum:
         _deny()
     seen = set()
     for row in items:
-        if view in SONARR_DIAGNOSTIC_VIEWS:
-            if not valid_sonarr_diagnostic_row(view, row) or row["id"] in seen:
+        if view in REQUEST_STATUS_VIEWS.get(rid, ()) or (service == "sonarr" and view in SONARR_DIAGNOSTIC_VIEWS):
+            valid = (valid_sonarr_diagnostic_row(view, row) if service == "sonarr"
+                     else valid_request_status_row(rid, view, row))
+            if not valid or row["id"] in seen:
                 _deny()
             seen.add(row["id"])
             continue
@@ -207,6 +212,7 @@ def _arr_snapshot(source, now, *, view):
 
 RESOURCE_SCHEMAS["arr/radarr"]["validate_snapshot"] = _arr_snapshot
 RESOURCE_SCHEMAS["arr/sonarr"]["validate_snapshot"] = _arr_snapshot
+RESOURCE_SCHEMAS["arr/seerr"]["validate_snapshot"] = _arr_snapshot
 
 
 # New resources require a reviewed, registered validator and bounded views.
@@ -215,7 +221,8 @@ RESOURCE_SCHEMAS["movies/watchlist"]["validate_snapshot"] = _snapshot
 
 class ResourceQueryBroker:
     """Fixed schema registry with independently granted item disclosure."""
-    def __init__(self, providers, grants, cursor_key, *, disclosure_approved=False, sonarr_diagnostics=False):
+    def __init__(self, providers, grants, cursor_key, *, disclosure_approved=False,
+                 sonarr_diagnostics=False, view_grants=None):
         if type(providers) is not dict or set(providers) - RESOURCE_SCHEMAS.keys():
             _deny()
         if type(grants) is not frozenset or grants - RESOURCE_SCHEMAS.keys():
@@ -224,15 +231,21 @@ class ResourceQueryBroker:
             _deny()
         if type(sonarr_diagnostics) is not bool:
             _deny()
+        if view_grants is not None and (type(view_grants) is not dict or any(
+                resource not in grants or type(views) is not frozenset or views - RESOURCE_SCHEMAS[resource]["views"]
+                for resource, views in view_grants.items())):
+            _deny()
         self.providers, self.grants, self.key = dict(providers), grants, cursor_key
         self.disclosure_approved = disclosure_approved
         self.sonarr_diagnostics = sonarr_diagnostics
+        self.view_grants = {} if view_grants is None else dict(view_grants)
 
     def available_views(self, resource_id):
         if not self.disclosure_approved or resource_id not in self.grants or not callable(self.providers.get(resource_id)):
             return frozenset()
-        views = RESOURCE_SCHEMAS[resource_id]["views"]
-        if not self.sonarr_diagnostics:
+        defaults = RESOURCE_SCHEMAS[resource_id]["views"] - REQUEST_STATUS_VIEWS.get(resource_id, frozenset())
+        views = self.view_grants.get(resource_id, defaults)
+        if resource_id == "arr/sonarr" and not self.sonarr_diagnostics:
             return views - SONARR_DIAGNOSTIC_VIEWS
         return views
 
@@ -244,7 +257,7 @@ class ResourceQueryBroker:
         if not callable(provider):
             _deny()
         try:
-            is_arr = selected["resource_id"] in ("arr/radarr", "arr/sonarr")
+            is_arr = selected["resource_id"] in ("arr/radarr", "arr/sonarr", "arr/seerr")
             source = provider(selected["view"]) if is_arr else provider()
             validate_snapshot = RESOURCE_SCHEMAS[selected["resource_id"]]["validate_snapshot"]
             generation = (validate_snapshot(source, now or datetime.now(timezone.utc),
@@ -253,8 +266,11 @@ class ResourceQueryBroker:
             if source["resource_id"] != selected["resource_id"]:
                 _deny()
             items = source["items"]
-            if selected["view"] == "series":
-                items = [item for item in items if item["id"] == selected["target_id"]]
+            if selected["view"] in EXACT_VIEWS:
+                identity = "tmdb_id" if selected["view"] == "movie" else "id"
+                items = [item for item in items if item[identity] == selected["target_id"]]
+                if len(items) > 1:
+                    _deny()
             offset = 0
             if "cursor" in selected:
                 token = _decode(selected["cursor"])
