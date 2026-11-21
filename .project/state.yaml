@@ -130,6 +130,16 @@ current_state: >
   preflight passed. No model session, credential or permission expansion.
   Sanitized operator evidence: Issue #64 comment 6602708707.
 
+  2026-11-21 #64/#83: Codex Local ran two different model-directed diagnoses
+  against live Sonarr, Radarr and Seerr through the same bounded GET interface.
+  The model selected follow-up resources from returned evidence. The existing
+  Control/Issues poll was healthy. The pinned PR #101 collector passed a live
+  in-memory read for both ARR services, but the running Control image lacks
+  the typed ARR modules and mount. Host inference is disabled. This verifies
+  the foreground operator path only. Ordinary ChatGPT ARR and a live ARR
+  effect remain unaccepted. See Homelab #33 for verified encrypted offline
+  copy and representative isolated Radarr restore.
+
 exact_next_action: >
   #77 TRUSTED HOST RESOURCE -> WORKSPACE is LIVE_ACCEPTED in ordinary ChatGPT:
   control #119 new workspace.resource-python.v1 task read broker-owned fresh
@@ -143,8 +153,11 @@ exact_next_action: >
   Resolve Core project_os.status shared source_read_failure as a bounded
   independent incident without granting the model broader host permissions.
   Then advance separately approved #83 typed-effect execution with exact
-  prestate, approval, reservation and authoritative readback. WhatsApp #81
-  remains Gateway-owned and backup #33 remains paused.
+  prestate, approval, reservation and authoritative readback. For #83,
+  stage the PR #101 Sonarr-only GET grant on the existing Control transport
+  after explicit owner consent for title/ID retention and a verified
+  Control-only rollback. Verify one fresh correlated read from ordinary
+  ChatGPT before expanding the capability. WhatsApp #81 remains Gateway-owned.
 blockers:
   - "PAB Core project_os.status/current core.health direct read is failing at shared source-read gate: private Core request #115 and prior #114 failed on 2026-11-10; original homelab selector worked in #97 on 2026-11-01. Connector can read the full current project map plus 12 mapped states, but this does not establish on-host Core credential/access; precise on-host failure reason remains unknown."
   - "G2 no durable cross-turn goal/delivery acceptance into arbitrary new ChatGPT sessions; the existing GitHub Issue/task handle allows foreground resume."
