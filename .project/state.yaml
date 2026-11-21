@@ -137,10 +137,12 @@ current_state: >
   deployed on 2026-11-21. The existing Control ledger and capabilities were
   preserved, and the operator independently verified fresh profiles and items
   from the read-only mount. The protected prior Compose generation passed a
-  Control-only rollback dry run. See PAB #83 comment 7070564842 for image pins
-  and acceptance evidence. Ordinary ChatGPT correlation and a live ARR effect
-  remain unaccepted. See Homelab #33 for the verified encrypted offline copy
-  and representative isolated Radarr restore.
+  Control-only rollback dry run. See PAB #83 comment 7070564842 for image pins.
+  On 2026-11-22 the first ordinary ChatGPT Sonarr profiles GET returned two
+  records from a fresh snapshot via private Control request #128. Authenticated
+  author, UUID, request and result matched the on-host ledger, with no effect.
+  See PAB #83 comment 7070619767 for acceptance evidence. See Homelab #33 for
+  the verified encrypted offline copy and representative isolated Radarr restore.
 
 exact_next_action: >
   #77 TRUSTED HOST RESOURCE -> WORKSPACE is LIVE_ACCEPTED in ordinary ChatGPT:
@@ -154,11 +156,11 @@ exact_next_action: >
   an unrelated coding/data goal, with zero bespoke per-task platform edits.
   Resolve Core project_os.status shared source_read_failure as a bounded
   independent incident without granting the model broader host permissions.
-  Then advance separately approved #83 typed-effect execution with exact
-  prestate, approval, reservation and authoritative readback. For #83,
-  verify one fresh correlated Sonarr read from signed-in ordinary ChatGPT
-  through the existing private Control transport. The host deployment and
-  protected rollback dry run passed. WhatsApp #81 remains Gateway-owned.
+  Sonarr profiles GET is live-accepted from ordinary ChatGPT through the
+  existing private Control transport (request #128). Sonarr items passed
+  host readback. A future #83 effect requires an exact owner-intended target,
+  separate approval, reservation and authoritative readback. WhatsApp #81
+  remains Gateway-owned.
 blockers:
   - "PAB Core project_os.status/current core.health direct read is failing at shared source-read gate: private Core request #115 and prior #114 failed on 2026-11-10; original homelab selector worked in #97 on 2026-11-01. Connector can read the full current project map plus 12 mapped states, but this does not establish on-host Core credential/access; precise on-host failure reason remains unknown."
   - "G2 no durable cross-turn goal/delivery acceptance into arbitrary new ChatGPT sessions; the existing GitHub Issue/task handle allows foreground resume."
