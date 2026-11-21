@@ -255,8 +255,14 @@ def build_registry(core_state: Path, reader_factory, redactor, work_client=None,
             MediaResourceUnavailable, read_media_resource, validate_media_selector,
         )
         media_query_broker = getattr(media_resource_provider, "query_broker", None)
+        visible_queries = {}
         if media_query_broker is not None:
             from .resource_query import RESOURCE_SCHEMAS, validate_query
+            for resource_id in sorted(RESOURCE_SCHEMAS):
+                views = media_query_broker.available_views(resource_id)
+                if views:
+                    visible_queries[resource_id] = sorted(views)
+        visible_views = sorted({view for views in visible_queries.values() for view in views})
 
         def media_selector(value):
             try:
@@ -284,9 +290,11 @@ def build_registry(core_state: Path, reader_factory, redactor, work_client=None,
              "required": ["resource_id"],
              "properties": {"resource_id": {"type": "string",
                                             "enum": ["sonarr/overview", "movies/watchlist-overview"] +
-                                                    (sorted(RESOURCE_SCHEMAS) if media_query_broker is not None else [])},
-                            "view": {"type": "string", "enum": ["items", "profiles"]},
+                                                    list(visible_queries)},
+                            "view": {"type": "string", "enum": visible_views or ["items", "profiles"]},
                             "limit": {"type": "integer", "minimum": 1, "maximum": 10},
+                            "target_id": {"type": "integer", "minimum": 1, "maximum": 2147483647,
+                                          "description": "Required for a Sonarr series view, with limit 1."},
                             "cursor": {"type": "string", "maxLength": 512}}},
             media_selector, media_read,
         ))

@@ -58,6 +58,33 @@ def read(dir, service="sonarr", view="items"):
                             expected_owner=os.geteuid())
 
 
+def test_unavailable_diagnostic_view_preserves_fresh_inventory(monkeypatch, directory):
+    from personal_ai_brain import arr_snapshot_bridge as bridge
+
+    def provider(view):
+        if view == "queue":
+            raise ValueError("unavailable")
+        captured = source(view=view)
+        if view == "health":
+            captured["items"] = [{"id": 1, "check": "update", "severity": "warning"}]
+        if view == "series":
+            captured["items"] = [{"id": 7, "monitored": True, "quality_profile_id": 2, "status": "ended",
+                                  "episode_count": 12, "episode_file_count": 12, "season_count": 1}]
+        return captured
+
+    def publisher(provider, resource, view, **options):
+        return publish_arr(provider, resource, view, directory=directory,
+                           expected_owner=os.geteuid(), reader_gid=options["reader_gid"])
+
+    monkeypatch.setattr(bridge, "publish_arr", publisher)
+    assert bridge.publish_arr_views("sonarr", provider, reader_gid=os.getegid(), sonarr_diagnostics=True) == ["queue"]
+    assert read(directory, view="items")["items"][0]["id"] == 7
+    assert read(directory, view="health")["items"][0]["severity"] == "warning"
+    assert read(directory, view="series")["items"][0]["episode_count"] == 12
+    with pytest.raises(ARRBridgeUnavailable):
+        read(directory, view="queue")
+
+
 @pytest.mark.parametrize("service", ["sonarr", "radarr"])
 def test_both_arr_families_share_one_publisher_and_query_broker(directory, service):
     pub(directory, service, "items")
