@@ -45,7 +45,8 @@ def radarr_rows():
 
 def api(service, rows, **kwargs):
     fake = FakeAPI(rows, **kwargs)
-    provider = ARRReadProvider(service, "http://" + service + (":7878" if service == "radarr" else ":8989"),
+    port = {"radarr": 7878, "sonarr": 8989, "seerr": 5055}[service]
+    provider = ARRReadProvider(service, f"http://{service}:{port}",
                                "local-test-key", opener=fake)
     return provider, fake
 
@@ -167,6 +168,46 @@ def test_health_view_filters_messages_and_only_discloses_the_granted_scope():
     assert result["items"] == [{"id": 1, "check": "other", "severity": "unknown"},
                                {"id": 2, "check": "update", "severity": "warning"}]
     assert "PRIVATE" not in json.dumps(result)
+
+
+def test_status_only_seerr_and_radarr_join_use_exact_identity_without_titles():
+    request = {"id": 17, "type": "movie", "is4k": True, "status": 2,
+               "media": {"tmdbId": 111, "status": 5, "status4k": 3},
+               "createdAt": "2026-11-21T20:00:00.123Z", "requestedBy": {"email": "PRIVATE"}}
+    seerr, api_calls = api("seerr", {"pageInfo": {"results": 1}, "results": [request]})
+    radarr, movie_calls = api("radarr", [{**radarr_rows()[0], "tmdbId": 111, "status": "released"}])
+    providers = {"arr/seerr": seerr, "arr/radarr": radarr}
+    with pytest.raises(QueryUnavailable):
+        broker(providers).read(typed("seerr", view="request", target_id=17), principal="owner")
+    assert not api_calls.calls
+    active = ResourceQueryBroker(providers, frozenset(providers), b"k" * 32, disclosure_approved=True,
+                                 view_grants={"arr/seerr": frozenset({"request", "requests"}),
+                                              "arr/radarr": frozenset({"queue", "movie"})})
+    with pytest.raises(QueryUnavailable):
+        active.read(typed("radarr", view="items"), principal="owner")
+    assert not movie_calls.calls
+    a = active.read(typed("seerr", view="request", target_id=17), principal="owner")
+    assert a["items"] == [{"id": 17, "tmdb_id": 111, "media_type": "movie", "request_status": "approved",
+                           "media_status": "processing", "is_4k": True, "created_at": "2026-11-21T20:00:00Z",
+                           "updated_at": None}]
+    b = active.read(typed("radarr", view="movie", target_id=111), principal="owner")
+    assert b["items"] == [{"id": 9, "tmdb_id": 111, "monitored": False, "has_file": False,
+                           "quality_profile_id": 3, "status": "released"}]
+    assert all("title" not in item for item in a["items"] + b["items"])
+    assert "PRIVATE" not in json.dumps(a)
+    assert api_calls.calls[0].full_url.endswith("/api/v1/request?take=100&skip=0&sort=added")
+    assert movie_calls.calls[0].full_url.endswith("/api/v3/movie")
+
+
+def test_request_status_rejects_incomplete_or_ambiguous_data():
+    seerr, _ = api("seerr", {"pageInfo": {"results": 101}, "results": []})
+    radarr, _ = api("radarr", [{**row, "tmdbId": 123} for row in radarr_rows()])
+    providers = {"arr/seerr": seerr, "arr/radarr": radarr}
+    active = ResourceQueryBroker(providers, frozenset(providers), b"k" * 32, disclosure_approved=True,
+                                 view_grants={"arr/seerr": frozenset({"requests"}), "arr/radarr": frozenset({"movie"})})
+    for requested in (typed("seerr", view="requests"), typed("radarr", view="movie", target_id=123)):
+        with pytest.raises(QueryUnavailable):
+            active.read(requested, principal="owner")
 
 
 def test_cursor_stays_valid_across_fresh_gets_if_items_unchanged():

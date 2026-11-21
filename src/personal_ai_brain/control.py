@@ -294,7 +294,7 @@ def build_registry(core_state: Path, reader_factory, redactor, work_client=None,
                             "view": {"type": "string", "enum": visible_views or ["items", "profiles"]},
                             "limit": {"type": "integer", "minimum": 1, "maximum": 10},
                             "target_id": {"type": "integer", "minimum": 1, "maximum": 2147483647,
-                                          "description": "Required for a Sonarr series view, with limit 1."},
+                                          "description": "Exact Sonarr series ID, Radarr TMDb ID or Seerr request ID, with limit 1."},
                             "cursor": {"type": "string", "maxLength": 512}}},
             media_selector, media_read,
         ))

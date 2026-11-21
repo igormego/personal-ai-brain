@@ -622,5 +622,30 @@ ID returns an empty list. The `health` and `queue` cursors use the existing sign
 content-bound paging contract. All views use the same two-minute freshness limit
 and owner-authenticated read-only transport. Existing `items` and `profiles`
 are unchanged. The optional diagnostic views require explicit enablement.
+
+### Opt-in Seerr and Radarr request status
+
+The existing owner-bound resource broker can correlate a Seerr movie request
+with Radarr without retaining titles, requester names, raw warnings or paths.
+Enable either `PAB_ARR_SEERR_STATUS_ENABLED=1` or `PAB_ARR_RADARR_STATUS_ENABLED=1`
+only after consent for IDs and status retention in the existing private ledger and
+reply transport. Set `PAB_ARR_STATUS_DISCLOSURE_APPROVED=1` separately. The
+Sonarr title-disclosure flag does not approve this lane. Radarr status-only
+enablement grants neither `items` nor `profiles`.
+
+| Resource | View | Evidence |
+| --- | --- | --- |
+| `arr/seerr` | `requests`, limit 1–10 | Request IDs, media type and TMDb identity, request state, quality-specific availability and timestamps. |
+| `arr/seerr` | `request`, `target_id=<request ID>`, limit 1 | One exact request from the same snapshot. |
+| `arr/radarr` | `movie`, `target_id=<TMDb ID>`, limit 1 | Matched Radarr ID, monitor state, file presence, profile ID and release state. |
+| `arr/radarr` | `queue`, limit 1–10 | Queue IDs, Radarr movie IDs and categorical download/import states. |
+
+Run `--service seerr --request-status` or `--service radarr --request-status`
+from an authorized host-only collector using its fixed secret-file reference.
+The collector accepts a Seerr request page only when it covers its reported
+total (at most 100). The Radarr queue follows the same completeness policy
+(at most 200). Exact views return an empty list for a missing match and reject
+ambiguous identities. A Seerr status or a Radarr file flag on its own does not
+establish playable media or whether a title has been watched.
 Additional diagnostic resources should be added by their resource class and
 explicit grant, not with a new tool for every natural-language question.

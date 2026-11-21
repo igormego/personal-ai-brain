@@ -109,7 +109,7 @@ class Worker:
                 # metadata, never proof of owner identity. Bind to GitHub's
                 # authenticated issue author on every newly admitted request.
                 if ((capability.id == "media.resource_read"
-                        and arguments.get("resource_id") in ("arr/radarr", "arr/sonarr"))
+                        and arguments.get("resource_id") in ("arr/radarr", "arr/sonarr", "arr/seerr"))
                         or capability.id in ("homelab.resource_read", "effect.execute")):
                     author = issue.get("user")
                     if (type(author) is not dict
@@ -251,13 +251,21 @@ def serve(state=STATE, heartbeat=BEAT):
 
         # ARR item/title disclosure is an independent, OFF-by-default
         # configuration gate; existing Sonarr overview remains unchanged.
-        services = frozenset(
+        title_grants = frozenset(
             "arr/" + service for service in ("sonarr", "radarr")
             if os.environ.get("PAB_ARR_" + service.upper() + "_ENABLED") == "1"
         )
+        status_grants = frozenset(
+            "arr/" + service for service in ("radarr", "seerr")
+            if os.environ.get("PAB_ARR_" + service.upper() + "_STATUS_ENABLED") == "1"
+        )
+        services = title_grants | status_grants
         if services:
-            if os.environ.get("PAB_ARR_DISCLOSURE_APPROVED") != "1":
+            if title_grants and os.environ.get("PAB_ARR_DISCLOSURE_APPROVED") != "1":
                 raise ValueError("arr_title_disclosure_not_approved")
+            if status_grants and os.environ.get("PAB_ARR_STATUS_DISCLOSURE_APPROVED") != "1":
+                raise ValueError("arr_status_disclosure_not_approved")
+            from .arr_request_status import REQUEST_STATUS_VIEWS
             from .arr_snapshot_bridge import read_mounted_arr
             from .resource_query import ResourceQueryBroker
 
@@ -274,6 +282,9 @@ def serve(state=STATE, heartbeat=BEAT):
             media_provider.query_broker = ResourceQueryBroker(
                 providers, services, cursor_key, disclosure_approved=True,
                 sonarr_diagnostics=os.environ.get("PAB_ARR_SONARR_DIAGNOSTICS_ENABLED") == "1",
+                view_grants={resource: REQUEST_STATUS_VIEWS[resource] | (
+                    frozenset({"items", "profiles"}) if resource in title_grants else frozenset())
+                    for resource in status_grants},
             )
 
     registry = build_registry(
