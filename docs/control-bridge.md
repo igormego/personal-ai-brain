@@ -601,9 +601,26 @@ on failure, preserve all prior durable ledgers; never claim CI alone deployed
 a live adapter. **No monitored toggle, download, quality change or API write**
 is permitted by this activation. #83 Effect Broker remains separate.
 
-**User-visible limit:** `items` + `profiles` supports audits of monitored
-status and profile assignment; it does **not yet** expose episode-level missing
-counts, logs or queue failure details. An unverified statement like
-“Sonarr is broken because X” cannot be inferred from these two views alone.
+### Opt-in Sonarr diagnostics
+
+With `PAB_ARR_SONARR_DIAGNOSTICS_ENABLED=1` in addition to the existing Sonarr
+and disclosure grants, the same `media.resource_read` capability accepts:
+
+| View | Arguments | Evidence |
+| --- | --- | --- |
+| `health` | `resource_id=arr/sonarr`, `view=health`, `limit=1..10` | Reported check classes and severities. |
+| `queue` | `resource_id=arr/sonarr`, `view=queue`, `limit=1..10` | Queue, series and episode IDs, download and import states, and categorized warnings. |
+| `series` | `resource_id=arr/sonarr`, `view=series`, `limit=1`, `target_id=<Sonarr series ID>` | One series' monitor state, profile, status and Sonarr-reported episode, file and season counts. |
+
+The host collector can opt in with `--sonarr-diagnostics`. Existing inventory
+publishes independently of diagnostic endpoint failures. The queue is accepted
+only when the fixed upstream page covers its reported total (at most 200).
+Health messages, queue messages, file paths, clients' download identifiers and
+credentials stay on the collector side. An unclassified warning is `other`.
+The series view selects exactly one ID locally from the collected data. A missing
+ID returns an empty list. The `health` and `queue` cursors use the existing signed,
+content-bound paging contract. All views use the same two-minute freshness limit
+and owner-authenticated read-only transport. Existing `items` and `profiles`
+are unchanged. The optional diagnostic views require explicit enablement.
 Additional diagnostic resources should be added by their resource class and
 explicit grant, not with a new tool for every natural-language question.

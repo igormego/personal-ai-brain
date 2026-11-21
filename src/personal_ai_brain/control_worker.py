@@ -272,7 +272,8 @@ def serve(state=STATE, heartbeat=BEAT):
                 for rid in services
             }
             media_provider.query_broker = ResourceQueryBroker(
-                providers, services, cursor_key, disclosure_approved=True
+                providers, services, cursor_key, disclosure_approved=True,
+                sonarr_diagnostics=os.environ.get("PAB_ARR_SONARR_DIAGNOSTICS_ENABLED") == "1",
             )
 
     registry = build_registry(

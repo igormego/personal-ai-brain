@@ -10,13 +10,17 @@ from datetime import datetime, timezone
 import json
 import re
 from urllib.parse import urlsplit
-from urllib.request import HTTPRedirectHandler, Request, build_opener
+from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
+
+from .sonarr_diagnostics import MAX_QUEUE_ITEMS, SONARR_DIAGNOSTIC_VIEWS, project_sonarr_diagnostics
 
 MAX_BODY = 4_194_304
 MAX_ITEMS = 4096
 ENDPOINTS = {
     "radarr": {"items": "/api/v3/movie", "profiles": "/api/v3/qualityprofile"},
-    "sonarr": {"items": "/api/v3/series", "profiles": "/api/v3/qualityprofile"},
+    "sonarr": {"items": "/api/v3/series", "profiles": "/api/v3/qualityprofile",
+               "series": "/api/v3/series", "health": "/api/v3/health",
+               "queue": f"/api/v3/queue?page=1&pageSize={MAX_QUEUE_ITEMS}&includeUnknownSeriesItems=true"},
 }
 
 
@@ -56,7 +60,7 @@ def _title(value):
 
 
 class ARRReadProvider:
-    """One operator-pinned ARR instance, two allowlisted GET views.
+    """One operator-pinned ARR instance with fixed GET views.
 
     Supply one instance per service. The origin and key are trusted deployment
     configuration, not request arguments; no default credentials are invented.
@@ -85,7 +89,7 @@ class ARRReadProvider:
         self.service = service
         self.origin = origin.rstrip("/")
         self._api_key = api_key
-        self._open = opener if opener is not None else build_opener(_NoRedirect()).open
+        self._open = opener if opener is not None else build_opener(ProxyHandler({}), _NoRedirect()).open
         if not callable(self._open):
             _deny()
 
@@ -104,6 +108,8 @@ class ARRReadProvider:
                 _deny()
             records = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique,
                                  parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
+            if view in SONARR_DIAGNOSTIC_VIEWS:
+                return self._snapshot(view, project_sonarr_diagnostics(view, records))
             if type(records) is not list or len(records) > MAX_ITEMS:
                 _deny()
             items = []
@@ -137,10 +143,13 @@ class ARRReadProvider:
                     }
                 items.append(item)
             items.sort(key=lambda r: r["id"])
-            return {
-                "schema_version": "0.1", "resource_id": "arr/" + self.service,
-                "view": view, "collected_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                "complete": True, "source_status": {self.service: "ok"}, "items": items,
-            }
+            return self._snapshot(view, items)
         except Exception:
             _deny()
+
+    def _snapshot(self, view, items):
+        return {
+            "schema_version": "0.1", "resource_id": "arr/" + self.service,
+            "view": view, "collected_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "complete": True, "source_status": {self.service: "ok"}, "items": items,
+        }

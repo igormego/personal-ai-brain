@@ -97,6 +97,78 @@ def test_sonarr_live_get_and_profiles_registered_same_query_capability():
     assert fake_profiles.calls[0].full_url.endswith("/api/v3/qualityprofile")
 
 
+def test_sonarr_diagnostics_require_separate_grant_and_strip_private_text():
+    provider, upstream = api("sonarr", {"totalRecords": 1, "records": [{
+        "id": 18, "seriesId": 7, "episodeId": 25, "status": "completed",
+        "trackedDownloadStatus": "warning", "trackedDownloadState": "importPending",
+        "statusMessages": [{"title": "PRIVATE", "messages": ["Access to the path /PRIVATE: permission denied"]}],
+        "outputPath": "/PRIVATE", "downloadId": "PRIVATE",
+    }]})
+    query = typed("sonarr", view="queue")
+    with pytest.raises(QueryUnavailable):
+        broker({"arr/sonarr": provider}).read(query, principal="owner")
+    assert upstream.calls == []
+    enabled = ResourceQueryBroker({"arr/sonarr": provider}, frozenset({"arr/sonarr"}), b"k" * 32,
+                                  disclosure_approved=True, sonarr_diagnostics=True)
+    response = enabled.read(query, principal="owner")
+    assert response["items"] == [{"id": 18, "series_id": 7, "episode_id": 25, "status": "completed",
+                                  "download_status": "warning", "download_state": "importPending",
+                                  "reasons": ["permission"]}]
+    assert "PRIVATE" not in json.dumps(response)
+    assert response["effect_performed"] is False
+    assert upstream.calls[0].full_url.endswith("/api/v3/queue?page=1&pageSize=200&includeUnknownSeriesItems=true")
+    warnings = upstream.rows["records"][0]["statusMessages"][0]["messages"]
+    warnings[:] = ["Not a custom format upgrade for existing episode file",
+                   "Episode 4 was not found in the downloaded release"]
+    assert enabled.read(query, principal="owner")["items"][0]["reasons"] == ["quality", "release_episode_missing"]
+    upstream.rows["totalRecords"] = 2
+    with pytest.raises(QueryUnavailable):
+        enabled.read(query, principal="owner")
+
+
+def test_sonarr_series_detail_selects_one_exact_id():
+    provider, upstream = api("sonarr", [
+        {"id": 17, "monitored": True, "qualityProfileId": 7, "status": "continuing",
+         "statistics": {"episodeCount": 25, "episodeFileCount": 20, "seasonCount": 3}, "title": "PRIVATE"},
+        {"id": 19, "monitored": False, "qualityProfileId": 3},
+    ])
+    active = ResourceQueryBroker({"arr/sonarr": provider}, frozenset({"arr/sonarr"}), b"k" * 32,
+                                 disclosure_approved=True, sonarr_diagnostics=True)
+    answer = active.read(typed("sonarr", view="series", target_id=17), principal="owner")
+    assert answer["items"] == [{"id": 17, "monitored": True, "quality_profile_id": 7, "status": "continuing",
+                                "episode_count": 25, "episode_file_count": 20, "season_count": 3}]
+    assert answer["next_cursor"] is None
+    assert active.read(typed("sonarr", view="series", target_id=20), principal="owner")["items"] == []
+    for bad in (typed("sonarr", view="series"), typed("sonarr", view="series", target_id=True),
+                typed("sonarr", view="series", limit=2, target_id=17),
+                typed("sonarr", view="series", target_id=17, cursor="abc"),
+                typed("sonarr", view="queue", target_id=17), typed("radarr", view="health")):
+        with pytest.raises(QueryUnavailable):
+            active.read(bad, principal="owner")
+    assert all(call.full_url.endswith("/api/v3/series") for call in upstream.calls)
+
+
+def test_health_view_filters_messages_and_only_discloses_the_granted_scope():
+    from pathlib import Path
+
+    provider, _ = api("sonarr", [{"source": "UpdateCheck", "type": "warning", "message": "PRIVATE"},
+                                 {"source": "PRIVATE", "type": "PRIVATE", "message": "PRIVATE"}])
+
+    def legacy(_):
+        return {}
+
+    legacy.query_broker = ResourceQueryBroker({"arr/sonarr": provider}, frozenset({"arr/sonarr"}), b"k" * 32,
+                                             disclosure_approved=True, sonarr_diagnostics=True)
+    registry = build_registry(Path("."), lambda: None, Redactor(), media_resource_provider=legacy)
+    cap, args = registry.resolve("media.resource_read", typed("sonarr", view="health", limit=2))
+    assert "arr/radarr" not in cap.argument_schema["properties"]["resource_id"]["enum"]
+    assert "health" in cap.argument_schema["properties"]["view"]["enum"]
+    result = cap.handler(args)
+    assert result["items"] == [{"id": 1, "check": "other", "severity": "unknown"},
+                               {"id": 2, "check": "update", "severity": "warning"}]
+    assert "PRIVATE" not in json.dumps(result)
+
+
 def test_cursor_stays_valid_across_fresh_gets_if_items_unchanged():
     provider, fake = api("radarr", radarr_rows())
     b = broker({"arr/radarr": provider})

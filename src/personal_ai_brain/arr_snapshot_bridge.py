@@ -19,9 +19,10 @@ import uuid
 
 from .resource_query import _arr_snapshot
 from .arr_read import ARRReadProvider
+from .sonarr_diagnostics import SONARR_DIAGNOSTIC_VIEWS
 
 ARR_FILES = {
-    "arr/sonarr": {"items": "sonarr-items.json", "profiles": "sonarr-profiles.json"},
+    "arr/sonarr": {view: f"sonarr-{view}.json" for view in {"items", "profiles"} | SONARR_DIAGNOSTIC_VIEWS},
     "arr/radarr": {"items": "radarr-items.json", "profiles": "radarr-profiles.json"},
 }
 HOST_OUTPUT = Path("/opt/personal-ai-brain/arr-audit")
@@ -223,30 +224,46 @@ def _trusted_config(service):
         _deny()
 
 
+def publish_arr_views(service, provider, *, reader_gid, sonarr_diagnostics=False):
+    """Keep the working inventory fresh even when a diagnostic endpoint fails."""
+    if sonarr_diagnostics and service != "sonarr":
+        _deny()
+    resource = "arr/" + service
+    snapshots = {}
+    for view in ("items", "profiles"):
+        source = provider(view)
+        _arr_snapshot(source, datetime.now(timezone.utc), view=view)
+        snapshots[view] = source
+    for view in snapshots:
+        publish_arr(snapshots.__getitem__, resource, view, reader_gid=reader_gid)
+    unavailable = []
+    if sonarr_diagnostics:
+        for view in sorted(SONARR_DIAGNOSTIC_VIEWS):
+            try:
+                publish_arr(provider, resource, view, reader_gid=reader_gid)
+            except ARRBridgeUnavailable:
+                unavailable.append(view)
+    return unavailable
+
+
 def main(argv=None):
     """Operator-owned one-shot per service, scheduled outside the Control app."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--service", required=True, choices=("sonarr", "radarr"))
+    parser.add_argument("--sonarr-diagnostics", action="store_true")
     args = parser.parse_args(argv)
     if os.geteuid() != 0:
         print("arr_bridge_unavailable")
         return 1
     try:
         service, gid, provider = _trusted_config(args.service)
-        # Fetch/validate BOTH source views before publishing either. Each write
-        # is atomic; any later failure leaves older files to expire in 2 min.
-        snapshots = {}
-        for view in ("items", "profiles"):
-            src = provider(view)
-            _arr_snapshot(src, datetime.now(timezone.utc), view=view)
-            snapshots[view] = src
-        for view, src in snapshots.items():
-            publish_arr(lambda _view, source=src: source, "arr/" + service, view,
-                        reader_gid=gid)
+        unavailable = publish_arr_views(service, provider, reader_gid=gid, sonarr_diagnostics=args.sonarr_diagnostics)
     except (ARRBridgeUnavailable, OSError, ValueError, TypeError):
         print("arr_bridge_unavailable")
         return 1
     print("arr_snapshots_published")
+    if unavailable:
+        print("sonarr_diagnostics_unavailable " + ",".join(unavailable))
     return 0
 
 

@@ -19,6 +19,9 @@ from personal_ai_brain.github_issues import TITLE
 
 
 NOW = datetime(2026, 11, 14, 22, 10, 0, tzinfo=timezone.utc)
+# The synthetic effect clock stays fixed. The real transport clock validates
+# request age, and replays must have byte-identical request bodies.
+TRANSPORT_REQUESTED_AT = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 KEY = b"offline synthetic host verifier material" * 2
 GRANT = EffectGrant("fixture/service", "set_enabled", "owner", "enabled", "bool", "v1")
 OWNER = {"id": 55916200, "login": "igormego"}
@@ -198,7 +201,7 @@ def as_body(rid, args, *, requested_by="chatgpt"):
     return json.dumps({
         "schema_version": "0.1", "request_id": rid,
         "capability": "effect.execute", "arguments": args,
-        "requested_by": requested_by, "requested_at": NOW.isoformat(),
+        "requested_by": requested_by, "requested_at": TRANSPORT_REQUESTED_AT,
     })
 
 

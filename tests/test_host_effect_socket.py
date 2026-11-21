@@ -253,7 +253,7 @@ def test_existing_control_worker_can_reach_separate_host_broker_without_approval
     rid, args = signed()
     envelope = {"schema_version": "0.1", "request_id": rid,
                 "capability": "effect.execute", "arguments": args,
-                "requested_by": "chatgpt", "requested_at": NOW.isoformat()}
+                "requested_by": "chatgpt", "requested_at": datetime.now(timezone.utc).isoformat()}
     transport = Transport(json.dumps(envelope))
     adapter = FakeCAS()
     registry = build_registry(
