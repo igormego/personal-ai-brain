@@ -11,15 +11,23 @@ import hashlib
 import hmac
 import json
 import re
+from unicodedata import normalize
 
-from .arr_request_status import EXACT_VIEWS, MAX_REQUEST_ITEMS, REQUEST_STATUS_VIEWS, valid_request_status_row
+from .arr_request_status import (EXACT_VIEWS, MAX_DIAGNOSTIC_REQUESTS, MEDIA_DIAGNOSTIC_VIEWS,
+                                 PRIVATE_DIAGNOSTIC_FIELDS, REQUEST_STATUS_VIEWS, SEERR_REQUEST_STATUSES,
+                                 valid_request_status_row, valid_seerr_health_row, valid_title)
 from .sonarr_diagnostics import MAX_QUEUE_ITEMS, SONARR_DIAGNOSTIC_VIEWS, valid_sonarr_diagnostic_row
 
 RESOURCE_SCHEMAS = {
     "movies/watchlist": {"views": frozenset({"items"}), "max_page": 10},
-    "arr/radarr": {"views": frozenset({"items", "profiles"}) | REQUEST_STATUS_VIEWS["arr/radarr"], "max_page": 10},
-    "arr/seerr": {"views": REQUEST_STATUS_VIEWS["arr/seerr"], "max_page": 10},
+    "arr/radarr": {"views": MEDIA_DIAGNOSTIC_VIEWS["arr/radarr"], "max_page": 10},
+    "arr/seerr": {"views": MEDIA_DIAGNOSTIC_VIEWS["arr/seerr"], "max_page": 10},
     "arr/sonarr": {"views": frozenset({"items", "profiles"}) | SONARR_DIAGNOSTIC_VIEWS, "max_page": 10},
+}
+QUERY_FILTERS = {
+    ("arr/radarr", "items"): {"title"},
+    ("arr/radarr", "queue"): {"related_id"},
+    ("arr/seerr", "requests"): {"title", "related_id", "request_status", "media_type"},
 }
 
 
@@ -47,7 +55,18 @@ def validate_query(value):
         if (set(value) != required | {"target_id"} or value["limit"] != 1
                 or type(target) is not int or not 1 <= target <= 2147483647):
             _deny()
-    elif set(value) - required - {"cursor"}:
+    else:
+        filters = QUERY_FILTERS.get((value["resource_id"], value["view"]), ())
+        if set(value) - required - {"cursor"} - set(filters):
+            _deny()
+    if "title" in value and (not valid_title(value["title"]) or not value["title"].strip()):
+        _deny()
+    if "related_id" in value and (type(value["related_id"]) is not int or not 1 <= value["related_id"] <= 2147483647):
+        _deny()
+    if "request_status" in value and (type(value["request_status"]) is not str
+                                      or value["request_status"] not in SEERR_REQUEST_STATUSES):
+        _deny()
+    if "media_type" in value and value["media_type"] not in ("movie", "tv"):
         _deny()
     if "cursor" in value and (type(value["cursor"]) is not str or
             not re.fullmatch(r"[A-Za-z0-9_-]{1,512}", value["cursor"])):
@@ -161,14 +180,19 @@ def _arr_snapshot(source, now, *, view):
     if not -timedelta(minutes=2) <= age <= timedelta(minutes=2):
         _deny()
     items = source["items"]
-    maximum = {"queue": MAX_QUEUE_ITEMS, "requests": MAX_REQUEST_ITEMS, "request": MAX_REQUEST_ITEMS}.get(view, 4096)
+    maximum = {"queue": MAX_QUEUE_ITEMS, "requests": MAX_DIAGNOSTIC_REQUESTS,
+               "request": MAX_DIAGNOSTIC_REQUESTS}.get(view, 4096)
     if type(items) is not list or len(items) > maximum:
         _deny()
     seen = set()
     for row in items:
-        if view in REQUEST_STATUS_VIEWS.get(rid, ()) or (service == "sonarr" and view in SONARR_DIAGNOSTIC_VIEWS):
-            valid = (valid_sonarr_diagnostic_row(view, row) if service == "sonarr"
-                     else valid_request_status_row(rid, view, row))
+        if view in REQUEST_STATUS_VIEWS.get(rid, ()) or view == "health" or (service == "sonarr" and view in SONARR_DIAGNOSTIC_VIEWS):
+            if view == "health" and service == "seerr":
+                valid = valid_seerr_health_row(row)
+            elif view == "health" or service == "sonarr":
+                valid = valid_sonarr_diagnostic_row(view, row)
+            else:
+                valid = valid_request_status_row(rid, view, row)
             if not valid or row["id"] in seen:
                 _deny()
             seen.add(row["id"])
@@ -183,8 +207,7 @@ def _arr_snapshot(source, now, *, view):
             _deny()
         seen.add(rid_value)
         name = row["name"] if view == "profiles" else row["title"]
-        if type(name) is not str or not 1 <= len(name) <= 200 or any(
-                ord(ch) < 32 or ord(ch) == 127 for ch in name):
+        if not valid_title(name):
             _deny()
         if view == "profiles":
             continue
@@ -222,7 +245,7 @@ RESOURCE_SCHEMAS["movies/watchlist"]["validate_snapshot"] = _snapshot
 class ResourceQueryBroker:
     """Fixed schema registry with independently granted item disclosure."""
     def __init__(self, providers, grants, cursor_key, *, disclosure_approved=False,
-                 sonarr_diagnostics=False, view_grants=None):
+                 sonarr_diagnostics=False, view_grants=None, media_diagnostics=frozenset()):
         if type(providers) is not dict or set(providers) - RESOURCE_SCHEMAS.keys():
             _deny()
         if type(grants) is not frozenset or grants - RESOURCE_SCHEMAS.keys():
@@ -231,6 +254,8 @@ class ResourceQueryBroker:
             _deny()
         if type(sonarr_diagnostics) is not bool:
             _deny()
+        if type(media_diagnostics) is not frozenset or media_diagnostics - grants or media_diagnostics - MEDIA_DIAGNOSTIC_VIEWS.keys():
+            _deny()
         if view_grants is not None and (type(view_grants) is not dict or any(
                 resource not in grants or type(views) is not frozenset or views - RESOURCE_SCHEMAS[resource]["views"]
                 for resource, views in view_grants.items())):
@@ -238,13 +263,19 @@ class ResourceQueryBroker:
         self.providers, self.grants, self.key = dict(providers), grants, cursor_key
         self.disclosure_approved = disclosure_approved
         self.sonarr_diagnostics = sonarr_diagnostics
+        self.media_diagnostics = media_diagnostics
         self.view_grants = {} if view_grants is None else dict(view_grants)
 
     def available_views(self, resource_id):
         if not self.disclosure_approved or resource_id not in self.grants or not callable(self.providers.get(resource_id)):
             return frozenset()
-        defaults = RESOURCE_SCHEMAS[resource_id]["views"] - REQUEST_STATUS_VIEWS.get(resource_id, frozenset())
+        if resource_id in self.media_diagnostics:
+            return MEDIA_DIAGNOSTIC_VIEWS[resource_id]
+        defaults = (frozenset({"items", "profiles"}) if resource_id == "arr/radarr"
+                    else frozenset() if resource_id == "arr/seerr" else RESOURCE_SCHEMAS[resource_id]["views"])
         views = self.view_grants.get(resource_id, defaults)
+        if resource_id in MEDIA_DIAGNOSTIC_VIEWS:
+            return views - {"health"}
         if resource_id == "arr/sonarr" and not self.sonarr_diagnostics:
             return views - SONARR_DIAGNOSTIC_VIEWS
         return views
@@ -257,20 +288,47 @@ class ResourceQueryBroker:
         if not callable(provider):
             _deny()
         try:
-            is_arr = selected["resource_id"] in ("arr/radarr", "arr/sonarr", "arr/seerr")
-            source = provider(selected["view"]) if is_arr else provider()
-            validate_snapshot = RESOURCE_SCHEMAS[selected["resource_id"]]["validate_snapshot"]
+            resource, view = selected["resource_id"], selected["view"]
+            is_arr = resource in ("arr/radarr", "arr/sonarr", "arr/seerr")
+            source = provider(view) if is_arr else provider()
+            validate_snapshot = RESOURCE_SCHEMAS[resource]["validate_snapshot"]
             generation = (validate_snapshot(source, now or datetime.now(timezone.utc),
-                                            view=selected["view"]) if is_arr
+                                            view=view) if is_arr
                           else validate_snapshot(source, now or datetime.now(timezone.utc)))
-            if source["resource_id"] != selected["resource_id"]:
+            if source["resource_id"] != resource:
                 _deny()
             items = source["items"]
-            if selected["view"] in EXACT_VIEWS:
-                identity = "tmdb_id" if selected["view"] == "movie" else "id"
+            private_fields = PRIVATE_DIAGNOSTIC_FIELDS.get((resource, view))
+            if private_fields and resource not in self.media_diagnostics:
+                items = [{key: value for key, value in item.items() if key not in private_fields} for item in items]
+            if view in EXACT_VIEWS:
+                identity = "tmdb_id" if view == "movie" else "id"
                 items = [item for item in items if item[identity] == selected["target_id"]]
                 if len(items) > 1:
                     _deny()
+            filters = {key: selected[key] for key in QUERY_FILTERS.get((resource, view), ()) if key in selected}
+            coverage = {}
+            if view == "requests" and resource in self.media_diagnostics:
+                items = sorted(items, key=lambda item: (item["created_at"] or "", item["id"]), reverse=True)
+            if "related_id" in filters:
+                identity = "movie_id" if resource == "arr/radarr" else "tmdb_id"
+                items = [item for item in items if item[identity] == filters["related_id"]]
+            for key in ("request_status", "media_type"):
+                if key in filters:
+                    items = [item for item in items if item[key] == filters[key]]
+            if "title" in filters:
+                if resource == "arr/seerr":
+                    if resource not in self.media_diagnostics:
+                        _deny()
+                    coverage["title_missing_count"] = sum(not item.get("title") for item in items)
+                needle = normalize("NFKC", filters["title"]).strip().casefold()
+                items = [item for item in items if needle in normalize("NFKC", item.get("title") or "").casefold()]
+            if filters:
+                coverage["matching_count"] = len(items)
+            cursor_generation = generation
+            if filters or resource in self.media_diagnostics:
+                cursor_generation = hashlib.sha256(
+                    _canonical([generation, filters, resource in self.media_diagnostics])).hexdigest()
             offset = 0
             if "cursor" in selected:
                 token = _decode(selected["cursor"])
@@ -283,23 +341,26 @@ class ResourceQueryBroker:
                 if type(state) is not dict or set(state) != {"resource_id", "view", "generation", "offset", "principal", "limit"}:
                     _deny()
                 if (state["resource_id"] != selected["resource_id"] or state["view"] != selected["view"]
-                    or state["generation"] != generation or state["principal"] != principal
+                    or state["generation"] != cursor_generation or state["principal"] != principal
                     or type(state["offset"]) is not int or state["offset"] <= 0
                     or state["limit"] != selected["limit"] or state["offset"] >= len(items)):
                     _deny()
                 offset = state["offset"]
             end = min(offset + selected["limit"], len(items))
-            next_cursor = None
-            if end < len(items):
-                state = {"resource_id": selected["resource_id"], "view": selected["view"], "generation": generation,
-                         "offset": end, "principal": principal, "limit": selected["limit"]}
-                raw = _canonical(state)
-                next_cursor = _encode(raw + hmac.new(self.key, raw, hashlib.sha256).digest())
-            result = {"resource_id": selected["resource_id"], "view": selected["view"], "collected_at": source["collected_at"],
-                      "generation": generation, "items": items[offset:end], "next_cursor": next_cursor,
-                      "effect_performed": False}
-            if len(_canonical(result)) > 4096:
-                _deny()
-            return result
+            result = {"resource_id": resource, "view": view, "collected_at": source["collected_at"],
+                      "generation": generation, "effect_performed": False, **coverage}
+            while True:
+                next_cursor = None
+                if end < len(items):
+                    state = {"resource_id": resource, "view": view, "generation": cursor_generation,
+                             "offset": end, "principal": principal, "limit": selected["limit"]}
+                    raw = _canonical(state)
+                    next_cursor = _encode(raw + hmac.new(self.key, raw, hashlib.sha256).digest())
+                result.update(items=items[offset:end], next_cursor=next_cursor)
+                if len(_canonical(result)) <= 4096:
+                    return result
+                if resource not in self.media_diagnostics or end <= offset + 1:
+                    _deny()
+                end -= 1
         except Exception:
             _deny()

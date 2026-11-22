@@ -16,16 +16,17 @@ import os
 from pathlib import Path
 import stat
 import uuid
+from xml.etree import ElementTree
 
 from .resource_query import _arr_snapshot
 from .arr_read import ARRReadProvider
-from .arr_request_status import REQUEST_STATUS_VIEWS
+from .arr_request_status import MEDIA_DIAGNOSTIC_VIEWS, REQUEST_STATUS_VIEWS
 from .sonarr_diagnostics import SONARR_DIAGNOSTIC_VIEWS
 
 ARR_FILES = {
     "arr/sonarr": {view: f"sonarr-{view}.json" for view in {"items", "profiles"} | SONARR_DIAGNOSTIC_VIEWS},
-    "arr/radarr": {view: f"radarr-{view}.json" for view in {"items", "profiles"} | REQUEST_STATUS_VIEWS["arr/radarr"]},
-    "arr/seerr": {view: f"seerr-{view}.json" for view in REQUEST_STATUS_VIEWS["arr/seerr"]},
+    "arr/radarr": {view: f"radarr-{view}.json" for view in MEDIA_DIAGNOSTIC_VIEWS["arr/radarr"]},
+    "arr/seerr": {view: f"seerr-{view}.json" for view in MEDIA_DIAGNOSTIC_VIEWS["arr/seerr"]},
 }
 HOST_OUTPUT = Path("/opt/personal-ai-brain/arr-audit")
 CONTROL_MOUNT = Path("/arr-audit")
@@ -81,7 +82,9 @@ def _name(resource_id, view):
     return ARR_FILES[resource_id][view]
 
 
-def _read_file(path, *, max_bytes, expected_uid, private):
+def _read_file(path, *, max_bytes, expected_uid, private, mode=None):
+    if mode is None:
+        mode = 0o600 if private else 0o640
     parent = _directory(path.parent)
     try:
         fd = os.open(path.name, READ_FLAGS, dir_fd=parent)
@@ -90,7 +93,7 @@ def _read_file(path, *, max_bytes, expected_uid, private):
             if (not stat.S_ISREG(meta.st_mode) or meta.st_nlink != 1
                     or meta.st_uid != expected_uid
                     or not 0 < meta.st_size <= max_bytes
-                    or (stat.S_IMODE(meta.st_mode) != (0o600 if private else 0o640))):
+                    or stat.S_IMODE(meta.st_mode) != mode):
                 _deny()
             raw = os.read(fd, max_bytes + 1)
             if not 0 < len(raw) <= max_bytes:
@@ -199,32 +202,45 @@ def publish_arr(provider, resource_id, view, *, directory=HOST_OUTPUT,
             os.close(fd)
 
 
-def _trusted_config(service):
+def _trusted_config(service, *, media_diagnostics=False):
     """Fixed service selector only from the operator-owned systemd unit."""
     if type(service) is not str or service not in COLLECTOR_CONFIGS:
         _deny()
     try:
         spec = _source_json(_read_file(COLLECTOR_CONFIGS[service], max_bytes=2048,
                                       expected_uid=0, private=True))
+        credential_dir = os.environ.get("CREDENTIALS_DIRECTORY") if media_diagnostics else None
+        expected_fields = {"service", "origin", "reader_gid"}
+        if not credential_dir:
+            expected_fields.add("api_key_file")
         if (type(spec) is not dict or set(spec) !=
-                {"service", "origin", "api_key_file", "reader_gid"}
+                expected_fields
                 or spec["service"] != service
                 or type(spec["origin"]) is not str
-                or type(spec["api_key_file"]) is not str
                 or type(spec["reader_gid"]) is not int
                 or spec["reader_gid"] <= 0):
             _deny()
-        key_path = Path(spec["api_key_file"])
-        if not key_path.is_absolute():
-            _deny()
-        key = _read_file(key_path, max_bytes=1024, expected_uid=0, private=True)
-        # Operator must configure an existing dedicated secret; no environment
-        # variable or raw credential is added to the control container.
+        if credential_dir:
+            key = _systemd_api_key(service, Path(credential_dir))
+        else:
+            key_path = Path(spec["api_key_file"])
+            key = _read_file(key_path, max_bytes=1024, expected_uid=0, private=True).decode("ascii").strip()
         provider = ARRReadProvider(spec["service"], spec["origin"],
-                                   key.decode("ascii").strip())
+                                   key, media_diagnostics=media_diagnostics)
         return spec["service"], spec["reader_gid"], provider
-    except (OSError, UnicodeError, ValueError, TypeError, RecursionError):
+    except (OSError, UnicodeError, ValueError, TypeError, RecursionError, KeyError, ElementTree.ParseError):
         _deny()
+
+
+def _systemd_api_key(service, directory):
+    """Read one ephemeral copy of the application's existing settings."""
+    raw = _read_file(directory / "arr-source-config", max_bytes=1_048_576,
+                     expected_uid=0, private=True, mode=0o400)
+    if service == "seerr":
+        return _source_json(raw)["main"]["apiKey"]
+    if service == "radarr" and b"<!DOCTYPE" not in raw.upper():
+        return ElementTree.fromstring(raw.decode("utf-8")).findtext("ApiKey")
+    _deny()
 
 
 def publish_arr_views(service, provider, *, reader_gid, sonarr_diagnostics=False):
@@ -265,6 +281,27 @@ def publish_request_status_views(service, provider, *, reader_gid):
         publish_arr(snapshots.__getitem__, resource, view, reader_gid=reader_gid)
 
 
+def publish_media_diagnostic_views(service, provider, *, reader_gid):
+    resource = "arr/" + service
+    if resource not in MEDIA_DIAGNOSTIC_VIEWS:
+        _deny()
+    unavailable = []
+    if service == "seerr":
+        try:
+            publish_request_status_views(service, provider, reader_gid=reader_gid)
+        except (ARRBridgeUnavailable, ValueError, OSError):
+            unavailable.extend(("requests", "request"))
+        views = ("health",)
+    else:
+        views = sorted(MEDIA_DIAGNOSTIC_VIEWS[resource])
+    for view in views:
+        try:
+            publish_arr(provider, resource, view, reader_gid=reader_gid)
+        except ARRBridgeUnavailable:
+            unavailable.append(view)
+    return unavailable
+
+
 def main(argv=None):
     """Operator-owned one-shot per service, scheduled outside the Control app."""
     parser = argparse.ArgumentParser()
@@ -272,13 +309,16 @@ def main(argv=None):
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--sonarr-diagnostics", action="store_true")
     mode.add_argument("--request-status", action="store_true")
+    mode.add_argument("--media-diagnostics", action="store_true")
     args = parser.parse_args(argv)
     if os.geteuid() != 0:
         print("arr_bridge_unavailable")
         return 1
     try:
-        service, gid, provider = _trusted_config(args.service)
-        if args.request_status:
+        service, gid, provider = _trusted_config(args.service, media_diagnostics=args.media_diagnostics)
+        if args.media_diagnostics:
+            unavailable = publish_media_diagnostic_views(service, provider, reader_gid=gid)
+        elif args.request_status:
             publish_request_status_views(service, provider, reader_gid=gid)
             unavailable = []
         elif service == "seerr":
@@ -288,9 +328,12 @@ def main(argv=None):
     except (ARRBridgeUnavailable, OSError, ValueError, TypeError):
         print("arr_bridge_unavailable")
         return 1
-    print("arr_snapshots_published")
     if unavailable:
-        print("sonarr_diagnostics_unavailable " + ",".join(unavailable))
+        prefix = "arr_diagnostics_unavailable" if args.media_diagnostics else "sonarr_diagnostics_unavailable"
+        print(prefix + " " + ",".join(unavailable))
+        if args.media_diagnostics and len(unavailable) == len(MEDIA_DIAGNOSTIC_VIEWS["arr/" + service]):
+            return 1
+    print("arr_snapshots_published")
     return 0
 
 

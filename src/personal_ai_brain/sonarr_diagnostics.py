@@ -28,6 +28,11 @@ _REASONS = {
     "quality": ("not an upgrade", "not a custom format upgrade", "quality cutoff", "lower quality"),
 }
 _RELEASE_EPISODE_MISSING = re.compile(r"\bepisode\b.{0,120}\bnot found\b.{0,120}\brelease\b")
+_MOVIE_REASONS = {
+    "movie_match": ("unable to identify", "unable to parse", "unable to find the movie", "expected movie"),
+    "disk_space": ("not enough free space", "disk full", "no space left"),
+    "download_client": ("unable to connect to", "download client unavailable", "failed to download"),
+}
 _REASON_CODES = frozenset(_REASONS) | {"release_episode_missing", "other"}
 
 
@@ -58,19 +63,36 @@ def _messages(row):
                         yield message[:768].casefold()
 
 
-def _queue_item(row):
+def queue_reasons(row, *, movie=False):
     messages = tuple(_messages(row))
     reasons = [key for key, terms in _REASONS.items()
                if any(term in message for term in terms for message in messages)]
-    if any(_RELEASE_EPISODE_MISSING.search(message) for message in messages):
+    if movie:
+        reasons = [reason for reason in reasons if reason != "episode_match"]
+        reasons.extend(key for key, terms in _MOVIE_REASONS.items()
+                       if any(term in message for term in terms for message in messages))
+    elif any(_RELEASE_EPISODE_MISSING.search(message) for message in messages):
         reasons.append("release_episode_missing")
+    return sorted(reasons) or (["other"] if messages else [])
+
+
+def valid_queue_reasons(reasons, *, movie=False):
+    codes = _REASON_CODES
+    if movie:
+        codes = (_REASON_CODES - {"episode_match", "release_episode_missing"}) | _MOVIE_REASONS.keys()
+    return (type(reasons) is list
+            and all(type(reason) is str and reason in codes for reason in reasons)
+            and reasons == sorted(set(reasons)))
+
+
+def _queue_item(row):
     return {
         "id": row.get("id"), "series_id": _optional(row.get("seriesId"), 1),
         "episode_id": _optional(row.get("episodeId"), 1),
         "status": _enum(row.get("status"), _QUEUE_STATUS),
         "download_status": _enum(row.get("trackedDownloadStatus"), _TRACKED_STATUS),
         "download_state": _enum(row.get("trackedDownloadState"), _TRACKED_STATE),
-        "reasons": sorted(reasons) or (["other"] if messages else []),
+        "reasons": queue_reasons(row),
     }
 
 
@@ -122,9 +144,7 @@ def valid_sonarr_diagnostic_row(view, row):
                 and _enum(row["status"], _QUEUE_STATUS) == row["status"]
                 and _enum(row["download_status"], _TRACKED_STATUS) == row["download_status"]
                 and _enum(row["download_state"], _TRACKED_STATE) == row["download_state"]
-                and type(row["reasons"]) is list
-                and all(type(reason) is str and reason in _REASON_CODES for reason in row["reasons"])
-                and row["reasons"] == sorted(set(row["reasons"])))
+                and valid_queue_reasons(row["reasons"]))
     return (view == "series"
             and set(row) == {"id", "monitored", "quality_profile_id", "status", "episode_count", "episode_file_count", "season_count"}
             and type(row["monitored"]) is bool and _number(row["quality_profile_id"], 1)

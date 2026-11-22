@@ -85,6 +85,30 @@ def test_unavailable_diagnostic_view_preserves_fresh_inventory(monkeypatch, dire
         read(directory, view="queue")
 
 
+@pytest.mark.parametrize(("service", "settings"), [
+    ("radarr", b"<Config><ApiKey>synthetic-key</ApiKey></Config>"),
+    ("seerr", b'{"main":{"apiKey":"synthetic-key"}}'),
+])
+def test_diagnostics_reuse_protected_ephemeral_application_credentials(monkeypatch, service, settings):
+    from personal_ai_brain import arr_snapshot_bridge as bridge
+
+    monkeypatch.setenv("CREDENTIALS_DIRECTORY", "/run/credentials/test")
+    credential = Path("/run/credentials/test/arr-source-config")
+
+    def fake_read(path, **options):
+        assert options["expected_uid"] == 0 and options["private"]
+        if path == credential:
+            assert options["mode"] == 0o400
+            return settings
+        assert path == bridge.COLLECTOR_CONFIGS[service]
+        return json.dumps({"service": service, "origin": "http://127.0.0.1:5050", "reader_gid": 1000}).encode()
+
+    monkeypatch.setattr(bridge, "_read_file", fake_read)
+    selected, gid, provider = bridge._trusted_config(service, media_diagnostics=True)
+    assert selected == service and gid == 1000 and provider.media_diagnostics
+    assert provider._api_key == "synthetic-key"
+
+
 @pytest.mark.parametrize("service", ["sonarr", "radarr"])
 def test_both_arr_families_share_one_publisher_and_query_broker(directory, service):
     pub(directory, service, "items")

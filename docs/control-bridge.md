@@ -649,3 +649,50 @@ ambiguous identities. A Seerr status or a Radarr file flag on its own does not
 establish playable media or whether a title has been watched.
 Additional diagnostic resources should be added by their resource class and
 explicit grant, not with a new tool for every natural-language question.
+
+### Owner-private Radarr and Seerr diagnosis
+
+Radarr and Seerr have independent diagnostics flags,
+`PAB_ARR_RADARR_DIAGNOSTICS_ENABLED` and `PAB_ARR_SEERR_DIAGNOSTICS_ENABLED`.
+Each requires `PAB_ARR_MEDIA_DIAGNOSTICS_DISCLOSURE_APPROVED=1`. Starting
+Control without that consent fails closed. The existing status-only flags
+retain their prior grants and omit the added fields even if the mounted
+snapshot is rich. Sonarr settings and the owner-authenticated transport
+continue to use the existing capability and cursor key.
+
+| Resource | Views | Diagnostic evidence |
+| --- | --- | --- |
+| `arr/seerr` | `requests`, exact `request` by Seerr ID | Request and quality-specific availability states, media type, TMDb identity, title when resolved, timestamps and profile/routing references. The list is newest first and supports optional `title`, `related_id` (TMDb ID), `request_status` and `media_type`. |
+| `arr/seerr` | `health` | Reported Radarr/Sonarr profile lookup failures by service ID. An empty result only means this check reported no failure. |
+| `arr/radarr` | `items`, exact `movie` by TMDb ID, `profiles` | Title, library and file flags, monitoring, release state and profile names/IDs. The library supports optional `title`. |
+| `arr/radarr` | `queue`, `health` | Download/import state and categorized warnings, plus health check classes and severities. The queue supports optional `related_id` (Radarr movie ID). |
+
+Title selectors match a Unicode-normalized case-insensitive substring. The
+result reports the match count and, for Seerr, how many otherwise matching
+requests lack titles. Cursors bind filters, grant and snapshot content. Control
+returns at most the requested 1–10 records, with an opaque cursor if another
+page is available. Pages can be shorter when the reply size bound is reached.
+
+Deploy with root-only per-service collector configuration and
+`--media-diagnostics`. Use fixed GET origins. Prefer systemd
+`LoadCredential=arr-source-config:<existing app settings>` for each collector.
+The root-only collector spec then contains only service, origin and reader
+GID. The collector reads the existing key from the transient settings copy.
+The existing `api_key_file` mode remains available for dedicated credentials.
+Seerr collects complete pages of
+100 (up to 2,000 total) with a bounded deadline, and resolves titles for up to
+24 distinct recent media identities per collection within an eight-second
+lookup budget. Missing titles do not interrupt status reads. Radarr queue
+coverage remains limited to a verified complete page of 200. View failures
+do not renew their snapshots. The broker rejects snapshots more than two
+minutes old. No per-question API route is added.
+
+The authenticated owner may request a view. Existing authorized mailbox
+readers and host ledger operators may see the returned titles, profile
+names, IDs, timestamps and categorized diagnostics. Snapshots are replaced by
+their collectors. Private Issues and the existing durable ledger retain
+requests and replies under the existing manual retention policy. Do not store
+requester account data, raw warnings, filesystem paths, download identifiers,
+API credentials, detailed source payloads or Plex tokens. A Radarr file flag
+or Seerr availability status alone cannot establish Plex playback or distinguish
+the playable Movies library from the metadata-only Watched shelf.

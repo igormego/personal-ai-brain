@@ -1,4 +1,4 @@
-"""Bounded GET-only Radarr/Sonarr resource adapter; not a production grant.
+"""Bounded GET-only Radarr/Sonarr/Seerr resource adapter.
 
 Only a trusted operator may construct this adapter with a fixed service origin and
 an existing host-managed credential. Callers choose a registered view, never an
@@ -9,22 +9,26 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import json
 import re
+from time import monotonic
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
-from .arr_request_status import MAX_REQUEST_ITEMS, REQUEST_STATUS_VIEWS, project_request_status
+from .arr_request_status import (MAX_DIAGNOSTIC_REQUESTS, MAX_REQUEST_ITEMS, REQUEST_STATUS_VIEWS, project_request_status,
+                                 project_seerr_health, valid_title)
 from .sonarr_diagnostics import MAX_QUEUE_ITEMS, SONARR_DIAGNOSTIC_VIEWS, project_sonarr_diagnostics
 
 MAX_BODY = 4_194_304
 MAX_ITEMS = 4096
+MAX_TITLE_LOOKUPS = 24
+SEERR_REQUESTS = f"/api/v1/request?take={MAX_REQUEST_ITEMS}&skip=0&sort=added"
 ENDPOINTS = {
     "radarr": {"items": "/api/v3/movie", "profiles": "/api/v3/qualityprofile", "movie": "/api/v3/movie",
+               "health": "/api/v3/health",
                "queue": f"/api/v3/queue?page=1&pageSize={MAX_QUEUE_ITEMS}&includeUnknownMovieItems=true"},
     "sonarr": {"items": "/api/v3/series", "profiles": "/api/v3/qualityprofile",
                "series": "/api/v3/series", "health": "/api/v3/health",
                "queue": f"/api/v3/queue?page=1&pageSize={MAX_QUEUE_ITEMS}&includeUnknownSeriesItems=true"},
-    "seerr": {view: f"/api/v1/request?take={MAX_REQUEST_ITEMS}&skip=0&sort=added"
-              for view in REQUEST_STATUS_VIEWS["arr/seerr"]},
+    "seerr": {view: SEERR_REQUESTS for view in ("request", "requests", "health")},
 }
 
 
@@ -57,8 +61,7 @@ def _positive(value):
 
 
 def _title(value):
-    if (type(value) is not str or not 1 <= len(value) <= 200
-            or any(ord(c) < 32 or ord(c) == 127 for c in value)):
+    if not valid_title(value):
         _deny()
     return value
 
@@ -71,10 +74,10 @@ class ARRReadProvider:
     Transport never follows redirects and does not retry failed requests.
     """
 
-    def __init__(self, service: str, origin: str, api_key: str, *, opener=None):
+    def __init__(self, service: str, origin: str, api_key: str, *, opener=None, media_diagnostics=False):
         if type(service) is not str or service not in ENDPOINTS:
             _deny()
-        if type(origin) is not str or type(api_key) is not str:
+        if type(origin) is not str or type(api_key) is not str or type(media_diagnostics) is not bool:
             _deny()
         if (not api_key or len(api_key) > 1024
                 or any(ord(ch) < 33 or ord(ch) > 126 for ch in api_key)):
@@ -91,31 +94,90 @@ class ARRReadProvider:
         if not valid or any(c in origin for c in ("\\", "\r", "\n", "@")):
             _deny()
         self.service = service
+        self.media_diagnostics = media_diagnostics
         self.origin = origin.rstrip("/")
         self._api_key = api_key
         self._open = opener if opener is not None else build_opener(ProxyHandler({}), _NoRedirect()).open
         if not callable(self._open):
             _deny()
 
+    def _get(self, path, *, timeout=8):
+        url = self.origin + path
+        request = Request(url, headers={"X-Api-Key": self._api_key, "Accept": "application/json"}, method="GET")
+        response = self._open(request, timeout=timeout)
+        with response:
+            if response.geturl() != url or response.status != 200:
+                _deny()
+            raw = response.read(MAX_BODY + 1)
+        if len(raw) > MAX_BODY:
+            _deny()
+        return json.loads(raw.decode("utf-8"), object_pairs_hook=_unique,
+                          parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
+
+    def _seerr_titles(self, rows):
+        titles = {}
+        deadline = monotonic() + 8
+        for row in reversed(rows):
+            key = (row["media_type"], row["tmdb_id"])
+            if key in titles:
+                continue
+            remaining = deadline - monotonic()
+            if len(titles) >= MAX_TITLE_LOOKUPS or remaining <= 0:
+                break
+            kind, tmdb_id = key
+            # Both components have already passed the request-row schema.
+            titles[key] = None
+            try:
+                details = self._get(f"/api/v1/{kind}/{tmdb_id}", timeout=min(remaining, 2))
+            except (OSError, ValueError, TypeError):
+                continue
+            if type(details) is dict and details.get("id") == tmdb_id:
+                title = details.get("title" if kind == "movie" else "name")
+                if valid_title(title):
+                    titles[key] = title
+        for row in rows:
+            row["title"] = titles.get((row["media_type"], row["tmdb_id"]))
+
+    def _seerr_requests(self, first):
+        """Follow Seerr's fixed server-side pages before publishing a complete view."""
+        page_info = first.get("pageInfo") if type(first) is dict else None
+        total = page_info.get("results") if type(page_info) is dict else None
+        if type(total) is not int or not 0 <= total <= MAX_DIAGNOSTIC_REQUESTS:
+            _deny()
+        rows = []
+        deadline = monotonic() + 16
+        for skip in range(0, max(total, 1), MAX_REQUEST_ITEMS):
+            remaining = deadline - monotonic()
+            if remaining <= 0:
+                _deny()
+            data = first if skip == 0 else self._get(
+                f"/api/v1/request?take={MAX_REQUEST_ITEMS}&skip={skip}&sort=added", timeout=min(remaining, 8))
+            page = data.get("pageInfo") if type(data) is dict else None
+            batch = data.get("results") if type(data) is dict else None
+            if (type(page) is not dict or page.get("results") != total or type(batch) is not list
+                    or len(batch) != min(MAX_REQUEST_ITEMS, total - skip)):
+                _deny()
+            rows.extend(batch)
+        return {**first, "results": rows}
+
     def __call__(self, view: str) -> dict:
         if type(view) is not str or view not in ENDPOINTS[self.service]:
             _deny()
-        url = self.origin + ENDPOINTS[self.service][view]
-        request = Request(url, headers={"X-Api-Key": self._api_key, "Accept": "application/json"}, method="GET")
+        if view == "health" and self.service != "sonarr" and not self.media_diagnostics:
+            _deny()
         try:
-            response = self._open(request, timeout=8)
-            with response:
-                if response.geturl() != url or response.status != 200:
-                    _deny()
-                raw = response.read(MAX_BODY + 1)
-            if len(raw) > MAX_BODY:
-                _deny()
-            records = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique,
-                                 parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
+            records = self._get(ENDPOINTS[self.service][view])
             resource = "arr/" + self.service
             if view in REQUEST_STATUS_VIEWS.get(resource, ()):
-                return self._snapshot(view, project_request_status(resource, view, records))
-            if self.service == "sonarr" and view in SONARR_DIAGNOSTIC_VIEWS:
+                if self.service == "seerr" and self.media_diagnostics:
+                    records = self._seerr_requests(records)
+                items = project_request_status(resource, view, records, diagnostics=self.media_diagnostics)
+                if self.service == "seerr" and self.media_diagnostics:
+                    self._seerr_titles(items)
+                return self._snapshot(view, items)
+            if view == "health" and self.service == "seerr":
+                return self._snapshot(view, project_seerr_health(records))
+            if view == "health" or (self.service == "sonarr" and view in SONARR_DIAGNOSTIC_VIEWS):
                 return self._snapshot(view, project_sonarr_diagnostics(view, records))
             if type(records) is not list or len(records) > MAX_ITEMS:
                 _deny()

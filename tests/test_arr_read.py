@@ -317,3 +317,88 @@ def test_existing_registry_is_off_by_default_and_opt_in_is_shared():
     cap, args = registry.resolve("media.resource_read", typed("sonarr"))
     with pytest.raises(CapabilityFailed):
         cap.handler(args)
+
+
+def test_diagnostic_followups_join_named_seerr_request_radarr_and_queue():
+    seerr_row = {"id": 18, "type": "movie", "is4k": False, "status": 2, "profileId": 4,
+                 "serverId": 0, "profileName": "HD", "media": {"tmdbId": 22, "status": 3},
+                 "requestedBy": {"email": "private@example.invalid", "plexToken": "secret-token"}}
+    queue_row = {"id": 3, "movieId": 2, "status": "completed", "trackedDownloadStatus": "warning",
+                 "trackedDownloadState": "importPending", "errorMessage": "Permission denied at /private/path"}
+    seerr_rows = {"pageInfo": {"results": 1}, "results": [seerr_row], "serviceErrors": {
+        "radarr": [{"id": 0, "name": "private-server-name"}], "sonarr": []}}
+    routes = {
+        "/api/v1/request?take=100&skip=0&sort=added": seerr_rows,
+        "/api/v1/movie/22": {"id": 22, "title": "Étoile", "apiKey": "secret-token"},
+        "/api/v3/movie": radarr_rows(),
+        "/api/v3/queue?page=1&pageSize=200&includeUnknownMovieItems=true": {"totalRecords": 1, "records": [queue_row]},
+    }
+
+    def open_get(request, timeout):
+        assert request.get_method() == "GET"
+        return Response(routes[request.selector], request.full_url)
+
+    providers = {f"arr/{name}": ARRReadProvider(name, f"http://{name}:1234", "local-test-key",
+                                              opener=open_get, media_diagnostics=True)
+                 for name in ("radarr", "seerr")}
+    enabled = ResourceQueryBroker(providers, frozenset(providers), b"k" * 32, disclosure_approved=True,
+                                  media_diagnostics=frozenset(providers))
+    matches = enabled.read(typed("seerr", "requests", title="E\u0301TOILE"), principal="owner")
+    assert matches["matching_count"] == 1 and matches["title_missing_count"] == 0
+    request = matches["items"][0]
+    assert request["title"] == "Étoile" and request["profile_name"] == "HD"
+    identified = enabled.read(typed("radarr", "movie", target_id=request["tmdb_id"]), principal="owner")["items"][0]
+    assert identified["id"] == 2 and identified["quality_profile_id"] == request["profile_id"]
+    queue = enabled.read(typed("radarr", "queue", related_id=identified["id"]), principal="owner")
+    assert queue["items"][0]["reasons"] == ["permission"]
+    assert enabled.read(typed("radarr", "queue", related_id=99), principal="owner")["items"] == []
+    health = enabled.read(typed("seerr", "health"), principal="owner")["items"]
+    assert health == [{"id": 1, "service": "radarr", "service_id": 0, "severity": "error",
+                       "check": "profile_lookup_failed"}]
+    result = json.dumps([matches, queue, health])
+    for private in ("private@example.invalid", "/private/path", "secret-token", "private-server-name"):
+        assert private not in result
+    limited = ResourceQueryBroker(providers, frozenset(providers), b"k" * 32, disclosure_approved=True,
+                                  view_grants={"arr/radarr": frozenset({"queue"}), "arr/seerr": frozenset({"requests"})})
+    assert "reasons" not in limited.read(typed("radarr", "queue"), principal="owner")["items"][0]
+    assert "title" not in limited.read(typed("seerr", "requests"), principal="owner")["items"][0]
+    with pytest.raises(QueryUnavailable):
+        limited.read(typed("seerr", "requests", title="Étoile"), principal="owner")
+    with pytest.raises(QueryUnavailable):
+        limited.read(typed("seerr", "health"), principal="owner")
+
+
+def test_filtered_cursor_cannot_be_reused_for_another_selector():
+    provider, _ = api("radarr", radarr_rows())
+    active = broker({"arr/radarr": provider})
+    page = active.read(typed("radarr", title="Film"), principal="owner")
+    cursor = page["next_cursor"]
+    assert page["matching_count"] == 2 and cursor
+    assert active.read(typed("radarr", title="Film", cursor=cursor), principal="owner")["items"][0]["id"] == 9
+    for filters in ({}, {"title": "Film A"}):
+        with pytest.raises(QueryUnavailable):
+            active.read(typed("radarr", cursor=cursor, **filters), principal="owner")
+
+
+def test_seerr_request_collection_follows_complete_pages_with_limited_title_lookups():
+    rows = [{"id": item_id, "type": "movie", "is4k": False, "status": 4,
+             "media": {"tmdbId": item_id, "status": 2}} for item_id in range(101, 0, -1)]
+    calls = []
+
+    def open_get(request, timeout):
+        calls.append(request.selector)
+        if request.selector.startswith("/api/v1/request?"):
+            page = rows[:100] if "skip=0" in request.selector else rows[100:]
+            return Response({"pageInfo": {"results": 101}, "results": page}, request.full_url)
+        return Response({}, request.full_url, status=404)
+
+    provider = ARRReadProvider("seerr", "http://seerr:5055", "local-test-key",
+                               opener=open_get, media_diagnostics=True)
+    active = ResourceQueryBroker({"arr/seerr": provider}, frozenset({"arr/seerr"}), b"k" * 32,
+                                 disclosure_approved=True, media_diagnostics=frozenset({"arr/seerr"}))
+    result = active.read(typed("seerr", "requests", title="Unresolved", request_status="failed"), principal="owner")
+    assert result["items"] == [] and result["title_missing_count"] == 101
+    assert "skip=100" in calls[1] and len(calls) == 26
+    rows.pop()
+    with pytest.raises(ARRSourceUnavailable, match="arr_source_unavailable"):
+        provider("requests")
