@@ -21,7 +21,8 @@ import subprocess
 
 from .work_sandbox import command, kill_tree, limits
 from .work_store import atomic_bytes, atomic_json
-from .work_contract import RESOURCE_TYPE
+from .work_contract import RESOURCE_TYPE, OPERATOR_TYPE
+from .operator_scope import ScopeGrant
 from .workspace_artifacts import InputGrant, inspect_outputs, stage_inputs, WorkspaceArtifactDenied
 
 MAX_STDOUT = 16384
@@ -68,7 +69,8 @@ def _output_grants(raw: bytes):
 
 
 def execute(request: dict, workspace: Path, artifacts: Path, guard, *,
-            trusted_grants: tuple[InputGrant, ...] | None = None):
+            trusted_grants: tuple[InputGrant, ...] | None = None,
+            operator_scope: ScopeGrant | None = None):
     """Return (terminal state, fixed failure/success code, safe artifact summary).
 
     Must be invoked only after durable reservation and operator opt-in.
@@ -76,6 +78,13 @@ def execute(request: dict, workspace: Path, artifacts: Path, guard, *,
     metadata can pass through Work Runner status. No blind retry after failure.
     """
     try:
+        if request['task_type'] == OPERATOR_TYPE:
+            if (not isinstance(operator_scope, ScopeGrant)
+                    or operator_scope.scope_id != request['scope_id']
+                    or operator_scope.access != request['access']):
+                raise WorkspaceArtifactDenied('operator_scope_unavailable')
+        elif operator_scope is not None:
+            raise WorkspaceArtifactDenied('unexpected_operator_scope')
         if request["task_type"] == RESOURCE_TYPE:
             # Only a trusted Work Runner supplies these bytes after host-only
             # source validation. No input from the GitHub contract can become
@@ -107,7 +116,8 @@ def execute(request: dict, workspace: Path, artifacts: Path, guard, *,
     try:
         guard()
         process = subprocess.Popen(
-            command(workspace, script, generic=True),
+            (command(workspace, script, generic=True, operator_scope=operator_scope)
+             if operator_scope is not None else command(workspace, script, generic=True)),
             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             env={"PATH": "/usr/bin:/bin", "LC_ALL": "C"},
@@ -142,7 +152,7 @@ def execute(request: dict, workspace: Path, artifacts: Path, guard, *,
         # Only small, safe UTF-8 text outputs are returned inline. Full file
         # contents otherwise remain in the private worker artifact store.
         # The control service still independently redacts outgoing fields.
-        preview_budget = 1024
+        preview_budget = 1024 if operator_scope is None or operator_scope.preview else 0
         items = []
         content_by_path = {a.path: a.content for a in grants}
         for artifact in verified:

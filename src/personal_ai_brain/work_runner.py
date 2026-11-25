@@ -11,7 +11,7 @@ import sys
 import time
 import multiprocessing
 
-from .work_contract import Rejected, REPOSITORY, RESOURCE_TYPE, GENERIC_TYPE, parse, timestamp, Abort
+from .work_contract import Rejected, REPOSITORY, RESOURCE_TYPE, GENERIC_TYPE, OPERATOR_TYPE, parse, timestamp, Abort
 from .work_store import Store, TERMINAL, atomic_json, locked
 from .work_sandbox import execute, kill_tree
 
@@ -20,10 +20,11 @@ PROFILE = Path('/etc/personal-ai-brain/builder/profile.json')
 
 def profile(path=PROFILE):
     value = json.loads(path.read_bytes())
-    if (set(value) - {'coding_enabled', 'generic_enabled', 'resource_enabled'} != {'schema_version', 'repository', 'base_ref', 'seed', 'min_free_bytes'}
+    if (set(value) - {'coding_enabled', 'generic_enabled', 'resource_enabled', 'operator_enabled'} != {'schema_version', 'repository', 'base_ref', 'seed', 'min_free_bytes'}
             or type(value.get('coding_enabled', False)) is not bool
             or type(value.get('generic_enabled', False)) is not bool
             or type(value.get('resource_enabled', False)) is not bool
+            or type(value.get('operator_enabled', False)) is not bool
             or value['schema_version'] != '0.1' or value['repository'] != REPOSITORY
             or not re.fullmatch('[0-9a-f]{40}', value['base_ref'])
             or value['seed'] != '/opt/personal-ai-brain/builder/repository.git'
@@ -78,7 +79,7 @@ class Runner:
         identifier = record['task_id']
         parent = self.store.workspaces / identifier
         parent.mkdir(mode=0o700)
-        if record['request']['task_type'] in (GENERIC_TYPE, RESOURCE_TYPE):
+        if record['request']['task_type'] in (GENERIC_TYPE, RESOURCE_TYPE, OPERATOR_TYPE):
             scratch = parent / 'scratch'
             scratch.mkdir(mode=0o700)
             return scratch
@@ -107,7 +108,8 @@ class Runner:
         deadline = time.monotonic() + record['request']['deadline_seconds']
         try:
             resource = record['request']['task_type'] == RESOURCE_TYPE
-            generic = record['request']['task_type'] in (GENERIC_TYPE, RESOURCE_TYPE)
+            operator = record['request']['task_type'] == OPERATOR_TYPE
+            generic = record['request']['task_type'] in (GENERIC_TYPE, RESOURCE_TYPE, OPERATOR_TYPE)
             reserved = {'attempts': 1, 'base_sha': record['request']['base_ref']}
             if not generic:
                 reserved['branch'] = 'builder/' + identifier
@@ -122,6 +124,9 @@ class Runner:
             if generic and not self.policy.get('generic_enabled', False):
                 self.store.transition(identifier, 'blocked', 'generic_not_enabled')
                 return True
+            if operator and not self.policy.get('operator_enabled', False):
+                self.store.transition(identifier, 'blocked', 'operator_not_enabled')
+                return True
             if resource and not self.policy.get('resource_enabled', False):
                 self.store.transition(identifier, 'blocked', 'resource_not_enabled')
                 return True
@@ -129,7 +134,14 @@ class Runner:
                 self.store.transition(identifier, 'blocked', 'insufficient_storage')
                 return True
             workspace = self.prepare(record, deadline)
-            grants, receipt = None, None
+            grants, receipt, operator_scope = None, None, None
+            if operator:
+                from .operator_scope import load_scope, ScopeDenied
+                try:
+                    operator_scope = load_scope(record['request']['scope_id'], record['request']['access'])
+                except (ScopeDenied, OSError):
+                    self.store.transition(identifier, 'blocked', 'operator_scope_unavailable')
+                    return True
             if resource:
                 from .work_resource_grants import ResourceGrantUnavailable, load_host_resource
                 try:
@@ -147,7 +159,11 @@ class Runner:
             output_artifacts = ()
             if generic:
                 from .work_generic import execute as generic_execute
-                if resource:
+                if operator:
+                    status, code, output_artifacts = generic_execute(
+                        record['request'], workspace, artifacts,
+                        lambda: self.guard(identifier, deadline), operator_scope=operator_scope)
+                elif resource:
                     status, code, output_artifacts = generic_execute(
                         record['request'], workspace, artifacts,
                         lambda: self.guard(identifier, deadline),

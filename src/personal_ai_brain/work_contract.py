@@ -12,6 +12,7 @@ REPOSITORY = 'Az1mutt/personal-ai-brain'
 TASK_TYPE = 'fixture.patch-test.v1'
 GENERIC_TYPE = 'workspace.python.v1'
 RESOURCE_TYPE = 'workspace.resource-python.v1'
+OPERATOR_TYPE = 'workspace.operator-python.v1'
 HOST_RESOURCE = 'homelab/host-snapshot'
 GENERIC_FIELDS = {'script', 'inputs'}
 GOAL = 'Create the deterministic Work Runner fixture artifact.'
@@ -55,14 +56,16 @@ def parse(raw):
         if not isinstance(value, dict):
             raise Rejected('invalid_fields')
         resource = value.get('task_type') == RESOURCE_TYPE
-        generic = value.get('task_type') in (GENERIC_TYPE, RESOURCE_TYPE)
+        operator = value.get('task_type') == OPERATOR_TYPE
+        generic = value.get('task_type') in (GENERIC_TYPE, RESOURCE_TYPE, OPERATOR_TYPE)
         expected_fields = (FIELDS | GENERIC_FIELDS | ({'resource_id'} if resource else set())
+                           | ({'scope_id', 'access'} if operator else set())
                            if generic else FIELDS)
         if set(value) != expected_fields:
             raise Rejected('invalid_fields')
         task_id(value['task_id'])
         coding = value['task_type'] == coding_policy.TYPE
-        if (value['schema_version'] != '0.1' or value['task_type'] not in (TASK_TYPE, coding_policy.TYPE, GENERIC_TYPE, RESOURCE_TYPE)
+        if (value['schema_version'] != '0.1' or value['task_type'] not in (TASK_TYPE, coding_policy.TYPE, GENERIC_TYPE, RESOURCE_TYPE, OPERATOR_TYPE)
                 or value['repository'] != REPOSITORY):
             raise Rejected('unsupported_contract')
         if coding:
@@ -94,6 +97,12 @@ def parse(raw):
             if (type(script) is not str or not 1 <= len(script.encode('utf-8')) <= 4096
                     or any(ord(ch) == 0 for ch in script)):
                 raise Rejected('invalid_generic_script')
+            if operator:
+                from .operator_scope import validate_selector, ScopeDenied
+                try:
+                    validate_selector(value['scope_id'], value['access'])
+                except ScopeDenied:
+                    raise Rejected('invalid_operator_selector') from None
             inputs = value['inputs']
             if resource and (value['resource_id'] != HOST_RESOURCE or inputs != []):
                 # A brokered input must never be caller-provided or impersonated.

@@ -123,7 +123,7 @@ def summary(record):
             raise ValueError('invalid_state_timestamp')
     result = {'status': status, 'artifacts_retained': True} if status in TERMINAL else None
     if status == 'succeeded' and record['request']['task_type'] in (
-            contract.GENERIC_TYPE, contract.RESOURCE_TYPE):
+            contract.GENERIC_TYPE, contract.RESOURCE_TYPE, contract.OPERATOR_TYPE):
         # Metadata only: no script/input/output body or private filesystem path
         # crosses the existing control transport. Never claim semantic success.
         artifacts = record.get('output_artifacts')
