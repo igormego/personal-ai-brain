@@ -123,7 +123,7 @@ def summary(record):
             raise ValueError('invalid_state_timestamp')
     result = {'status': status, 'artifacts_retained': True} if status in TERMINAL else None
     if status == 'succeeded' and record['request']['task_type'] in (
-            contract.GENERIC_TYPE, contract.RESOURCE_TYPE):
+            contract.GENERIC_TYPE, contract.RESOURCE_TYPE, contract.OPERATOR_TYPE):
         # Metadata only: no script/input/output body or private filesystem path
         # crosses the existing control transport. Never claim semantic success.
         artifacts = record.get('output_artifacts')
@@ -152,6 +152,15 @@ def summary(record):
                     or type(receipt['size']) is not int or not 1 <= receipt['size'] <= 4096):
                 raise ValueError('invalid_resource_receipt')
             result['resource_receipt'] = receipt
+    operator = record['request']['task_type'] == contract.OPERATOR_TYPE
+    if operator and result is not None:
+        # A failed/cancelled script can already have modified granted files.
+        # This is deliberately conservative; it is not a production receipt.
+        result['scope_id'] = record['request']['scope_id']
+        result['access'] = record['request']['access']
+        result['workspace_write_may_have_occurred'] = (
+            record['request']['access'] == 'write' and record['attempts'] == 1
+            and any(event['status'] == 'running' for event in record['history']))
     return {'task_id': contract.task_id(record['task_id']), 'status': status,
             'payload_hash': record['payload_hash'], 'attempts': record['attempts'],
             'cancel_requested': record['cancel_requested'],

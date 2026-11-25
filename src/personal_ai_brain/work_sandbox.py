@@ -25,7 +25,11 @@ def limits():
     resource.setrlimit(resource.RLIMIT_FSIZE, (1048576, 1048576))
     resource.setrlimit(resource.RLIMIT_NOFILE, (64, 64))
 
-def command(workspace, fixture, *, generic=False):
+def command(workspace, fixture, *, generic=False, operator_scope=None):
+    if operator_scope is not None:
+        from .operator_scope import ScopeGrant
+        if not generic or not isinstance(operator_scope, ScopeGrant):
+            raise ValueError('invalid_operator_scope')
     version = f'python{sys.version_info.major}.{sys.version_info.minor}'
     args = ['/usr/bin/bwrap', '--unshare-all', '--unshare-user', '--die-with-parent', '--new-session',
             '--disable-userns', '--assert-userns-disabled', '--uid', '65534', '--gid', '65534',
@@ -49,6 +53,9 @@ def command(workspace, fixture, *, generic=False):
     else:
         args.extend(['--bind', str(workspace), '/workspace',
                      '--ro-bind', str(workspace / '.git'), '/workspace/.git'])
+    if operator_scope is not None:
+        # Only the trusted grant loader supplies these fixed host mounts.
+        args.extend(operator_scope.mount_arguments())
     args.extend(['--ro-bind', str(fixture), '/fixture.py', '--chdir', '/workspace',
                  '/usr/bin/python3', '-I', '-B', '/fixture.py'])
     return args

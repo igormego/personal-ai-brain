@@ -96,6 +96,7 @@ def test_control_restart_after_handoff_reservation_is_not_reinvoked(setup, tmp_p
             client.invoke(*args)
             raise KeyboardInterrupt()
     transport = FakeTransport([json.dumps(req)])
+    transport.issues[1]['user'] = {'login':'igormego','id':55916200}
     registry = build_registry(tmp_path, None, Redactor(), CrashingClient())
     worker = Worker(tmp_path / 'control', transport, registry, Redactor())
     with pytest.raises(KeyboardInterrupt):
@@ -186,3 +187,18 @@ def test_original_registry_unchanged_and_new_operations_explicit(tmp_path):
         assert cap.argument_schema == other.argument_schema
         assert cap.risk_level == other.risk_level == 'read_only'
         assert cap.side_effect_class == other.side_effect_class == 'none'
+
+
+@pytest.mark.parametrize('operation', ['work.submit', 'work.status', 'work.cancel'])
+def test_work_transport_requires_authenticated_owner(setup, tmp_path, operation):
+    store, server, client, surface = setup
+    task = task_request(base_ref=BASE)
+    args = {'contract':task} if operation == 'work.submit' else {'task_id':task['task_id']}
+    req = control_request(capability=operation, arguments=args, requested_by='owner')
+    transport = FakeTransport([json.dumps(req)])
+    transport.issues[1]['user'] = {'login':'other','id':12345}
+    worker = Worker(tmp_path/'control', transport, build_registry(tmp_path,None,Redactor(),client),Redactor())
+    worker.tick()
+    assert transport.comments[0][1]['status'] == 'request_rejected'
+    assert transport.comments[0][1]['error'] == 'owner_auth_required'
+    assert not list((surface/'inbox').iterdir())
