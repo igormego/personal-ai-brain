@@ -43,4 +43,12 @@ def test_control_uses_fixed_distinct_mount_default_off():
     assert 'host_storage_snapshot=storage_file' in source
     assert 'Path("/host-audit/snapshot.json")' in source
     assert 'os.environ.get("PAB_HOST_AUDIT_ENABLED") == "1"' in source
-    assert "approved_effect_provider=" not in source
+    # A separate, explicitly enabled fixed Unix socket is now supported.
+    # Storage-only overlays still cannot activate this independent effect lane.
+    assert """    effect_provider = None
+    if os.environ.get('PAB_EFFECT_SOCKET_ENABLED') == '1':
+        from .host_effect_socket import HostEffectClient
+        effect_provider = HostEffectClient(Path('/host-effects/effect.sock'))
+""" in source
+    assert "approved_effect_provider=effect_provider" in source
+    assert "PAB_EFFECT_SOCKET_ENABLED" not in TEMPLATE.read_text(encoding="utf-8")

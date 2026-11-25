@@ -338,9 +338,9 @@ def build_registry(core_state: Path, reader_factory, redactor, work_client=None,
             ]},
             validate_media_selector, media_plan,
         ))
-    # This source-only lane cannot be activated by model-supplied arguments,
-    # environment variables or a private Issue. Only a separately deployed,
-    # operator-wired trusted adapter provides any effect authority.
+    # No model argument or private Issue can activate this lane. Only a
+    # separately deployed operator-wired trusted adapter provides authority;
+    # the normal registry has no effect capability without that provider.
     if approved_effect_provider is not None:
         from .approved_effect import EffectDenied, validate_arguments as effect_arguments
 

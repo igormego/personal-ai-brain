@@ -72,7 +72,7 @@ def test_real_switch_and_separately_approved_rollback_no_replay(setup):
     assert (slot/'current/main.py').read_bytes()==b'one'
     assert len(list(receipts.iterdir()))==2
 
-@pytest.mark.parametrize('change',['tamper','extra','symlink','hardlink','unregistered'])
+@pytest.mark.parametrize('change',['tamper','extra','symlink','hardlink','group-writable','unregistered'])
 def test_untrusted_release_never_activated(setup,change):
     adapter,releases,slot,receipts=setup
     rid,args=signed(adapter,3 if change=='unregistered' else 2)
@@ -84,6 +84,8 @@ def test_untrusted_release_never_activated(setup,change):
     elif change=='symlink':
         (directory/'main.py').unlink()
         (directory/'main.py').symlink_to(releases/'importer/1/main.py')
+    elif change=='group-writable':
+        (directory/'main.py').chmod(0o664)
     elif change=='hardlink':
         (directory/'main.py').unlink()
         os.link(releases/'importer/1/main.py',directory/'main.py')
