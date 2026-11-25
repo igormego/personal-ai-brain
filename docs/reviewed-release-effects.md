@@ -28,9 +28,9 @@ Provision a dedicated non-root pab-release service user, a narrowly shared
 pab-effects group for the socket peer, and the root-owned trusted module tree
 /opt/personal-ai-brain/effects/src. Do not add Docker, sudo, SSH keys or network.
 Install reviewed deploy/pab-release-effects.service only after checking the
-effective systemd constraints. Provision /run/pab-effects as service-owned,
-peer-group, setgid 2750 (including reboot recreation via operator-owned
-tmpfiles configuration). Its only socket is effect.sock. The actual Control
+effective systemd constraints. The reviewed systemd unit provisions /run/pab-effects as service-owned,
+peer-group, setgid 2750, recreated on service restart. Verify its effective
+mode and cleanup on the host. Its only socket is effect.sock. The actual Control
 UID is verified locally and configured, never guessed. The service requires
 a private 0700 state root, slots and reservations owned by pab-release;
 each slot directory 0700, lock file 0600, current symlink pointing to the
@@ -40,8 +40,9 @@ differs, plan a reviewed publication/read surface rather than loosening
 the private state tree. A synthetic slot is the first acceptance.
 
 Root-owned /etc/personal-ai-brain/effects has releases.json, peer.json and a
-32–64 byte verification.key readable only by the service as needed (no key
-in Git/Issues). Keep an independent approval signer, use existing signed
+32–64 byte verification.key root:pab-release mode 0640, using a private
+supplementary group distinct from the shared socket peer group (no key
+in Git/Issues). Control must not belong to that private group. Keep an independent approval signer, use existing signed
 effect plan contract, never let ChatGPT mint approval signatures. Example
 registry (synthetic only):
     {"schema_version":"0.1","slots":{"demo":{"target_id":1,"generations":{"1":"<manifest SHA256>","2":"<manifest SHA256>"}}}}

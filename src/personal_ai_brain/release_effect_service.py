@@ -5,6 +5,7 @@ executed by this service. The operator provisions fixed directories, group
 access, immutable packages, HMAC verifier and the socket mount.
 """
 import argparse
+import grp
 import os
 from pathlib import Path
 
@@ -31,7 +32,11 @@ def build():
             or peer['allowed_uid'] == os.geteuid()):
         raise EffectDenied('effect_denied')
     key = immutable_file(CONFIG/'verification.key',0,64)
-    if len(key)<32 or (CONFIG/'verification.key').stat().st_mode & 0o007:
+    key_info = (CONFIG/'verification.key').stat()
+    private_gid = grp.getgrnam('pab-release').gr_gid
+    if (len(key)<32 or key_info.st_mode & 0o007
+            or key_info.st_gid != private_gid or private_gid == os.getegid()
+            or private_gid not in os.getgroups()):
         raise EffectDenied('effect_denied')
     check_dir(STATE,os.geteuid(),private=True)
     adapter = ReleaseSlots(policy, RELEASES, STATE/'slots')
@@ -51,7 +56,7 @@ def main():
             print('release_effect_service_ready',flush=True)
             while True:
                 server.serve_one()
-    except (OSError,ValueError,RuntimeError):
+    except (OSError,ValueError,RuntimeError,KeyError):
         print('release_effect_service_stopped',flush=True)
         return 1
 

@@ -51,7 +51,7 @@ def immutable_file(path, owner, limit):
     with os.fdopen(os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK), 'rb') as f:
         info = os.fstat(f.fileno())
         if (not stat.S_ISREG(info.st_mode) or info.st_uid != owner or info.st_nlink != 1
-                or info.st_mode & 0o6222 or info.st_size > limit):
+                or info.st_mode & 0o6022 or info.st_size > limit):
             deny()
         data = f.read(limit+1)
     if len(data) > limit:
