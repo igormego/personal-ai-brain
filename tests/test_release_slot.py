@@ -88,7 +88,9 @@ def test_untrusted_release_never_activated(setup,change):
         (directory/'main.py').chmod(0o664)
     elif change=='hardlink':
         (directory/'main.py').unlink()
-        os.link(releases/'importer/1/main.py',directory/'main.py')
+        outside = releases.parent/'unregistered-file'
+        outside.write_bytes(b'two')
+        os.link(outside,directory/'main.py')
     with pytest.raises(EffectUncertain):
         broker(adapter,receipts).execute(args,request_id=rid)
     assert (slot/'current').readlink()==releases/'importer/1'
