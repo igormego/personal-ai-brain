@@ -76,6 +76,10 @@ def without_arr_worker(text):
     if text.count(storage) != 1:
         raise ValueError("candidate_baseline_mismatch")
     text = text.replace(storage, "", 1)
+    # The independent release/effect lane is not part of the historical image.
+    effect_arg = '        approved_effect_provider=effect_provider,\n'
+    if effect_arg in text:
+        text = replace_once(text, effect_arg, '')
     storage_arg = '        media_resource_provider=media_provider, host_storage_snapshot=storage_file,\n'
     if text.count(storage_arg) != 1:
         raise ValueError("candidate_baseline_mismatch")

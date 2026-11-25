@@ -113,19 +113,22 @@ class ApprovedEffectBroker:
     effect. A source that cannot provide this guarantee is not eligible.
     """
     def __init__(self, *, grants: dict[str, EffectGrant], adapter,
-                 verification_key: bytes, clock: Callable[[], datetime] | None = None):
+                 verification_key: bytes, clock: Callable[[], datetime] | None = None,
+                 reserve: Callable[[str, str], None] | None = None):
         if (type(grants) is not dict or not grants
                 or any(type(key) is not str or not isinstance(grant, EffectGrant)
                        or key != grant.resource_id for key, grant in grants.items())
                 or not isinstance(verification_key, bytes) or len(verification_key) < 32
                 or not callable(getattr(adapter, "read_current", None))
                 or not callable(getattr(adapter, "apply_cas", None))
-                or (clock is not None and not callable(clock))):
+                or (clock is not None and not callable(clock))
+                or (reserve is not None and not callable(reserve))):
             _deny()
         self._grants = dict(grants)
         self._adapter = adapter
         self._key = verification_key
         self._clock = clock or (lambda: datetime.now(timezone.utc))
+        self._reserve = reserve
 
     def execute(self, arguments: dict, *, request_id: str) -> dict:
         # The caller must separately bind the actual authenticated GitHub
@@ -166,6 +169,9 @@ class ApprovedEffectBroker:
                 or before[grant.field] != expected):
             _deny()  # Stale plan, not an invitation to retry or reinterpret.
 
+        if self._reserve is not None:
+            # A host-side durable reservation protects even direct socket replay.
+            self._reserve(request_id, plan['plan_hash'])
         try:
             # The adapter must provide its own last-moment compare-and-set
             # enforcement. The assistant supplies NO command or credential.

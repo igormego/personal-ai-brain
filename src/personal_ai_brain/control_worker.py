@@ -295,10 +295,15 @@ def serve(state=STATE, heartbeat=BEAT):
                     for resource in status_grants},
             )
 
+    effect_provider = None
+    if os.environ.get('PAB_EFFECT_SOCKET_ENABLED') == '1':
+        from .host_effect_socket import HostEffectClient
+        effect_provider = HostEffectClient(Path('/host-effects/effect.sock'))
     registry = build_registry(
         Path("/core-state"), lambda: RunReader(core_token),
         redactor, Client(), host_audit_snapshot=audit_file,
         media_resource_provider=media_provider, host_storage_snapshot=storage_file,
+        approved_effect_provider=effect_provider,
     )
     def pulse():
         atomic_json(heartbeat, {"time": time.time()})

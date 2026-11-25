@@ -1,0 +1,38 @@
+[Unit]
+Description=Personal AI Brain reviewed release effect adapter
+After=local-fs.target
+
+[Service]
+Type=simple
+# Operator must provision a dedicated non-root user and reviewed peer group.
+User=pab-release
+Group=pab-effects
+SupplementaryGroups=pab-release
+RuntimeDirectory=pab-effects
+RuntimeDirectoryMode=2750
+RuntimeDirectoryPreserve=yes
+Environment=PYTHONPATH=/opt/personal-ai-brain/effects/src
+ExecStart=/usr/bin/python3 -B -m personal_ai_brain.release_effect_service serve
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateNetwork=yes
+RestrictAddressFamilies=AF_UNIX
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+ReadWritePaths=/var/lib/personal-ai-brain/effects /run/pab-effects
+TasksMax=8
+MemoryMax=128M
+CPUQuota=50%
+LimitCORE=0
+Restart=no
+
+[Install]
+WantedBy=multi-user.target
