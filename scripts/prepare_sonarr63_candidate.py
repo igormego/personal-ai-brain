@@ -37,7 +37,8 @@ def without_arr_worker(text):
                 # authenticated issue author on every newly admitted request.
                 if ((capability.id == "media.resource_read"
                         and arguments.get("resource_id") in ("arr/radarr", "arr/sonarr", "arr/seerr"))
-                        or capability.id in ("homelab.resource_read", "effect.execute")):
+                        or capability.id in ("homelab.resource_read", "effect.execute",
+                                              "work.submit", "work.status", "work.cancel")):
                     author = issue.get("user")
                     if (type(author) is not dict
                             or type(author.get("id")) is not int

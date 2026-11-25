@@ -105,3 +105,16 @@ def test_owner_grant_reuses_runner_and_manifest(tmp_path, monkeypatch):
     assert record['status']=='succeeded' and record['attempts']==1
     assert summary(record)['result']['goal_semantics_verified'] is False
     assert not store.submit(request,BASE)[1]
+
+
+def test_interrupted_write_status_does_not_claim_no_effect(tmp_path):
+    request = parsed(access='write')
+    store = Store(tmp_path)
+    store.submit(request,BASE)
+    store.transition(request['task_id'],'reserved','worker_reserved',attempts=1)
+    store.transition(request['task_id'],'running','sandbox_starting')
+    Runner(store,{'base_ref':BASE}).recovery()
+    result = summary(store.load(request['task_id']))['result']
+    assert result['status'] == 'interrupted'
+    assert result['scope_id'] == 'media-analysis'
+    assert result['workspace_write_may_have_occurred'] is True

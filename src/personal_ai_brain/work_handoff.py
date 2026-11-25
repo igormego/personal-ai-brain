@@ -152,6 +152,15 @@ def summary(record):
                     or type(receipt['size']) is not int or not 1 <= receipt['size'] <= 4096):
                 raise ValueError('invalid_resource_receipt')
             result['resource_receipt'] = receipt
+    operator = record['request']['task_type'] == contract.OPERATOR_TYPE
+    if operator and result is not None:
+        # A failed/cancelled script can already have modified granted files.
+        # This is deliberately conservative; it is not a production receipt.
+        result['scope_id'] = record['request']['scope_id']
+        result['access'] = record['request']['access']
+        result['workspace_write_may_have_occurred'] = (
+            record['request']['access'] == 'write' and record['attempts'] == 1
+            and any(event['status'] == 'running' for event in record['history']))
     return {'task_id': contract.task_id(record['task_id']), 'status': status,
             'payload_hash': record['payload_hash'], 'attempts': record['attempts'],
             'cancel_requested': record['cancel_requested'],
