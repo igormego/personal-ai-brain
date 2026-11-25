@@ -10,6 +10,7 @@ Group=pab-effects
 SupplementaryGroups=pab-release
 RuntimeDirectory=pab-effects
 RuntimeDirectoryMode=2750
+RuntimeDirectoryPreserve=yes
 Environment=PYTHONPATH=/opt/personal-ai-brain/effects/src
 ExecStart=/usr/bin/python3 -B -m personal_ai_brain.release_effect_service serve
 UMask=0077

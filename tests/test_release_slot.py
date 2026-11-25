@@ -101,3 +101,22 @@ def test_stale_plan_cannot_switch(setup):
     with pytest.raises(EffectDenied):
         broker(adapter,receipts).execute(args,request_id=rid)
     assert len(list(receipts.iterdir()))==1
+
+
+def test_local_review_signer_exact_packet_and_recheck(setup):
+    from personal_ai_brain.release_admin import prepare,approve
+    adapter,releases,slot,receipts=setup
+    packet=prepare(adapter,'importer',2,now=NOW)
+    with pytest.raises(EffectDenied):
+        approve(adapter,KEY,packet,'wrong',now=NOW)
+    from copy import deepcopy
+    tampered=deepcopy(packet)
+    tampered['manifests']['desired_manifest']='0'*64
+    with pytest.raises(EffectDenied):
+        approve(adapter,KEY,tampered,packet['plan']['plan_hash'],now=NOW)
+    approved=approve(adapter,KEY,packet,packet['plan']['plan_hash'],now=NOW)
+    assert approved['capability']=='effect.execute'
+    assert broker(adapter,receipts).execute(approved['arguments'],
+        request_id=approved['request_id'])['observed']==2
+    with pytest.raises(EffectDenied):
+        approve(adapter,KEY,packet,packet['plan']['plan_hash'],now=NOW)

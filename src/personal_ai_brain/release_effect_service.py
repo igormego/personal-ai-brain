@@ -8,6 +8,7 @@ import argparse
 import grp
 import os
 from pathlib import Path
+import signal
 
 from .approved_effect import ApprovedEffectBroker, EffectDenied
 from .effect_plan import plan_effect
@@ -20,7 +21,7 @@ RELEASES = Path('/opt/personal-ai-brain/releases')
 STATE = Path('/var/lib/personal-ai-brain/effects')
 SOCKET = Path('/run/pab-effects/effect.sock')
 
-def build():
+def load_configuration():
     # Protect every ancestor of immutable configuration and release roots.
     for directory in (CONFIG, RELEASES):
         for ancestor in (directory,*directory.parents):
@@ -40,10 +41,14 @@ def build():
         raise EffectDenied('effect_denied')
     check_dir(STATE,os.geteuid(),private=True)
     adapter = ReleaseSlots(policy, RELEASES, STATE/'slots')
+    return adapter,key,peer['allowed_uid']
+
+def build():
+    adapter,key,uid = load_configuration()
     journal = EffectReservations(STATE/'reservations')
     broker = ApprovedEffectBroker(grants=adapter.grants,adapter=adapter,
                                   verification_key=key,reserve=journal)
-    return adapter,broker,peer['allowed_uid']
+    return adapter,broker,uid
 
 def main():
     parser = argparse.ArgumentParser()
@@ -51,6 +56,9 @@ def main():
     parser.parse_args()
     try:
         _,broker,uid = build()
+        def stop(_signum,_frame):
+            raise SystemExit(0)
+        signal.signal(signal.SIGTERM,stop)
         with HostEffectSocketServer(SOCKET,allowed_uid=uid,broker=broker,
                                     socket_mode=0o660) as server:
             print('release_effect_service_ready',flush=True)

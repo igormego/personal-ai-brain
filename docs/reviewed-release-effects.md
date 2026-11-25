@@ -30,7 +30,11 @@ pab-effects group for the socket peer, and the root-owned trusted module tree
 Install reviewed deploy/pab-release-effects.service only after checking the
 effective systemd constraints. The reviewed systemd unit provisions /run/pab-effects as service-owned,
 peer-group, setgid 2750, recreated on service restart. Verify its effective
-mode and cleanup on the host. Its only socket is effect.sock. The actual Control
+mode, normal SIGTERM socket cleanup and retained directory inode on restart.
+Its only socket is effect.sock. A crash may leave a stale socket: stop and
+reconcile locally; never unlink an unknown live socket. Mount the socket
+**directory** read-only into Control, not the socket inode, so normal service
+restart can recreate the listener. The actual Control
 UID is verified locally and configured, never guessed. The service requires
 a private 0700 state root, slots and reservations owned by pab-release;
 each slot directory 0700, lock file 0600, current symlink pointing to the
@@ -42,8 +46,18 @@ the private state tree. A synthetic slot is the first acceptance.
 Root-owned /etc/personal-ai-brain/effects has releases.json, peer.json and a
 32–64 byte verification.key root:pab-release mode 0640, using a private
 supplementary group distinct from the shared socket peer group (no key
-in Git/Issues). Control must not belong to that private group. Keep an independent approval signer, use existing signed
-effect plan contract, never let ChatGPT mint approval signatures. Example
+in Git/Issues). Control must not belong to that private group. The installed local-only `release_admin` module is the approval signer.
+Run as the authorized operator under the dedicated service identity (with its
+private key group). No Control or Work Runner invocation of this CLI.
+`python3 -m personal_ai_brain.release_admin prepare demo 2` emits a review
+packet with exact plan, request ID and current/candidate manifest digests.
+Review that packet, then pass it on stdin to
+`python3 -m personal_ai_brain.release_admin approve --confirm <plan_hash>`
+within its five-minute validity. It rechecks both releases and emits only
+the scoped request ID and effect arguments. The existing private Issues
+transport can submit those arguments; never transfer the HMAC key.
+This deliberately still requires independent approval; no unattended signer
+or policy-managed artifact publisher is activated here. Example
 registry (synthetic only):
     {"schema_version":"0.1","slots":{"demo":{"target_id":1,"generations":{"1":"<manifest SHA256>","2":"<manifest SHA256>"}}}}
 peer.json contains exactly {"allowed_uid": <verified Control UID>}.

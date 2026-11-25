@@ -180,6 +180,21 @@ class ReleaseSlots:
         with self._lock(state):
             return {'id':target_id,'generation':self._current(name,versions,state)}
 
+    def review_transition(self,plan):
+        name,versions,state = self._slot(plan['resource_id'],plan['target_id'])
+        grant = self.grants[plan['resource_id']]
+        if (plan['operation'] != grant.operation or plan['field'] != grant.field
+                or plan['principal'] != grant.principal or plan['policy_version'] != grant.policy_version
+                or type(plan['expected']) is not int or type(plan['desired']) is not int
+                or plan['expected'] == plan['desired']):
+            deny()
+        with self._lock(state):
+            if self._current(name,versions,state) != plan['expected']:
+                deny()
+            self._release(name,versions,plan['desired'])
+            return {'expected_manifest':versions[str(plan['expected'])],
+                    'desired_manifest':versions[str(plan['desired'])]}
+
     def apply_cas(self,plan):
         name,versions,state = self._slot(plan['resource_id'],plan['target_id'])
         with self._lock(state):
