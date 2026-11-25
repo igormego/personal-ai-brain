@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 
+import pytest
 import yaml
 
 from personal_ai_brain.state_quality import FreshnessPolicy, ProjectStateQualityChecker
@@ -84,6 +85,64 @@ def test_valid_single_project_state_has_no_quality_findings() -> None:
     ).check()
 
     assert report.findings == []
+
+
+@pytest.mark.parametrize(
+    ("verified", "expected_codes"),
+    [
+        ("2026-10-27", []),
+        ("2024-02-29", ["state_stale_by_policy"]),
+        ("2026-10-20", []),
+        ("2026-10-19", ["state_stale_by_policy"]),
+        ("2026-10-28", ["verification_date_in_future"]),
+        *[
+            (value, ["verification_date_invalid"])
+            for value in (
+                "2026-02-29",
+                "2026-04-31",
+                "2026-13-01",
+                "20261027",
+                "2026-W44-2",
+                "20261019",
+                "2026-W44-3",
+                "2026-10-27T00:00:00",
+                "2026-10-27T00:00:00Z",
+                "2026-10-27T00:00:00+00:00",
+                "2026-10-27 00:00:00",
+                " 2026-10-27",
+                "2026-10-27 ",
+                "2026-10-27\n",
+                "2026-1-2",
+            )
+        ],
+    ],
+)
+def test_verification_date_requires_canonical_calendar_date(
+    verified: str, expected_codes: list[str]
+) -> None:
+    central = "Az1mutt/personal-project-brain"
+    path = "projects/example/state.yaml"
+    project_map = {
+        "projects": [
+            {
+                "id": "example",
+                "name": "Example",
+                "storage": "central",
+                "state_path": path,
+                "core_attention": "active",
+            }
+        ]
+    }
+    reader = FakeReader(
+        {
+            (central, "core/project-map.yaml", "main"): dump(project_map),
+            (central, path, "main"): dump(valid_state(storage=path, verified=verified)),
+        }
+    )
+
+    report = ProjectStateQualityChecker(reader, today=date(2026, 10, 27)).check()
+
+    assert [finding.code for finding in report.findings] == expected_codes
 
 
 def test_sync_storage_mismatch_is_an_error() -> None:
