@@ -17,7 +17,7 @@ from .movie_request_socket import PLAN, REQUEST, checked_receipt, movie_request_
 ROOT = Path("/opt/personal-ai-brain/movie-request")
 APPROVAL = Path("/etc/personal-ai-brain/movie-request/approval.json")
 LEDGER = Path("/var/lib/personal-ai-brain/movie-control-ledger/requests")
-NODE = Path("/usr/bin/node")
+NODE = ROOT / "runtime" / "bin" / "node"
 APPROVAL_LIFETIME = 900
 WRITE_DEADLINE = 63
 
@@ -88,15 +88,33 @@ def reserve_movie(directory, request_id, tmdb_id):
 
 def submit(tmdb_id, env):
     try:
-        output = subprocess.run(
-            [str(NODE), str(ROOT / "controller" / "request-cli.mjs"), str(tmdb_id)],
+        proc = subprocess.run(
+            [str(NODE), str(ROOT / "controller" / "request-cli.mjs"),
+             "--tmdb-id", str(tmdb_id), "--execute"],
             input=b"", stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            env=env, timeout=WRITE_DEADLINE, check=True,
-        ).stdout
-        if len(output) > MAX_RESPONSE:
+            env=env, timeout=WRITE_DEADLINE, check=False,
+        )
+        if proc.returncode not in (0, 2) or len(proc.stdout) > 16_384:
             raise EffectUncertain("effect_outcome_uncertain")
-        return checked_receipt(json.loads(output, object_pairs_hook=_pairs_unique), tmdb_id)
-    except (OSError, ValueError, subprocess.SubprocessError, RecursionError):
+        raw = json.loads(proc.stdout, object_pairs_hook=_pairs_unique)
+        audit = raw["audit"]
+        identity = raw["identity"]
+        if raw["contract_version"] != "0.1" or audit["decision"] != raw["decision"]:
+            raise EffectUncertain("effect_outcome_uncertain")
+        if audit["mutation_attempted"] is False:
+            allowed = ("contract_version", "decision", "reason", "identity", "evidence")
+            return checked_receipt({**{key: raw[key] for key in allowed},
+                                    "mutation_attempted": False}, tmdb_id)
+        result = raw["request"]
+        if (proc.returncode != 0 or audit["mutation_attempted"] is not True
+                or raw["decision"] != "requested" or identity["tmdb_id"] != tmdb_id
+                or result["tmdb_id"] != tmdb_id or result["is4k"] is not False
+                or audit["tmdb_id"] != tmdb_id or audit["request_id"] != result["id"]
+                or audit["request_status"] != result["status"]):
+            raise EffectUncertain("effect_outcome_uncertain")
+        return checked_receipt({"tmdb_id": tmdb_id, "seerr_request_id": result["id"],
+                                "request_status": result["status"], "effect_performed": True}, tmdb_id)
+    except (OSError, ValueError, TypeError, KeyError, subprocess.SubprocessError, RecursionError):
         raise EffectUncertain("effect_outcome_uncertain") from None
 
 

@@ -3,8 +3,6 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
-import shutil
-import subprocess
 from unittest.mock import Mock
 from uuid import uuid4
 
@@ -12,7 +10,7 @@ import pytest
 
 from personal_ai_brain.approved_effect import EffectDenied, EffectUncertain
 from personal_ai_brain.control import Redactor, Rejected, build_registry
-from personal_ai_brain.movie_request_service import execute, reserve_movie, verify_approval
+from personal_ai_brain.movie_request_service import execute, reserve_movie, submit, verify_approval
 from personal_ai_brain.movie_request_socket import PLAN, REQUEST, MovieSocketClient, checked_receipt
 
 
@@ -109,47 +107,36 @@ def test_registry_defaults_off_and_accepts_only_a_tmdb_id(tmp_path):
         registry.resolve(REQUEST, {"tmdb_id": 42, "execute": True})
 
 
-@pytest.mark.skipif(shutil.which("node") is None, reason="requires Node.js")
-def test_node_entry_calls_controller_once_and_projects_only_matching_readback(tmp_path):
-    entry = tmp_path / "request-cli.mjs"
-    shutil.copyfile(Path(__file__).resolve().parents[1] / "deploy/movie-request-cli.mjs", entry)
-    (tmp_path / "sqlite.mjs").write_text("export function readMovieIntelligence() {}")
-    (tmp_path / "radarr.mjs").write_text("export function readRadarr() {}")
-    (tmp_path / "seerr-request.mjs").write_text("""
-import { appendFileSync } from 'node:fs';
-export function createMovieRequestController() {
-  return {request_movie(selector, options) {
-    appendFileSync('calls', JSON.stringify([selector, options]) + '\\n');
-    if (process.env.CASE === 'managed') return {
-      contract_version: '0.1', decision: 'already_managed', reason: 'radarr_manages_movie',
-      identity: {tmdb_id: 42, title: 'Fixture', year: 2020}, evidence: null,
-      audit: {mutation_attempted: false}, ignored: 'private',
-    };
-    return {
-      decision: 'requested', identity: {tmdb_id: 42}, audit: {mutation_attempted: true},
-      request: {tmdb_id: process.env.CASE === 'mismatch' ? 43 : 42, id: 7, status: 2, is4k: false},
-      ignored: 'private',
-    };
-  }};
-}
-""")
-
-    def invoke(case="", *args):
-        return subprocess.run([shutil.which("node"), str(entry), *args], cwd=tmp_path,
-                              env={**os.environ, "CASE": case}, capture_output=True, timeout=10)
-
-    assert invoke("", "--execute").returncode == 2
-    assert not (tmp_path / "calls").exists()
-    result = invoke("", "42")
-    assert result.returncode == 0
-    assert json.loads(result.stdout) == {
+def test_existing_request_cli_called_once_and_only_matching_readback_exits(monkeypatch):
+    upstream = {
+        "contract_version": "0.1", "decision": "requested", "identity": {"tmdb_id": 42},
+        "request": {"tmdb_id": 42, "id": 7, "status": 2, "is4k": False},
+        "audit": {"decision": "requested", "mutation_attempted": True, "tmdb_id": 42,
+                  "request_id": 7, "request_status": 2},
+        "intended_action": {"private": "never returned"},
+    }
+    proc = Mock(returncode=0, stdout=json.dumps(upstream).encode())
+    run = Mock(return_value=proc)
+    monkeypatch.setattr("personal_ai_brain.movie_request_service.subprocess.run", run)
+    assert submit(42, {}) == {
         "tmdb_id": 42, "seerr_request_id": 7, "request_status": 2, "effect_performed": True,
     }
-    assert (tmp_path / "calls").read_text().splitlines() == ['[{"tmdb_id":42},{"execute":true}]']
-    managed = invoke("managed", "42")
-    assert json.loads(managed.stdout)["decision"] == "already_managed"
-    mismatch = invoke("mismatch", "42")
-    assert mismatch.returncode == 2 and not mismatch.stdout
+    run.assert_called_once()
+    call = run.call_args.args[0]
+    assert call[1].endswith("/controller/request-cli.mjs")
+    assert call[2:] == ["--tmdb-id", "42", "--execute"]
+    upstream["request"]["tmdb_id"] = 43
+    proc.stdout = json.dumps(upstream).encode()
+    with pytest.raises(EffectUncertain):
+        submit(42, {})
+    proc.stdout = json.dumps({
+        **upstream, "decision": "already_managed", "reason": "radarr_manages_movie",
+        "evidence": None, "identity": {"tmdb_id": 42, "title": "Fixture", "year": 2020},
+        "audit": {"decision": "already_managed", "mutation_attempted": False},
+    }).encode()
+    result = submit(42, {})
+    assert result["decision"] == "already_managed"
+    assert "intended_action" not in result
 
 
 @pytest.mark.skipif(os.name != "posix", reason="Control worker uses flock and SIGALRM")
