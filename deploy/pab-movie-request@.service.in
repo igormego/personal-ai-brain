@@ -1,0 +1,36 @@
+[Unit]
+Description=Personal AI Brain fixed Seerr movie controller adapter
+
+[Service]
+Type=exec
+User=@CONTROL_UID@
+Group=@CONTROL_GID@
+StandardInput=socket
+StandardOutput=null
+StandardError=null
+Environment=PYTHONPATH=/opt/personal-ai-brain/movie-request/src
+Environment=PAB_MOVIE_REQUEST_ALLOWED=0
+LoadCredential=movie-sources.json:/etc/personal-ai-brain/movie-request/sources.json
+ExecStart=/usr/bin/python3 -B -m personal_ai_brain.movie_request_service
+BindReadOnlyPaths=@MOVIE_DB_DIRECTORY@:/run/pab-movie-db
+BindPaths=@CONTROL_REQUESTS_LEDGER@:/var/lib/personal-ai-brain/movie-control-ledger/requests
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ReadWritePaths=/var/lib/personal-ai-brain/movie-control-ledger/requests
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX AF_INET
+IPAddressDeny=any
+IPAddressAllow=@APP_IPV4_PINS@
+TasksMax=24
+MemoryMax=384M
+RuntimeMaxSec=85
+LimitCORE=0

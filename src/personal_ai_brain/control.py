@@ -119,7 +119,10 @@ class Registry:
         approved_effect = (capability.id == 'effect.execute'
                            and capability.risk_level == 'approved_effect'
                            and capability.side_effect_class == 'trusted_host_effect')
-        if not (bounded_work or approved_effect) and (capability.risk_level != "read_only" or capability.side_effect_class != "none"):
+        movie_request = (capability.id == 'media.request_movie'
+                         and capability.risk_level == 'approved_effect'
+                         and capability.side_effect_class == 'seerr_movie_request')
+        if not (bounded_work or approved_effect or movie_request) and (capability.risk_level != "read_only" or capability.side_effect_class != "none"):
             raise Rejected("capability_policy_denied")
         self.capabilities[capability.id] = capability
 
@@ -133,7 +136,7 @@ class Registry:
 def build_registry(core_state: Path, reader_factory, redactor, work_client=None,
                    media_plan_provider=None, host_audit_snapshot: Path | None = None,
                    *, media_resource_provider=None, host_storage_snapshot: Path | None = None,
-                   approved_effect_provider=None):
+                   approved_effect_provider=None, movie_request_provider=None):
     def runtime_health(_):
         health, code = runtime.health(core_state, core_state / "heartbeat.json")
         last = health.get("last_run", {})
@@ -337,6 +340,23 @@ def build_registry(core_state: Path, reader_factory, redactor, work_client=None,
                      "title": {"type": "string"}, "year": {"type": "integer"}}},
             ]},
             validate_media_selector, media_plan,
+        ))
+    if movie_request_provider is not None:
+        from .approved_effect import EffectDenied
+        from .movie_request_socket import movie_target
+
+        def request_selector(value):
+            try:
+                return movie_target(value)
+            except EffectDenied:
+                raise Rejected("invalid_movie_selector") from None
+
+        caps.append(Capability(
+            "media.request_movie", "Submit one separately approved Seerr movie request",
+            "approved_effect",
+            {"type": "object", "additionalProperties": False, "required": ["tmdb_id"],
+             "properties": {"tmdb_id": {"type": "integer", "minimum": 1}}},
+            request_selector, movie_request_provider, "seerr_movie_request",
         ))
     # No model argument or private Issue can activate this lane. Only a
     # separately deployed operator-wired trusted adapter provides authority;
