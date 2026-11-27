@@ -111,6 +111,7 @@ class Worker:
                 if ((capability.id == "media.resource_read"
                         and arguments.get("resource_id") in ("arr/radarr", "arr/sonarr", "arr/seerr"))
                         or capability.id in ("homelab.resource_read", "effect.execute",
+                                              "media.plan_movie", "media.request_movie",
                                               "work.submit", "work.status", "work.cancel")):
                     author = issue.get("user")
                     if (type(author) is not dict
@@ -129,12 +130,17 @@ class Worker:
                         record.update(status="request_rejected", error="request_conflict")
                     else:
                         if existing["status"] == "processing":
+                            error = ("effect_outcome_uncertain_needs_review"
+                                     if capability.id == "media.request_movie"
+                                     else "interrupted_execution_not_retried")
                             existing.update(status="capability_execution_failed",
-                                            error="interrupted_execution_not_retried",
+                                            error=error,
                                             execution_end=timestamp())
                             self.save(request_path, existing)
                         record.update(status="duplicate", original_status=existing["status"],
                                       original_issue=existing["transport_issue"], result=existing.get("result"))
+                        if capability.id == "media.request_movie":
+                            record["error"] = existing.get("error")
                 else:
                     record.update(payload_hash=payload_hash, status="processing", execution_start=timestamp())
                     self.save(request_path, record)  # fsync BEFORE any handler invocation.
@@ -142,7 +148,7 @@ class Worker:
                         with deadline():
                             if capability.id in {'work.submit', 'work.status', 'work.cancel'}:
                                 result = capability.handler(arguments, request_id=correlation)
-                            elif capability.id == "effect.execute":
+                            elif capability.id in ("effect.execute", "media.request_movie"):
                                 result = capability.handler(arguments, request_id=correlation)
                             else:
                                 result = capability.handler(arguments)
@@ -154,7 +160,9 @@ class Worker:
                     except CapabilityFailed:
                         record.update(status="capability_execution_failed", error="source_read_failure")
                     except ExecutionTimeout:
-                        record.update(status="capability_execution_failed", error="execution_timeout")
+                        error = ("effect_outcome_uncertain_needs_review"
+                                 if capability.id == "media.request_movie" else "execution_timeout")
+                        record.update(status="capability_execution_failed", error=error)
                     except Exception:
                         record.update(status="capability_execution_failed", error="handler_failed")
                     record["execution_end"] = timestamp()
@@ -299,11 +307,20 @@ def serve(state=STATE, heartbeat=BEAT):
     if os.environ.get('PAB_EFFECT_SOCKET_ENABLED') == '1':
         from .host_effect_socket import HostEffectClient
         effect_provider = HostEffectClient(Path('/host-effects/effect.sock'))
+    movie_plan_provider = movie_request_provider = None
+    if os.environ.get("PAB_MOVIE_PLAN_ENABLED") == "1":
+        from .movie_request_socket import MovieSocketClient
+
+        client = MovieSocketClient(Path("/movie-control/movie.sock"))
+        movie_plan_provider = client.plan
+        if os.environ.get("PAB_MOVIE_REQUEST_ENABLED") == "1":
+            movie_request_provider = client.request
     registry = build_registry(
         Path("/core-state"), lambda: RunReader(core_token),
         redactor, Client(), host_audit_snapshot=audit_file,
         media_resource_provider=media_provider, host_storage_snapshot=storage_file,
         approved_effect_provider=effect_provider,
+        media_plan_provider=movie_plan_provider, movie_request_provider=movie_request_provider,
     )
     def pulse():
         atomic_json(heartbeat, {"time": time.time()})

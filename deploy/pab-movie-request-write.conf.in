@@ -1,0 +1,5 @@
+# Install only under the separate write-activation approval.
+[Service]
+Environment=PAB_MOVIE_REQUEST_ALLOWED=1
+BindPaths=@CONTROL_REQUESTS_LEDGER@:/var/lib/personal-ai-brain/movie-control-ledger/requests
+ReadWritePaths=/var/lib/personal-ai-brain/movie-control-ledger/requests
