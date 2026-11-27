@@ -38,6 +38,7 @@ def without_arr_worker(text):
                 if ((capability.id == "media.resource_read"
                         and arguments.get("resource_id") in ("arr/radarr", "arr/sonarr", "arr/seerr"))
                         or capability.id in ("homelab.resource_read", "effect.execute",
+                                              "media.plan_movie", "media.request_movie",
                                               "work.submit", "work.status", "work.cancel")):
                     author = issue.get("user")
                     if (type(author) is not dict
@@ -57,7 +58,7 @@ def without_arr_worker(text):
     if text.count(effect_import) != 1:
         raise ValueError("candidate_baseline_mismatch")
     text = text.replace(effect_import, "", 1)
-    effect_call = '''                            elif capability.id == "effect.execute":
+    effect_call = '''                            elif capability.id in ("effect.execute", "media.request_movie"):
                                 result = capability.handler(arguments, request_id=correlation)
 '''
     if text.count(effect_call) != 1:
@@ -71,6 +72,27 @@ def without_arr_worker(text):
     if text.count(effect_errors) != 1:
         raise ValueError("candidate_baseline_mismatch")
     text = text.replace(effect_errors, "", 1)
+    # Strip #38's result classification when reproducing the old image.
+    text = replace_once(text,
+        '''                            error = ("effect_outcome_uncertain_needs_review"
+                                     if capability.id == "media.request_movie"
+                                     else "interrupted_execution_not_retried")
+                            existing.update(status="capability_execution_failed",
+                                            error=error,
+''',
+        '''                            existing.update(status="capability_execution_failed",
+                                            error="interrupted_execution_not_retried",
+''')
+    text = replace_once(text, '''                        if capability.id == "media.request_movie":
+                            record["error"] = existing.get("error")
+''', "")
+    text = replace_once(text,
+        '''                        error = ("effect_outcome_uncertain_needs_review"
+                                 if capability.id == "media.request_movie" else "execution_timeout")
+                        record.update(status="capability_execution_failed", error=error)
+''',
+        '''                        record.update(status="capability_execution_failed", error="execution_timeout")
+''')
     storage = ('    storage_file = (Path("/storage-audit/storage.json")\n'
                '                    if os.environ.get("PAB_HOST_STORAGE_ENABLED") == "1" else None)\n')
     if text.count(storage) != 1:
@@ -80,6 +102,9 @@ def without_arr_worker(text):
     effect_arg = '        approved_effect_provider=effect_provider,\n'
     if effect_arg in text:
         text = replace_once(text, effect_arg, '')
+    text = replace_once(text,
+        '        media_plan_provider=movie_plan_provider, movie_request_provider=movie_request_provider,\n',
+        '')
     storage_arg = '        media_resource_provider=media_provider, host_storage_snapshot=storage_file,\n'
     if text.count(storage_arg) != 1:
         raise ValueError("candidate_baseline_mismatch")
